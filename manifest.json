@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Lovable.dev Assistant",
+  "version": "1.0.0",
+  "description": "Intelligent prompt assistance and conversation management for Lovable.dev",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://lovable.dev/*",
+    "https://api.anthropic.com/*",
+    "https://*.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://lovable.dev/projects/*"],
+      "js": [
+        "content_scripts/lovable-detector.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Lovable.dev Assistant"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/styles/*.css"],
+      "matches": ["https://lovable.dev/*"]
+    }
+  ]
+}

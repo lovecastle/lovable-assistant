@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lovable Assistant</title>
+  <style>
+    body { width: 350px; padding: 20px; font-family: system-ui, sans-serif; margin: 0; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { color: #667eea; margin: 0; font-size: 18px; }
+    .config-group { margin-bottom: 15px; }
+    .config-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+    .config-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { background: #667eea; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
+    .btn-test { background: #38a169; }
+    .status { padding: 10px; margin-top: 10px; border-radius: 4px; text-align: center; font-size: 14px; }
+    .status.success { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
+    .status.error { background: #fed7d7; color: #742a2a; border: 1px solid #feb2b2; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Lovable Assistant</h1>
+    <p>Configure your API credentials</p>
+  </div>
+
+  <div class="config-group">
+    <label for="claude-api-key">Claude API Key</label>
+    <input type="password" id="claude-api-key" placeholder="sk-ant-...">
+  </div>
+
+  <div class="config-group">
+    <label for="supabase-url">Supabase URL</label>
+    <input type="url" id="supabase-url" placeholder="https://your-project.supabase.co">
+  </div>
+
+  <div class="config-group">
+    <label for="supabase-key">Supabase Key</label>
+    <input type="password" id="supabase-key" placeholder="eyJ...">
+  </div>
+
+  <button class="btn" id="save-config">Save Configuration</button>
+  <button class="btn btn-test" id="test-connection">Test Connection</button>
+  
+  <div id="status" class="status" style="display: none;"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

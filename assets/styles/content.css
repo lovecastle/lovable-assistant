@@ -1,0 +1,67 @@
+/* Lovable Assistant Dialog Styles */
+.lovable-assistant-dialog {
+  position: fixed;
+  top: 100px;
+  left: 100px;
+  width: 400px;
+  height: 600px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(20px);
+  overflow: hidden;
+}
+
+.lovable-assistant-dialog * {
+  box-sizing: border-box;
+}
+
+/* Header */
+.la-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 12px 12px 0 0;
+  user-select: none;
+}
+
+.la-header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.la-drag-handle {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: space-between;
+  cursor: move;
+  margin-left: 12px;
+}
+
+.la-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Buttons */
+.la-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
