@@ -8,7 +8,7 @@ class MarkdownFormatter {
           background: #f8fafc;
           border: 1px solid #e2e8f0;
           border-radius: 8px;
-          padding: 16px;
+          padding: 10px;
           margin: 16px 0;
           overflow-x: auto;
           font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;

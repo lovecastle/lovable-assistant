@@ -241,7 +241,7 @@ class LovableDetector {
       ">
         <div id="drag-handle" style="
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white; padding: 16px; border-radius: 12px 12px 0 0;
+          color: white; padding: 10px; border-radius: 12px 12px 0 0;
           display: flex; justify-content: space-between; align-items: center;
           cursor: move; user-select: none;
         ">
@@ -491,7 +491,7 @@ class LovableDetector {
   formatMessage(content) {
     return content
       .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
-        return `<pre style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.5; color: #1a202c;"><code>${this.escapeHtml(code.trim())}</code></pre>`;
+        return `<pre style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 16px 0; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.5; color: #1a202c;"><code>${this.escapeHtml(code.trim())}</code></pre>`;
       })
       .replace(/`([^`\n]+)`/g, '<code style="background: #f1f5f9; color: #d63384; padding: 3px 6px; border-radius: 4px; font-family: \'SF Mono\', Monaco, monospace; font-size: 0.9em;">$1</code>')
       .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: 600; margin: 20px 0 8px 0; color: #1a202c;">$1</h3>')
@@ -689,7 +689,7 @@ class LovableDetector {
     
     content.innerHTML = `
       <div id="chat-messages" style="
-        flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc;
+        flex: 1; overflow-y: auto; padding: 10px; background: #f8fafc;
         display: flex; flex-direction: column;
       ">
         <div style="
@@ -702,7 +702,7 @@ class LovableDetector {
       </div>
       
       <div style="
-        border-top: 1px solid #e2e8f0; padding: 16px; background: white;
+        border-top: 1px solid #e2e8f0; padding: 10px; background: white;
         border-radius: 0 0 12px 12px;
       ">
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
@@ -805,14 +805,14 @@ class LovableDetector {
     
     content.innerHTML = `
       <div id="chat-messages" style="
-        flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc;
+        flex: 1; overflow-y: auto; padding: 10px; background: #f8fafc;
         display: flex; flex-direction: column;
       ">
         <!-- Chat messages will be loaded here -->
       </div>
       
       <div style="
-        border-top: 1px solid #e2e8f0; padding: 16px; background: white;
+        border-top: 1px solid #e2e8f0; padding: 10px; background: white;
         border-radius: 0 0 12px 12px;
       ">
         <!-- Back Button Top Right -->
