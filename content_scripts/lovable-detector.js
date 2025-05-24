@@ -1002,9 +1002,32 @@ class LovableDetector {
   }
 
   async loadHistoryMessages() {
-    // For now, we'll create sample chat messages
-    // In the future, this will load from Supabase
+    // Load both sample messages and captured real conversations
     this.allHistoryMessages = this.generateSampleMessages();
+    
+    // Add detected messages from conversation capture if available
+    if (window.conversationCapture && window.conversationCapture.detectedMessages) {
+      const detectedMessages = window.conversationCapture.detectedMessages.map(msg => ({
+        id: msg.id,
+        timestamp: new Date(msg.timestamp),
+        speaker: msg.speaker,
+        content: msg.content,
+        category: this.mapCategoriesToOldFormat(msg.categories),
+        categories: msg.categories,
+        isDetected: true,
+        techTerms: msg.techTerms || [],
+        codeSnippets: msg.codeSnippets || []
+      }));
+      
+      // Add to the beginning so real conversations appear first
+      this.allHistoryMessages.unshift(...detectedMessages);
+      
+      console.log(`📚 Loaded ${detectedMessages.length} real conversations and ${this.allHistoryMessages.length - detectedMessages.length} sample messages`);
+    }
+    
+    // Sort all messages by timestamp (newest first for better UX)
+    this.allHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
     this.filteredHistoryMessages = [...this.allHistoryMessages];
     this.renderHistoryMessages();
   }
@@ -1013,80 +1036,83 @@ class LovableDetector {
     const sampleMessages = [
       // Extension Development Conversations
       {
-        id: 1,
-        timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
+        id: 'sample_1',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
         speaker: 'user',
         content: 'Let\'s create a Chrome extension for Lovable.dev that provides AI assistance',
-        category: 'planning'
+        category: 'planning',
+        isSample: true
       },
       {
-        id: 2,
-        timestamp: new Date(Date.now() - 1000 * 60 * 13),
+        id: 'sample_2',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 + 120000),
         speaker: 'lovable',
         content: 'Great idea! I\'ll help you create a powerful Chrome extension. Here\'s what we can build:\n\n**Core Features:**\n1. 🤖 AI Chat Assistant\n2. 📚 Development History\n3. 🧠 Project Knowledge Base\n4. ⚙️ Settings & Configuration\n\nLet\'s start with the manifest.json and basic structure.',
-        category: 'planning'
+        category: 'planning',
+        isSample: true
       },
       {
-        id: 3,
-        timestamp: new Date(Date.now() - 1000 * 60 * 10),
+        id: 'sample_3',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
         speaker: 'user',
         content: 'How do we detect when we\'re on a Lovable.dev project page?',
-        category: 'coding'
+        category: 'coding',
+        isSample: true
       },
       {
-        id: 4,
-        timestamp: new Date(Date.now() - 1000 * 60 * 8),
+        id: 'sample_4',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12 + 120000),
         speaker: 'lovable',
         content: 'We can use content scripts to detect Lovable.dev project pages. Here\'s the approach:\n\n```javascript\nclass LovableDetector {\n  detectLovablePage() {\n    const url = window.location.href;\n    const isProjectPage = url.includes(\'lovable.dev/projects/\');\n    \n    if (isProjectPage) {\n      this.projectId = this.extractProjectId(url);\n      this.showReadyNotification();\n    }\n  }\n}\n```\n\nThis will monitor the URL and activate when we\'re on a project page.',
-        category: 'coding'
-      },
-      {
-        id: 5,
-        timestamp: new Date(Date.now() - 1000 * 60 * 5),
-        speaker: 'user',
-        content: 'The keyboard shortcut Cmd+K stops working after a few seconds. How can we fix this?',
-        category: 'debugging'
-      },
-      {
-        id: 6,
-        timestamp: new Date(Date.now() - 1000 * 60 * 3),
-        speaker: 'lovable',
-        content: 'This is a common issue with SPAs! The JavaScript frameworks can interfere with event listeners. Here\'s a robust solution:\n\n```javascript\n// Continuous monitoring approach\nsetInterval(() => {\n  this.ensureKeyboardShortcuts();\n}, 2000);\n\n// Multiple event targets\ndocument.addEventListener(\'keydown\', handler, true);\nwindow.addEventListener(\'keydown\', handler, true);\ndocument.body.addEventListener(\'keydown\', handler, true);\n```\n\nThis ensures shortcuts stay active even when the page dynamically loads content.',
-        category: 'debugging'
-      },
-      {
-        id: 7,
-        timestamp: new Date(Date.now() - 1000 * 60 * 1),
-        speaker: 'user',
-        content: 'Can you help me style the chat interface to look modern and professional?',
-        category: 'design'
-      },
-      {
-        id: 8,
-        timestamp: new Date(Date.now() - 1000 * 30),
-        speaker: 'lovable',
-        content: 'Absolutely! Here\'s a modern chat design with gradients and animations:\n\n```css\n.chat-bubble {\n  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n  border-radius: 18px;\n  padding: 12px 16px;\n  box-shadow: 0 4px 12px rgba(0,0,0,0.1);\n  transition: transform 0.2s ease;\n}\n\n.chat-bubble:hover {\n  transform: translateY(-1px);\n}\n```\n\nThis creates a premium look with subtle hover effects!',
-        category: 'design'
-      },
-      
-      // Previous sample conversations
-      {
-        id: 9,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        speaker: 'user',
-        content: 'How do I add a dark mode toggle to my React app?',
-        category: 'coding'
-      },
-      {
-        id: 10,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2 + 1000 * 60 * 2),
-        speaker: 'lovable',
-        content: 'I can help you implement a dark mode toggle! Here\'s a complete solution using React hooks and CSS variables:\n\n```jsx\nimport { useState, useEffect } from \'react\';\n\nfunction App() {\n  const [darkMode, setDarkMode] = useState(false);\n\n  useEffect(() => {\n    const isDark = localStorage.getItem(\'darkMode\') === \'true\';\n    setDarkMode(isDark);\n    document.documentElement.classList.toggle(\'dark\', isDark);\n  }, []);\n\n  const toggleDarkMode = () => {\n    const newMode = !darkMode;\n    setDarkMode(newMode);\n    localStorage.setItem(\'darkMode\', newMode);\n    document.documentElement.classList.toggle(\'dark\', newMode);\n  };\n\n  return (\n    <button onClick={toggleDarkMode}>\n      {darkMode ? \'☀️\' : \'🌙\'} Toggle Dark Mode\n    </button>\n  );\n}\n```',
-        category: 'coding'
+        category: 'coding',
+        isSample: true
       }
     ];
     
     return sampleMessages;
+  }
+
+  mapCategoriesToOldFormat(categories) {
+    if (!categories || !categories.primary) return 'other';
+    
+    const mapping = {
+      'Planning': 'planning',
+      'Functioning': 'coding',
+      'Designing': 'design',
+      'Debugging': 'debugging',
+      'Deployment': 'deployment'
+    };
+    
+    return mapping[categories.primary[0]] || 'other';
+  }
+
+  // Method to add detected messages from conversation capture
+  addDetectedMessage(messageData) {
+    if (!this.allHistoryMessages) this.allHistoryMessages = [];
+    
+    const formattedMessage = {
+      id: messageData.id,
+      timestamp: new Date(messageData.timestamp),
+      speaker: messageData.speaker,
+      content: messageData.content,
+      category: this.mapCategoriesToOldFormat(messageData.categories),
+      categories: messageData.categories,
+      isDetected: true
+    };
+    
+    // Avoid duplicates
+    if (!this.allHistoryMessages.find(msg => msg.id === formattedMessage.id)) {
+      this.allHistoryMessages.push(formattedMessage);
+      
+      // Re-sort messages by timestamp (newest first)
+      this.allHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      // Update filtered messages if currently viewing history
+      if (this.filteredHistoryMessages) {
+        this.filteredHistoryMessages = [...this.allHistoryMessages];
+        this.applyHistoryFilters();
+      }
+    }
   }
 
   applyHistoryFilters() {
@@ -1139,6 +1165,9 @@ class LovableDetector {
       
       return true;
     });
+    
+    // Sort filtered messages by timestamp (newest first)
+    this.filteredHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
     this.renderHistoryMessages();
   }
@@ -1194,7 +1223,7 @@ class LovableDetector {
     this.filteredHistoryMessages
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       .forEach(msg => {
-        this.addHistoryMessage(msg.content, msg.speaker, msg.timestamp);
+        this.addHistoryMessage(msg.content, msg.speaker, msg.timestamp, msg);
       });
     
     // Update search matches after rendering
@@ -1206,7 +1235,7 @@ class LovableDetector {
     container.scrollTop = container.scrollHeight;
   }
 
-  addHistoryMessage(content, speaker, timestamp) {
+  addHistoryMessage(content, speaker, timestamp, messageData = {}) {
     const messagesContainer = document.getElementById('chat-messages');
     if (!messagesContainer) return;
 
@@ -1219,6 +1248,14 @@ class LovableDetector {
     let textColor = speaker === 'user' ? 'white' : '#2d3748';
     let speakerIcon = speaker === 'user' ? '👤' : '🤖';
     let speakerName = speaker === 'user' ? 'You' : 'Lovable';
+
+    // Add indicator for real vs sample messages
+    let messageTypeIndicator = '';
+    if (messageData.isDetected) {
+      messageTypeIndicator = '<span style="background: #10b981; color: white; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-left: 4px; font-weight: 600;">LIVE</span>';
+    } else if (messageData.isSample) {
+      messageTypeIndicator = '<span style="background: #6b7280; color: white; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-left: 4px; font-weight: 600;">DEMO</span>';
+    }
 
     const messageBubble = document.createElement('div');
     messageBubble.style.cssText = `
@@ -1234,7 +1271,7 @@ class LovableDetector {
         font-size: 11px; opacity: 0.7; margin-bottom: 4px;
         ${speaker === 'user' ? 'text-align: right;' : ''}
       ">
-        ${speakerIcon} ${speakerName} • ${timeString}
+        ${speakerIcon} ${speakerName} • ${timeString} ${messageTypeIndicator}
       </div>
     `;
 

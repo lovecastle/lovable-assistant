@@ -20,8 +20,11 @@
     {
       "matches": ["https://lovable.dev/projects/*"],
       "js": [
-        "content_scripts/lovable-detector.js"
+        "content_scripts/lovable-detector.js",
+        "content_scripts/conversation-capture.js",
+        "content_scripts/ui-injector.js"
       ],
+      "css": ["assets/styles/content.css"],
       "run_at": "document_end"
     }
   ],
@@ -41,7 +44,10 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/styles/*.css"],
+      "resources": [
+        "assets/styles/*.css",
+        "content_scripts/*.js"
+      ],
       "matches": ["https://lovable.dev/*"]
     }
   ]
