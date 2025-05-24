@@ -822,7 +822,7 @@ class LovableDetector {
             padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
           ">← Back</button>
           <div style="color: #718096; font-size: 12px;">
-            <span id="message-count">0</span> messages found
+            <span id="message-count">0</span>
           </div>
         </div>
         
