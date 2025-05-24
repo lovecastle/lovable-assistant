@@ -6,7 +6,7 @@ class MarkdownFormatter {
       .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
         return `<pre style="
           background: #f8fafc;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #c9cfd7;
           border-radius: 8px;
           padding: 10px;
           margin: 16px 0;
@@ -22,8 +22,8 @@ class MarkdownFormatter {
       .replace(/`([^`\n]+)`/g, '<code style="background: #f1f5f9; color: #d63384; padding: 3px 6px; border-radius: 4px; font-family: \'SF Mono\', Monaco, monospace; font-size: 0.9em;">$1</code>')
       
       // Headers
-      .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: 600; margin: 20px 0 8px 0; color: #1a202c; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2 style="font-size: 20px; font-weight: 600; margin: 24px 0 12px 0; color: #1a202c; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">$1</h2>')
+      .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: 600; margin: 20px 0 8px 0; color: #1a202c; border-bottom: 1px solid #c9cfd7; padding-bottom: 4px;">$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2 style="font-size: 20px; font-weight: 600; margin: 24px 0 12px 0; color: #1a202c; border-bottom: 2px solid #c9cfd7; padding-bottom: 6px;">$1</h2>')
       .replace(/^# (.*$)/gm, '<h1 style="font-size: 24px; font-weight: 700; margin: 24px 0 16px 0; color: #1a202c; border-bottom: 3px solid #3182ce; padding-bottom: 8px;">$1</h1>')
       
       // Bold, italic, and combinations
@@ -53,7 +53,7 @@ class MarkdownFormatter {
       })
       
       // Horizontal rules
-      .replace(/^---+$/gm, '<hr style="border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; border-radius: 1px;">')
+      .replace(/^---+$/gm, '<hr style="border: none; border-top: 2px solid #c9cfd7; margin: 24px 0; border-radius: 1px;">')
       
       // Process lists
       .replace(/^(\s*)[-*+] (.+)$/gm, function(match, indent, item) {

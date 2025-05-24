@@ -235,7 +235,7 @@ class LovableDetector {
     dialog.innerHTML = `
       <div id="assistant-window" style="
         position: fixed; top: 100px; left: 100px; width: 450px; height: 600px;
-        background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+        background: white; border: 1px solid #c9cfd7; border-radius: 12px;
         box-shadow: 0 20px 40px rgba(0,0,0,0.15); z-index: 10001;
         font-family: system-ui, sans-serif; display: flex; flex-direction: column;
       ">
@@ -289,7 +289,7 @@ class LovableDetector {
         <div style="display: grid; gap: 12px; margin-bottom: 24px;">
           <!-- Project Manager -->
           <div class="feature-card" data-feature="chat" style="
-            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
             text-align: left; position: relative; overflow: hidden;
           ">
@@ -314,7 +314,7 @@ class LovableDetector {
           
           <!-- Prompt History -->
           <div class="feature-card" data-feature="history" style="
-            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
             text-align: left; position: relative; overflow: hidden;
           ">
@@ -339,7 +339,7 @@ class LovableDetector {
           
           <!-- Project Knowledge -->
           <div class="feature-card" data-feature="knowledge" style="
-            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
             text-align: left; position: relative; overflow: hidden;
           ">
@@ -369,7 +369,7 @@ class LovableDetector {
           
           <!-- Settings -->
           <div class="feature-card" data-feature="settings" style="
-            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
             text-align: left; position: relative; overflow: hidden;
           ">
@@ -394,7 +394,7 @@ class LovableDetector {
         </div>
         
         <div style="
-          background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+          background: #f7fafc; border: 1px solid #c9cfd7; border-radius: 8px;
           padding: 12px; font-size: 13px; color: #4a5568; text-align: center;
         ">
           💡 <strong>Tip:</strong> Press <kbd style="
@@ -478,7 +478,7 @@ class LovableDetector {
     const messageBubble = document.createElement('div');
     messageBubble.style.cssText = `
       background: ${bgColor}; color: ${textColor}; padding: 12px 16px; border-radius: 18px;
-      max-width: 85%; border: ${type === 'assistant' ? '1px solid #e2e8f0' : 'none'};
+      max-width: 85%; border: ${type === 'assistant' ? '1px solid #c9cfd7' : 'none'};
       line-height: 1.4; word-wrap: break-word; font-size: 14px;
     `;
 
@@ -491,7 +491,7 @@ class LovableDetector {
   formatMessage(content) {
     return content
       .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
-        return `<pre style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 16px 0; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.5; color: #1a202c;"><code>${this.escapeHtml(code.trim())}</code></pre>`;
+        return `<pre style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 8px; padding: 10px; margin: 16px 0; overflow-x: auto; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; line-height: 1.5; color: #1a202c;"><code>${this.escapeHtml(code.trim())}</code></pre>`;
       })
       .replace(/`([^`\n]+)`/g, '<code style="background: #f1f5f9; color: #d63384; padding: 3px 6px; border-radius: 4px; font-family: \'SF Mono\', Monaco, monospace; font-size: 0.9em;">$1</code>')
       .replace(/^### (.*$)/gm, '<h3 style="font-size: 18px; font-weight: 600; margin: 20px 0 8px 0; color: #1a202c;">$1</h3>')
@@ -503,7 +503,7 @@ class LovableDetector {
       .replace(/~~(.*?)~~/g, '<del style="text-decoration: line-through; color: #718096;">$1</del>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #3182ce; text-decoration: underline;">$1</a>')
       .replace(/^> (.*$)/gm, '<blockquote style="border-left: 4px solid #3182ce; margin: 16px 0; padding: 12px 20px; background: #f7fafc; font-style: italic; color: #4a5568; border-radius: 0 6px 6px 0;">$1</blockquote>')
-      .replace(/^---+$/gm, '<hr style="border: none; border-top: 2px solid #e2e8f0; margin: 24px 0;">')
+      .replace(/^---+$/gm, '<hr style="border: none; border-top: 2px solid #c9cfd7; margin: 24px 0;">')
       .replace(/^[-*+] (.+)$/gm, '<li style="margin: 6px 0; padding-left: 8px;">$1</li>')
       .replace(/^\d+\. (.+)$/gm, '<li style="margin: 6px 0; padding-left: 8px;">$1</li>')
       .replace(/(<li[^>]*>.*?<\/li>(?:\s*<li[^>]*>.*?<\/li>)*)/gs, '<ul style="margin: 12px 0; padding-left: 24px; list-style-type: disc; color: #2d3748;">$1</ul>')
@@ -521,7 +521,7 @@ class LovableDetector {
     typingDiv.id = 'typing-indicator';
     typingDiv.style.cssText = 'display: flex; justify-content: flex-start; margin-bottom: 12px;';
     typingDiv.innerHTML = `
-      <div style="background: white; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 18px; max-width: 85%;">
+      <div style="background: white; border: 1px solid #c9cfd7; padding: 12px 16px; border-radius: 18px; max-width: 85%;">
         <div style="display: flex; gap: 4px; align-items: center;">
           <div style="width: 8px; height: 8px; background: #cbd5e0; border-radius: 50%; animation: pulse 1.5s infinite;"></div>
           <div style="width: 8px; height: 8px; background: #cbd5e0; border-radius: 50%; animation: pulse 1.5s infinite 0.2s;"></div>
@@ -607,7 +607,7 @@ class LovableDetector {
       });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = '#e2e8f0';
+        card.style.borderColor = '#c9cfd7';
         card.style.transform = 'translateY(0)';
         card.style.boxShadow = 'none';
       });
@@ -702,18 +702,18 @@ class LovableDetector {
       </div>
       
       <div style="
-        border-top: 1px solid #e2e8f0; padding: 10px; background: white;
+        border-top: 1px solid #c9cfd7; padding: 10px; background: white;
         border-radius: 0 0 12px 12px;
       ">
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
           <button id="back-to-welcome-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
           ">← Back</button>
         </div>
         <div style="display: flex; gap: 8px;">
           <textarea id="chat-input" placeholder="Ask me anything about your project..." style="
-            flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            flex: 1; padding: 12px; border: 1px solid #c9cfd7; border-radius: 8px;
             font-family: inherit; font-size: 14px; resize: none; min-height: 40px;
             max-height: 120px; outline: none; background: white; color: #2d3748;
           "></textarea>
@@ -743,12 +743,12 @@ class LovableDetector {
       <div style="padding: 20px;">
         <div style="margin-bottom: 20px;">
           <button id="back-to-welcome-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
           ">← Back to Welcome</button>
         </div>
         
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
             🔑 API Configuration
           </h3>
@@ -761,7 +761,7 @@ class LovableDetector {
           ">Open Settings</button>
         </div>
         
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
             📊 Usage & Limits
           </h3>
@@ -770,7 +770,7 @@ class LovableDetector {
           </p>
         </div>
         
-        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
             🎨 Appearance
           </h3>
@@ -812,13 +812,13 @@ class LovableDetector {
       </div>
       
       <div style="
-        border-top: 1px solid #e2e8f0; padding: 10px; background: white;
+        border-top: 1px solid #c9cfd7; padding: 10px; background: white;
         border-radius: 0 0 12px 12px;
       ">
         <!-- Back Button Top Right -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <button id="back-to-welcome-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
           ">← Back</button>
           <div style="color: #718096; font-size: 12px;">
@@ -832,7 +832,7 @@ class LovableDetector {
             Filter by:
           </div>
           <select id="date-filter" style="
-            padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
             font-size: 14px; background: white; color: #4a5568; min-width: 80px;
           ">
             <option value="all">Date</option>
@@ -843,7 +843,7 @@ class LovableDetector {
           </select>
           
           <select id="category-filter" style="
-            padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
             font-size: 14px; background: white; color: #4a5568; min-width: 90px;
           ">
             <option value="all">Category</option>
@@ -856,7 +856,7 @@ class LovableDetector {
           </select>
           
           <select id="speaker-filter" style="
-            padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
             font-size: 14px; background: white; color: #4a5568; min-width: 80px;
           ">
             <option value="all">Speaker</option>
@@ -868,15 +868,15 @@ class LovableDetector {
         <!-- Search Section with Navigation -->
         <div style="display: flex; gap: 8px;">
           <input type="text" id="search-input" placeholder="Search in conversations..." style="
-            flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px;
+            flex: 1; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
             font-family: inherit; font-size: 14px; outline: none; background: white; color: #2d3748;
           ">
           <button id="search-prev-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
           " disabled>Back</button>
           <button id="search-next-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
           " disabled>Next</button>
         </div>
@@ -1223,7 +1223,7 @@ class LovableDetector {
     const messageBubble = document.createElement('div');
     messageBubble.style.cssText = `
       background: ${bgColor}; color: ${textColor}; padding: 12px 16px; border-radius: 18px;
-      max-width: 85%; border: ${speaker === 'lovable' ? '1px solid #e2e8f0' : 'none'};
+      max-width: 85%; border: ${speaker === 'lovable' ? '1px solid #c9cfd7' : 'none'};
       line-height: 1.4; word-wrap: break-word; font-size: 14px; position: relative;
     `;
 
