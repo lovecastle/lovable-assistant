@@ -1085,9 +1085,8 @@ class LovableDetector {
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
   escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return string.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
   }
-}
 }
 
 // Initialize the detector
