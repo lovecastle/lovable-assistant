@@ -12,16 +12,8 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     
-    // Setup keyboard shortcuts with continuous monitoring
+    // Setup keyboard shortcuts once
     this.setupKeyboardShortcuts();
-    
-    // Monitor and re-register shortcuts every 2 seconds to prevent loss
-    this.shortcutMonitorInterval = setInterval(() => {
-      this.ensureKeyboardShortcuts();
-    }, 2000);
-    
-    // Also re-register on page interactions that might interfere
-    this.setupPageMonitoring();
   }
 
   detectLovablePage() {
@@ -60,19 +52,6 @@ class LovableDetector {
   }
 
   setupKeyboardShortcuts() {
-    // Remove existing listeners if they exist
-    if (this.handleKeydown) {
-      document.removeEventListener('keydown', this.handleKeydown, true);
-      window.removeEventListener('keydown', this.handleKeydown, true);
-      document.removeEventListener('keydown', this.handleKeydown, false);
-      window.removeEventListener('keydown', this.handleKeydown, false);
-      
-      if (document.body) {
-        document.body.removeEventListener('keydown', this.handleKeydown, true);
-        document.body.removeEventListener('keydown', this.handleKeydown, false);
-      }
-    }
-    
     // Create bound function once
     this.handleKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -84,78 +63,16 @@ class LovableDetector {
       }
     };
     
-    // Add listeners with both capture and bubble phases for maximum coverage
+    // Add listeners
     document.addEventListener('keydown', this.handleKeydown, true);
     window.addEventListener('keydown', this.handleKeydown, true);
-    document.addEventListener('keydown', this.handleKeydown, false);
-    window.addEventListener('keydown', this.handleKeydown, false);
-    
-    // Also add to body specifically (in case document listeners get overridden)
-    if (document.body) {
-      document.body.addEventListener('keydown', this.handleKeydown, true);
-      document.body.addEventListener('keydown', this.handleKeydown, false);
-    }
-    
-    // Mark that shortcuts are registered
-    this.shortcutsRegistered = true;
-    this.lastShortcutRegistration = Date.now();
     
     console.log('🎹 Keyboard shortcuts registered at', new Date().toLocaleTimeString());
   }
 
-  ensureKeyboardShortcuts() {
-    // Simple but effective: just re-register shortcuts regularly
-    const timeSinceLastRegistration = Date.now() - (this.lastShortcutRegistration || 0);
-    
-    if (!this.shortcutsRegistered || timeSinceLastRegistration > 5000) {
-      console.log('🔄 Re-registering keyboard shortcuts (monitoring)');
-      this.setupKeyboardShortcuts();
-    }
-  }
 
-  setupPageMonitoring() {
-    // Re-register shortcuts when the page changes or loads new content
-    const observer = new MutationObserver((mutations) => {
-      let shouldReRegister = false;
-      
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Check if significant DOM changes occurred
-          mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === Node.ELEMENT_NODE && 
-                (node.tagName === 'SCRIPT' || node.classList?.contains('app') || 
-                 node.id?.includes('root') || node.id?.includes('app'))) {
-              shouldReRegister = true;
-            }
-          });
-        }
-      });
-      
-      if (shouldReRegister) {
-        console.log('🔄 Page content changed, re-registering shortcuts');
-        setTimeout(() => this.setupKeyboardShortcuts(), 500);
-      }
-    });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
 
-    // Re-register on focus events (when user returns to tab)
-    window.addEventListener('focus', () => {
-      console.log('🔄 Window focused, ensuring shortcuts');
-      setTimeout(() => this.setupKeyboardShortcuts(), 100);
-    });
-
-    // Re-register on visibility change
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        console.log('🔄 Tab visible, ensuring shortcuts');
-        setTimeout(() => this.setupKeyboardShortcuts(), 100);
-      }
-    });
-  }
 
   toggleAssistant() {
     console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog);
@@ -665,15 +582,9 @@ class LovableDetector {
 
   // Cleanup method
   destroy() {
-    if (this.shortcutMonitorInterval) {
-      clearInterval(this.shortcutMonitorInterval);
-    }
-    
     if (this.handleKeydown) {
       document.removeEventListener('keydown', this.handleKeydown, true);
       window.removeEventListener('keydown', this.handleKeydown, true);
-      document.removeEventListener('keydown', this.handleKeydown, false);
-      window.removeEventListener('keydown', this.handleKeydown, false);
     }
     
     if (this.assistantDialog) {
