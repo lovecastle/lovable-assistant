@@ -11,9 +11,17 @@ class LovableDetector {
 
   init() {
     this.detectLovablePage();
-    setTimeout(() => {
-      this.setupKeyboardShortcuts();
-    }, 1000);
+    
+    // Setup keyboard shortcuts with continuous monitoring
+    this.setupKeyboardShortcuts();
+    
+    // Monitor and re-register shortcuts every 2 seconds to prevent loss
+    this.shortcutMonitorInterval = setInterval(() => {
+      this.ensureKeyboardShortcuts();
+    }, 2000);
+    
+    // Also re-register on page interactions that might interfere
+    this.setupPageMonitoring();
   }
 
   detectLovablePage() {
@@ -52,8 +60,20 @@ class LovableDetector {
   }
 
   setupKeyboardShortcuts() {
-    document.removeEventListener('keydown', this.handleKeydown);
+    // Remove existing listeners if they exist
+    if (this.handleKeydown) {
+      document.removeEventListener('keydown', this.handleKeydown, true);
+      window.removeEventListener('keydown', this.handleKeydown, true);
+      document.removeEventListener('keydown', this.handleKeydown, false);
+      window.removeEventListener('keydown', this.handleKeydown, false);
+      
+      if (document.body) {
+        document.body.removeEventListener('keydown', this.handleKeydown, true);
+        document.body.removeEventListener('keydown', this.handleKeydown, false);
+      }
+    }
     
+    // Create bound function once
     this.handleKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         console.log('🤖 Assistant shortcut triggered');
@@ -64,11 +84,82 @@ class LovableDetector {
       }
     };
     
+    // Add listeners with both capture and bubble phases for maximum coverage
     document.addEventListener('keydown', this.handleKeydown, true);
     window.addEventListener('keydown', this.handleKeydown, true);
+    document.addEventListener('keydown', this.handleKeydown, false);
+    window.addEventListener('keydown', this.handleKeydown, false);
+    
+    // Also add to body specifically (in case document listeners get overridden)
+    if (document.body) {
+      document.body.addEventListener('keydown', this.handleKeydown, true);
+      document.body.addEventListener('keydown', this.handleKeydown, false);
+    }
+    
+    // Mark that shortcuts are registered
+    this.shortcutsRegistered = true;
+    this.lastShortcutRegistration = Date.now();
+    
+    console.log('🎹 Keyboard shortcuts registered at', new Date().toLocaleTimeString());
+  }
+
+  ensureKeyboardShortcuts() {
+    // Simple but effective: just re-register shortcuts regularly
+    const timeSinceLastRegistration = Date.now() - (this.lastShortcutRegistration || 0);
+    
+    if (!this.shortcutsRegistered || timeSinceLastRegistration > 5000) {
+      console.log('🔄 Re-registering keyboard shortcuts (monitoring)');
+      this.setupKeyboardShortcuts();
+    }
+  }
+
+  setupPageMonitoring() {
+    // Re-register shortcuts when the page changes or loads new content
+    const observer = new MutationObserver((mutations) => {
+      let shouldReRegister = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          // Check if significant DOM changes occurred
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE && 
+                (node.tagName === 'SCRIPT' || node.classList?.contains('app') || 
+                 node.id?.includes('root') || node.id?.includes('app'))) {
+              shouldReRegister = true;
+            }
+          });
+        }
+      });
+      
+      if (shouldReRegister) {
+        console.log('🔄 Page content changed, re-registering shortcuts');
+        setTimeout(() => this.setupKeyboardShortcuts(), 500);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Re-register on focus events (when user returns to tab)
+    window.addEventListener('focus', () => {
+      console.log('🔄 Window focused, ensuring shortcuts');
+      setTimeout(() => this.setupKeyboardShortcuts(), 100);
+    });
+
+    // Re-register on visibility change
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        console.log('🔄 Tab visible, ensuring shortcuts');
+        setTimeout(() => this.setupKeyboardShortcuts(), 100);
+      }
+    });
   }
 
   toggleAssistant() {
+    console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog);
+    
     if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
       console.log('🔒 Closing assistant dialog');
       this.assistantDialog.remove();
@@ -128,13 +219,41 @@ class LovableDetector {
     
     setTimeout(() => {
       this.makeDraggable();
-      this.setupChatFunctionality();
+      this.showWelcomePage(); // Start with welcome page instead of chat
     }, 50);
   }
 
   extractProjectId(url) {
     const match = url.match(/\/projects\/([^\/\?]+)/);
     return match ? match[1] : null;
+  }
+
+  extractProjectName() {
+    // Try to get project name from the page
+    const nameElement = document.querySelector('p.hidden.truncate.text-sm.font-medium.md\\:block');
+    if (nameElement && nameElement.textContent.trim()) {
+      return nameElement.textContent.trim();
+    }
+    
+    // Fallback: try other common selectors
+    const fallbackSelectors = [
+      'h1[data-testid="project-name"]',
+      '.project-name',
+      'h1',
+      'title'
+    ];
+    
+    for (const selector of fallbackSelectors) {
+      const element = document.querySelector(selector);
+      if (element && element.textContent.trim()) {
+        const text = element.textContent.trim();
+        if (text !== 'Lovable' && text.length > 0) {
+          return text;
+        }
+      }
+    }
+    
+    return this.projectId || 'Unknown Project';
   }
 
   escapeHtml(text) {
@@ -174,41 +293,18 @@ class LovableDetector {
           display: flex; justify-content: space-between; align-items: center;
           cursor: move; user-select: none;
         ">
-          <h3 style="margin: 0; font-size: 16px;">🤖 AI Chat Assistant</h3>
-          <button id="close-btn" onclick="document.getElementById('lovable-assistant-dialog').remove(); window.lovableDetector.assistantDialog = null;" style="
+          <h3 id="dialog-title" style="margin: 0; font-size: 16px;">🤖 Lovable Assistant</h3>
+          <button id="close-btn" style="
             background: rgba(255,255,255,0.2); border: none; color: white;
             padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 16px;
           ">×</button>
         </div>
         
-        <div id="chat-messages" style="
-          flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc;
+        <div id="dialog-content" style="
+          flex: 1; overflow-y: auto; background: #f8fafc;
           display: flex; flex-direction: column;
         ">
-          <div style="
-            background: #e6fffa; border: 1px solid #81e6d9; border-radius: 18px;
-            padding: 12px 16px; margin-bottom: 12px; font-size: 14px; color: #234e52;
-            align-self: flex-start; max-width: 85%;
-          ">
-            👋 Hello! I'm your AI assistant for <strong>${this.projectId}</strong>. I support full markdown formatting - try asking me to create code examples, lists, or formatted responses!
-          </div>
-        </div>
-        
-        <div style="
-          border-top: 1px solid #e2e8f0; padding: 16px; background: white;
-          border-radius: 0 0 12px 12px;
-        ">
-          <div style="display: flex; gap: 8px;">
-            <textarea id="chat-input" placeholder="Ask me anything about your project..." style="
-              flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;
-              font-family: inherit; font-size: 14px; resize: none; min-height: 40px;
-              max-height: 120px; outline: none; background: white; color: #2d3748;
-            "></textarea>
-            <button id="send-btn" style="
-              background: #667eea; color: white; border: none; padding: 12px 16px;
-              border-radius: 8px; cursor: pointer; font-size: 14px; min-width: 60px;
-            ">Send</button>
-          </div>
+          <!-- Content will be dynamically loaded here -->
         </div>
       </div>
     `;
@@ -216,11 +312,168 @@ class LovableDetector {
     return dialog;
   }
 
+  showWelcomePage() {
+    const projectName = this.extractProjectName();
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '🤖 Lovable Assistant';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 24px; text-align: center;">
+        <div style="margin-bottom: 24px;">
+          <h2 style="margin: 0 0 8px 0; color: #1a202c; font-size: 24px; font-weight: 600;">
+            Welcome! 👋
+          </h2>
+          <p style="margin: 0; color: #4a5568; font-size: 16px;">
+            AI Assistant for <strong style="color: #667eea;">${projectName}</strong>
+          </p>
+        </div>
+        
+        <div style="display: grid; gap: 12px; margin-bottom: 24px;">
+          <!-- Project Manager -->
+          <div class="feature-card" data-feature="chat" style="
+            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">💬</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Project Manager
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  AI-powered chat for development assistance and coding help
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+          </div>
+          
+          <!-- Prompt History -->
+          <div class="feature-card" data-feature="history" style="
+            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">📚</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Prompt History
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  Browse and search your past conversations and prompts
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+            <div style="
+              position: absolute; top: 8px; right: 8px;
+              background: #fed7d7; color: #c53030; padding: 2px 6px;
+              border-radius: 4px; font-size: 10px; font-weight: 600;
+            ">COMING SOON</div>
+          </div>
+          
+          <!-- Project Knowledge -->
+          <div class="feature-card" data-feature="knowledge" style="
+            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">🧠</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Project Knowledge
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  Store important project information, instructions, and knowledge
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+            <div style="
+              position: absolute; top: 8px; right: 8px;
+              background: #fed7d7; color: #c53030; padding: 2px 6px;
+              border-radius: 4px; font-size: 10px; font-weight: 600;
+            ">COMING SOON</div>
+          </div>
+          
+          <!-- Settings -->
+          <div class="feature-card" data-feature="settings" style="
+            background: white; border: 2px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">⚙️</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Settings
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  Configure API settings, usage limits, fonts, and styles
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="
+          background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+          padding: 12px; font-size: 13px; color: #4a5568; text-align: center;
+        ">
+          💡 <strong>Tip:</strong> Press <kbd style="
+            background: white; border: 1px solid #cbd5e0; border-radius: 3px;
+            padding: 2px 4px; font-size: 11px; font-family: monospace;
+          ">Cmd+K</kbd> anywhere on this page to toggle this assistant
+        </div>
+      </div>
+    `;
+    
+    this.setupWelcomePageEvents();
+  }
+
   setupChatFunctionality() {
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
+    const closeBtn = document.getElementById('close-btn');
     
     if (!chatInput || !sendBtn) return;
+
+    // Setup close button handler
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.toggleAssistant(); // Use toggleAssistant for proper cleanup
+      });
+    }
 
     const sendMessage = async () => {
       const message = chatInput.value.trim();
@@ -255,6 +508,9 @@ class LovableDetector {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.toggleAssistant(); // Close dialog on Escape
       }
     });
     chatInput.focus();
@@ -375,6 +631,211 @@ class LovableDetector {
       document.onmouseup = null;
       document.onmousemove = null;
     }
+  }
+
+  // Cleanup method
+  destroy() {
+    if (this.shortcutMonitorInterval) {
+      clearInterval(this.shortcutMonitorInterval);
+    }
+    
+    if (this.handleKeydown) {
+      document.removeEventListener('keydown', this.handleKeydown, true);
+      window.removeEventListener('keydown', this.handleKeydown, true);
+      document.removeEventListener('keydown', this.handleKeydown, false);
+      window.removeEventListener('keydown', this.handleKeydown, false);
+    }
+    
+    if (this.assistantDialog) {
+      this.assistantDialog.remove();
+    }
+  }
+
+  setupWelcomePageEvents() {
+    // Add hover effects and click handlers for feature cards
+    const featureCards = document.querySelectorAll('.feature-card');
+    
+    featureCards.forEach(card => {
+      const feature = card.getAttribute('data-feature');
+      
+      // Hover effects
+      card.addEventListener('mouseenter', () => {
+        card.style.borderColor = '#667eea';
+        card.style.transform = 'translateY(-2px)';
+        card.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+      });
+      
+      card.addEventListener('mouseleave', () => {
+        card.style.borderColor = '#e2e8f0';
+        card.style.transform = 'translateY(0)';
+        card.style.boxShadow = 'none';
+      });
+      
+      // Click handlers
+      card.addEventListener('click', () => {
+        this.handleFeatureSelection(feature);
+      });
+    });
+    
+    // Setup close button
+    const closeBtn = document.getElementById('close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.toggleAssistant();
+      });
+    }
+  }
+
+  handleFeatureSelection(feature) {
+    switch (feature) {
+      case 'chat':
+        this.showChatInterface();
+        break;
+      case 'history':
+        this.showComingSoon('Prompt History');
+        break;
+      case 'knowledge':
+        this.showComingSoon('Project Knowledge');
+        break;
+      case 'settings':
+        this.showSettingsPage();
+        break;
+      default:
+        console.log('Unknown feature:', feature);
+    }
+  }
+
+  showComingSoon(featureName) {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = `🚧 ${featureName}`;
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 40px; text-align: center;">
+        <div style="font-size: 64px; margin-bottom: 16px;">🚧</div>
+        <h2 style="margin: 0 0 8px 0; color: #1a202c; font-size: 24px; font-weight: 600;">
+          ${featureName}
+        </h2>
+        <p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.5;">
+          This feature is coming soon! We're working hard to bring you the best experience.
+        </p>
+        <button onclick="window.lovableDetector.showWelcomePage()" style="
+          background: #667eea; color: white; border: none; padding: 12px 24px;
+          border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
+        ">← Back to Welcome</button>
+      </div>
+    `;
+  }
+
+  showChatInterface() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '💬 Project Manager';
+    }
+    
+    if (!content) return;
+    
+    const projectName = this.extractProjectName();
+    
+    content.innerHTML = `
+      <div id="chat-messages" style="
+        flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc;
+        display: flex; flex-direction: column;
+      ">
+        <div style="
+          background: #e6fffa; border: 1px solid #81e6d9; border-radius: 18px;
+          padding: 12px 16px; margin-bottom: 12px; font-size: 14px; color: #234e52;
+          align-self: flex-start; max-width: 85%;
+        ">
+          👋 Hello! I'm your AI assistant for <strong>${projectName}</strong>. I support full markdown formatting - try asking me to create code examples, lists, or formatted responses!
+        </div>
+      </div>
+      
+      <div style="
+        border-top: 1px solid #e2e8f0; padding: 16px; background: white;
+        border-radius: 0 0 12px 12px;
+      ">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <button onclick="window.lovableDetector.showWelcomePage()" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+          ">← Back</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <textarea id="chat-input" placeholder="Ask me anything about your project..." style="
+            flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            font-family: inherit; font-size: 14px; resize: none; min-height: 40px;
+            max-height: 120px; outline: none; background: white; color: #2d3748;
+          "></textarea>
+          <button id="send-btn" style="
+            background: #667eea; color: white; border: none; padding: 12px 16px;
+            border-radius: 8px; cursor: pointer; font-size: 14px; min-width: 60px;
+          ">Send</button>
+        </div>
+      </div>
+    `;
+    
+    this.setupChatFunctionality();
+  }
+
+  showSettingsPage() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '⚙️ Settings';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button onclick="window.lovableDetector.showWelcomePage()" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Welcome</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            🔑 API Configuration
+          </h3>
+          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
+            Click the extension icon in your toolbar to configure your Claude API key and Supabase settings.
+          </p>
+          <button onclick="chrome.action.openPopup()" style="
+            background: #667eea; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">Open Settings</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            📊 Usage & Limits
+          </h3>
+          <p style="margin: 0; color: #4a5568; font-size: 14px;">
+            Coming soon: Track your API usage and set spending limits.
+          </p>
+        </div>
+        
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            🎨 Appearance
+          </h3>
+          <p style="margin: 0; color: #4a5568; font-size: 14px;">
+            Coming soon: Customize fonts, colors, and dialog size.
+          </p>
+        </div>
+      </div>
+    `;
   }
 }
 
