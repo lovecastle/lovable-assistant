@@ -871,165 +871,102 @@ class LovableDetector {
     if (!content) return;
     
     content.innerHTML = `
-      <div style="padding: 16px; height: 100%; display: flex; flex-direction: column;">
-        <!-- Header with Back Button -->
-        <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+      <div id="chat-messages" style="
+        flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc;
+        display: flex; flex-direction: column;
+      ">
+        <!-- Chat messages will be loaded here -->
+      </div>
+      
+      <div style="
+        border-top: 1px solid #e2e8f0; padding: 16px; background: white;
+        border-radius: 0 0 12px 12px;
+      ">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
             padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
           ">← Back</button>
-          <div style="color: #718096; font-size: 12px;">
-            <span id="conversation-count">0</span> conversations found
+          <div style="flex: 1; text-align: right; color: #718096; font-size: 12px; display: flex; align-items: center; justify-content: flex-end;">
+            <span id="message-count">0</span> messages found
           </div>
         </div>
         
-        <!-- Filters Section -->
-        <div style="
-          background: white; border: 1px solid #e2e8f0; border-radius: 8px;
-          padding: 16px; margin-bottom: 16px;
-        ">
-          <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
-            🔍 Filters
-          </h3>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-            <!-- Date Filter -->
-            <div>
-              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
-                Date Range
-              </label>
-              <select id="date-filter" style="
-                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
-                font-size: 12px; background: white;
-              ">
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-                <option value="custom">Custom Range</option>
-              </select>
-            </div>
-            
-            <!-- Category Filter -->
-            <div>
-              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
-                Category
-              </label>
-              <select id="category-filter" style="
-                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
-                font-size: 12px; background: white;
-              ">
-                <option value="all">All Categories</option>
-                <option value="coding">🔧 Coding</option>
-                <option value="debugging">🐛 Debugging</option>
-                <option value="design">🎨 Design</option>
-                <option value="deployment">🚀 Deployment</option>
-                <option value="planning">📋 Planning</option>
-                <option value="other">📁 Other</option>
-              </select>
-            </div>
-            
-            <!-- Speaker Filter -->
-            <div>
-              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
-                Speaker
-              </label>
-              <select id="speaker-filter" style="
-                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
-                font-size: 12px; background: white;
-              ">
-                <option value="all">All Messages</option>
-                <option value="user">👤 You</option>
-                <option value="lovable">🤖 Lovable</option>
-                <option value="assistant">💬 AI Assistant</option>
-              </select>
-            </div>
+        <!-- Filter Section -->
+        <div style="margin-bottom: 12px;">
+          <div style="color: #4a5568; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+            Filter by:
           </div>
-          
-          <!-- Search Field -->
-          <div>
-            <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
-              Search in conversations
-            </label>
-            <input type="text" id="search-input" placeholder="Search messages, code, or any content..." style="
-              width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px;
-              font-size: 14px; outline: none; box-sizing: border-box;
+          <div style="display: flex; gap: 8px;">
+            <select id="date-filter" style="
+              flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568;
             ">
-          </div>
-          
-          <!-- Filter Actions -->
-          <div style="margin-top: 12px; display: flex; gap: 8px;">
-            <button id="apply-filters-btn" style="
-              background: #667eea; color: white; border: none; padding: 6px 12px;
-              border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;
-            ">Apply Filters</button>
-            <button id="clear-filters-btn" style="
-              background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
-              padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
-            ">Clear All</button>
+              <option value="all">Date</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+            </select>
+            
+            <select id="category-filter" style="
+              flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568;
+            ">
+              <option value="all">Category</option>
+              <option value="coding">🔧 Coding</option>
+              <option value="debugging">🐛 Debugging</option>
+              <option value="design">🎨 Design</option>
+              <option value="deployment">🚀 Deployment</option>
+              <option value="planning">📋 Planning</option>
+              <option value="other">📁 Other</option>
+            </select>
+            
+            <select id="speaker-filter" style="
+              flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568;
+            ">
+              <option value="all">Speaker</option>
+              <option value="user">👤 You</option>
+              <option value="lovable">🤖 Lovable</option>
+            </select>
           </div>
         </div>
         
-        <!-- Conversations List -->
-        <div style="flex: 1; overflow-y: auto;">
-          <div id="conversations-container" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Conversations will be loaded here -->
-          </div>
-          
-          <!-- Empty State -->
-          <div id="empty-state" style="
-            text-align: center; padding: 40px 20px; color: #718096;
-            display: none;
+        <!-- Search Section -->
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="search-input" placeholder="Search in conversations..." style="
+            flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+            font-family: inherit; font-size: 14px; outline: none; background: white; color: #2d3748;
           ">
-            <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
-            <h3 style="margin: 0 0 8px 0; color: #4a5568; font-size: 16px;">
-              No conversations found
-            </h3>
-            <p style="margin: 0; font-size: 14px;">
-              Start chatting to see your development history here!
-            </p>
-          </div>
-          
-          <!-- Loading State -->
-          <div id="loading-state" style="
-            text-align: center; padding: 40px 20px; color: #718096;
-          ">
-            <div style="font-size: 24px; margin-bottom: 12px;">⏳</div>
-            <p style="margin: 0; font-size: 14px;">Loading conversations...</p>
-          </div>
+          <button id="clear-search-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            padding: 12px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
+          ">Clear</button>
         </div>
       </div>
     `;
     
     this.setupBackButton();
     this.setupHistoryFilters();
-    this.loadConversations();
+    this.loadHistoryMessages();
   }
 
   setupHistoryFilters() {
-    const applyBtn = document.getElementById('apply-filters-btn');
-    const clearBtn = document.getElementById('clear-filters-btn');
+    const clearBtn = document.getElementById('clear-search-btn');
     const searchInput = document.getElementById('search-input');
     
-    // Apply filters
-    if (applyBtn) {
-      applyBtn.addEventListener('click', () => {
-        this.applyFilters();
-      });
-    }
-    
-    // Clear filters
+    // Clear search
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
-        this.clearFilters();
+        this.clearHistoryFilters();
       });
     }
     
     // Real-time search
     if (searchInput) {
       searchInput.addEventListener('input', this.debounce(() => {
-        this.applyFilters();
+        this.applyHistoryFilters();
       }, 300));
     }
     
@@ -1039,7 +976,7 @@ class LovableDetector {
       const element = document.getElementById(filterId);
       if (element) {
         element.addEventListener('change', () => {
-          this.applyFilters();
+          this.applyHistoryFilters();
         });
       }
     });
@@ -1057,56 +994,75 @@ class LovableDetector {
     };
   }
 
-  async loadConversations() {
-    // For now, we'll create some sample data
+  async loadHistoryMessages() {
+    // For now, we'll create sample chat messages
     // In the future, this will load from Supabase
-    this.allConversations = this.generateSampleConversations();
-    this.filteredConversations = [...this.allConversations];
-    this.renderConversations();
+    this.allHistoryMessages = this.generateSampleMessages();
+    this.filteredHistoryMessages = [...this.allHistoryMessages];
+    this.renderHistoryMessages();
   }
 
-  generateSampleConversations() {
-    const projectName = this.extractProjectName();
-    const sampleConversations = [
+  generateSampleMessages() {
+    const sampleMessages = [
       {
         id: 1,
         timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-        category: 'coding',
-        messages: [
-          { speaker: 'user', content: 'How do I add a dark mode toggle to my React app?' },
-          { speaker: 'assistant', content: 'I can help you implement a dark mode toggle! Here\'s a complete solution using React hooks and CSS variables...' }
-        ]
+        speaker: 'user',
+        content: 'How do I add a dark mode toggle to my React app?',
+        category: 'coding'
       },
       {
         id: 2,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        category: 'debugging',
-        messages: [
-          { speaker: 'user', content: 'I\'m getting a "Cannot read property of undefined" error in my component' },
-          { speaker: 'assistant', content: 'This error typically occurs when trying to access a property on an undefined object. Let me help you debug this...' }
-        ]
+        timestamp: new Date(Date.now() - 1000 * 60 * 28),
+        speaker: 'lovable',
+        content: 'I can help you implement a dark mode toggle! Here\'s a complete solution using React hooks and CSS variables:\n\n```jsx\nimport { useState, useEffect } from \'react\';\n\nfunction App() {\n  const [darkMode, setDarkMode] = useState(false);\n\n  useEffect(() => {\n    const isDark = localStorage.getItem(\'darkMode\') === \'true\';\n    setDarkMode(isDark);\n    document.documentElement.classList.toggle(\'dark\', isDark);\n  }, []);\n\n  const toggleDarkMode = () => {\n    const newMode = !darkMode;\n    setDarkMode(newMode);\n    localStorage.setItem(\'darkMode\', newMode);\n    document.documentElement.classList.toggle(\'dark\', newMode);\n  };\n\n  return (\n    <button onClick={toggleDarkMode}>\n      {darkMode ? \'☀️\' : \'🌙\'} Toggle Dark Mode\n    </button>\n  );\n}\n```',
+        category: 'coding'
       },
       {
         id: 3,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // Yesterday
-        category: 'design',
-        messages: [
-          { speaker: 'user', content: 'What are some good color schemes for a SaaS dashboard?' },
-          { speaker: 'assistant', content: 'For SaaS dashboards, I recommend using neutral base colors with strategic accent colors. Here are some proven combinations...' }
-        ]
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+        speaker: 'user',
+        content: 'I\'m getting a "Cannot read property of undefined" error in my component',
+        category: 'debugging'
       },
       {
         id: 4,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2 + 1000 * 60 * 2),
+        speaker: 'lovable',
+        content: 'This error typically occurs when trying to access a property on an undefined object. Let me help you debug this. Can you share the specific line where the error occurs?\n\nCommon causes:\n1. **Async data not loaded yet** - use optional chaining: `user?.name`\n2. **Missing default values** - provide fallbacks: `user || {}`\n3. **Incorrect destructuring** - check your props/state structure',
+        category: 'debugging'
+      },
+      {
+        id: 5,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // Yesterday
+        speaker: 'user',
+        content: 'What are some good color schemes for a SaaS dashboard?',
+        category: 'design'
+      },
+      {
+        id: 6,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000 * 60 * 3),
+        speaker: 'lovable',
+        content: 'For SaaS dashboards, I recommend using neutral base colors with strategic accent colors. Here are some proven combinations:\n\n**Modern Professional:**\n- Background: #f8fafc (light gray)\n- Cards: #ffffff (white)\n- Primary: #3b82f6 (blue)\n- Success: #10b981 (green)\n- Warning: #f59e0b (amber)\n- Error: #ef4444 (red)\n\n**Dark Mode Alternative:**\n- Background: #0f172a (dark slate)\n- Cards: #1e293b (slate)\n- Text: #f1f5f9 (light)\n\nThis ensures good contrast and accessibility while maintaining a professional appearance.',
+        category: 'design'
+      },
+      {
+        id: 7,
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
-        category: 'deployment',
-        messages: [
-          { speaker: 'user', content: 'How do I deploy this to Vercel with environment variables?' },
-          { speaker: 'lovable', content: 'I\'ve updated your project configuration. Here are the deployment steps...' }
-        ]
+        speaker: 'user',
+        content: 'How do I deploy this to Vercel with environment variables?',
+        category: 'deployment'
+      },
+      {
+        id: 8,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3 + 1000 * 60 * 5),
+        speaker: 'lovable',
+        content: 'I\'ve updated your project configuration for Vercel deployment. Here are the steps:\n\n1. **Add environment variables in Vercel dashboard:**\n   - Go to Project Settings → Environment Variables\n   - Add your API keys and secrets\n\n2. **Create vercel.json for configuration:**\n```json\n{\n  "env": {\n    "NODE_ENV": "production"\n  },\n  "build": {\n    "env": {\n      "NEXT_PUBLIC_API_URL": "@api-url"\n    }\n  }\n}\n```\n\n3. **Deploy:** `vercel --prod`\n\nYour app will be live with all environment variables properly configured!',
+        category: 'deployment'
       }
     ];
     
-    return sampleConversations;
+    return sampleMessages;
   }
 
   applyFilters() {
@@ -1128,171 +1084,10 @@ class LovableDetector {
           case 'yesterday':
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
-            if (convDate.toDateString() !== yesterday.toDateString()) return false;
-            break;
-          case 'week':
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            if (convDate < weekAgo) return false;
-            break;
-          case 'month':
-            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            if (convDate < monthAgo) return false;
-            break;
-        }
-      }
-      
-      // Category filter
-      if (categoryFilter !== 'all' && conv.category !== categoryFilter) {
-        return false;
-      }
-      
-      // Speaker filter
-      if (speakerFilter !== 'all') {
-        const hasMatchingSpeaker = conv.messages.some(msg => msg.speaker === speakerFilter);
-        if (!hasMatchingSpeaker) return false;
-      }
-      
-      // Search filter
-      if (searchTerm) {
-        const searchableText = conv.messages
-          .map(msg => msg.content)
-          .join(' ')
-          .toLowerCase();
-        if (!searchableText.includes(searchTerm)) return false;
-      }
-      
-      return true;
-    });
-    
-    this.renderConversations();
+  escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
-
-  clearFilters() {
-    document.getElementById('date-filter').value = 'all';
-    document.getElementById('category-filter').value = 'all';
-    document.getElementById('speaker-filter').value = 'all';
-    document.getElementById('search-input').value = '';
-    
-    this.filteredConversations = [...this.allConversations];
-    this.renderConversations();
-  }
-
-  renderConversations() {
-    const container = document.getElementById('conversations-container');
-    const emptyState = document.getElementById('empty-state');
-    const loadingState = document.getElementById('loading-state');
-    const countElement = document.getElementById('conversation-count');
-    
-    if (!container) return;
-    
-    // Hide loading state
-    if (loadingState) loadingState.style.display = 'none';
-    
-    // Update count
-    if (countElement) {
-      countElement.textContent = this.filteredConversations.length;
-    }
-    
-    // Show/hide empty state
-    if (this.filteredConversations.length === 0) {
-      if (emptyState) emptyState.style.display = 'block';
-      container.innerHTML = '';
-      return;
-    } else {
-      if (emptyState) emptyState.style.display = 'none';
-    }
-    
-    // Render conversations
-    container.innerHTML = this.filteredConversations
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .map(conv => this.renderConversationCard(conv))
-      .join('');
-  }
-
-  renderConversationCard(conversation) {
-    const timeAgo = this.getTimeAgo(conversation.timestamp);
-    const categoryIcon = this.getCategoryIcon(conversation.category);
-    const firstMessage = conversation.messages[0];
-    const lastMessage = conversation.messages[conversation.messages.length - 1];
-    
-    return `
-      <div class="conversation-card" data-id="${conversation.id}" style="
-        background: white; border: 1px solid #e2e8f0; border-radius: 8px;
-        padding: 16px; cursor: pointer; transition: all 0.2s ease;
-      ">
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">${categoryIcon}</span>
-            <span style="
-              background: #f7fafc; color: #4a5568; padding: 2px 8px;
-              border-radius: 12px; font-size: 11px; font-weight: 500; text-transform: uppercase;
-            ">${conversation.category}</span>
-          </div>
-          <div style="color: #718096; font-size: 12px;">${timeAgo}</div>
-        </div>
-        
-        <!-- Preview -->
-        <div style="margin-bottom: 8px;">
-          <div style="color: #2d3748; font-size: 14px; line-height: 1.4; margin-bottom: 4px;">
-            <strong>You:</strong> ${this.truncateText(firstMessage.content, 80)}
-          </div>
-          ${lastMessage.speaker !== firstMessage.speaker ? `
-            <div style="color: #4a5568; font-size: 13px; line-height: 1.4;">
-              <strong>${this.getSpeakerName(lastMessage.speaker)}:</strong> ${this.truncateText(lastMessage.content, 60)}
-            </div>
-          ` : ''}
-        </div>
-        
-        <!-- Footer -->
-        <div style="display: flex; justify-content: between; align-items: center; font-size: 12px; color: #718096;">
-          <span>${conversation.messages.length} messages</span>
-        </div>
-      </div>
-    `;
-  }
-
-  getCategoryIcon(category) {
-    const icons = {
-      coding: '🔧',
-      debugging: '🐛',
-      design: '🎨',
-      deployment: '🚀',
-      planning: '📋',
-      other: '📁'
-    };
-    return icons[category] || '📁';
-  }
-
-  getSpeakerName(speaker) {
-    const names = {
-      user: 'You',
-      assistant: 'AI Assistant',
-      lovable: 'Lovable'
-    };
-    return names[speaker] || speaker;
-  }
-
-  truncateText(text, maxLength) {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  }
-
-  getTimeAgo(timestamp) {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMs = now - time;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return time.toLocaleDateString();
-  }
+}
 }
 
 // Initialize the detector
