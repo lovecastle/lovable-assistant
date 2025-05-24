@@ -379,6 +379,7 @@ class ConversationCapture {
 
   applyMessagePairing() {
     // Apply pairing logic: Lovable responses inherit categories from preceding user messages
+    // Also sync timestamps since Lovable responds immediately to user messages
     for (let i = 1; i < this.detectedMessages.length; i++) {
       const currentMessage = this.detectedMessages[i];
       const previousMessage = this.detectedMessages[i - 1];
@@ -391,7 +392,18 @@ class ConversationCapture {
           secondary: [...previousMessage.categories.secondary]
         };
         
-        console.log(`🔗 Paired Lovable response with user message categories:`, currentMessage.categories);
+        // Sync timestamps: user message gets the same timestamp as Lovable response
+        // since Lovable responds immediately and Lovable messages have more accurate timestamps
+        if (currentMessage.timestamp && currentMessage.timestamp !== previousMessage.timestamp) {
+          previousMessage.timestamp = currentMessage.timestamp;
+          if (this.verboseLogging) {
+            console.log(`🕒 Synced user message timestamp with Lovable response: ${currentMessage.timestamp}`);
+          }
+        }
+        
+        if (this.verboseLogging) {
+          console.log(`🔗 Paired Lovable response with user message categories:`, currentMessage.categories);
+        }
       }
     }
   }

@@ -1182,21 +1182,61 @@ class LovableDetector {
     this.renderHistoryMessages();
   }
 
+  cleanAllFilteredMessages() {
+    if (!confirm(`Are you sure you want to delete all ${this.filteredHistoryMessages.length} filtered messages? This action cannot be undone.`)) {
+      return;
+    }
+
+    // Get the IDs of messages to remove
+    const idsToRemove = new Set(this.filteredHistoryMessages.map(msg => msg.id));
+    
+    // Remove from allHistoryMessages
+    this.allHistoryMessages = this.allHistoryMessages.filter(msg => !idsToRemove.has(msg.id));
+    
+    // Remove from detected messages in conversation capture if available
+    if (window.conversationCapture && window.conversationCapture.detectedMessages) {
+      window.conversationCapture.detectedMessages = window.conversationCapture.detectedMessages.filter(msg => !idsToRemove.has(msg.id));
+      
+      // Also update the processed message IDs to prevent re-adding
+      if (window.conversationCapture.processedMessageIds) {
+        idsToRemove.forEach(id => window.conversationCapture.processedMessageIds.delete(id));
+      }
+    }
+    
+    // Update filtered messages
+    this.filteredHistoryMessages = [...this.allHistoryMessages];
+    this.applyHistoryFilters();
+    
+    console.log(`🗑️ Cleaned ${idsToRemove.size} messages from history`);
+  }
+
   renderHistoryMessages() {
     const container = document.getElementById('chat-messages');
     const countElement = document.getElementById('message-count');
     
     if (!container) return;
     
-    // Update count
+    // Update count with "Clean all!" link
     if (countElement) {
       const searchInput = document.getElementById('search-input');
       const searchTerm = searchInput?.value.trim();
       
+      const cleanAllLink = this.filteredHistoryMessages.length > 0 ? 
+        ` • <a href="#" id="clean-all-link" style="color: #dc2626; text-decoration: underline; font-weight: 500; cursor: pointer;">Clean all!</a>` : '';
+      
       if (searchTerm) {
-        countElement.textContent = `${this.filteredHistoryMessages.length} messages found`;
+        countElement.innerHTML = `${this.filteredHistoryMessages.length} messages found${cleanAllLink}`;
       } else {
-        countElement.textContent = `${this.filteredHistoryMessages.length} messages found`;
+        countElement.innerHTML = `${this.filteredHistoryMessages.length} messages found${cleanAllLink}`;
+      }
+      
+      // Add click handler for clean all link
+      const cleanAllElement = document.getElementById('clean-all-link');
+      if (cleanAllElement) {
+        cleanAllElement.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.cleanAllFilteredMessages();
+        });
       }
     }
     
@@ -1219,20 +1259,18 @@ class LovableDetector {
       return;
     }
     
-    // Render messages
-    this.filteredHistoryMessages
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-      .forEach(msg => {
-        this.addHistoryMessage(msg.content, msg.speaker, msg.timestamp, msg);
-      });
+    // Render messages (already sorted by timestamp, newest first)
+    this.filteredHistoryMessages.forEach(msg => {
+      this.addHistoryMessage(msg.content, msg.speaker, msg.timestamp, msg);
+    });
     
     // Update search matches after rendering
     setTimeout(() => {
       this.updateSearchMatches();
     }, 100);
     
-    // Scroll to bottom
-    container.scrollTop = container.scrollHeight;
+    // Scroll to top to show newest messages first
+    container.scrollTop = 0;
   }
 
   addHistoryMessage(content, speaker, timestamp, messageData = {}) {
@@ -1249,14 +1287,6 @@ class LovableDetector {
     let speakerIcon = speaker === 'user' ? '👤' : '🤖';
     let speakerName = speaker === 'user' ? 'You' : 'Lovable';
 
-    // Add indicator for real vs sample messages
-    let messageTypeIndicator = '';
-    if (messageData.isDetected) {
-      messageTypeIndicator = '<span style="background: #10b981; color: white; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-left: 4px; font-weight: 600;">LIVE</span>';
-    } else if (messageData.isSample) {
-      messageTypeIndicator = '<span style="background: #6b7280; color: white; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-left: 4px; font-weight: 600;">DEMO</span>';
-    }
-
     const messageBubble = document.createElement('div');
     messageBubble.style.cssText = `
       background: ${bgColor}; color: ${textColor}; padding: 12px 16px; border-radius: 18px;
@@ -1271,7 +1301,7 @@ class LovableDetector {
         font-size: 11px; opacity: 0.7; margin-bottom: 4px;
         ${speaker === 'user' ? 'text-align: right;' : ''}
       ">
-        ${speakerIcon} ${speakerName} • ${timeString} ${messageTypeIndicator}
+        ${speakerIcon} ${speakerName} • ${timeString}
       </div>
     `;
 
