@@ -271,10 +271,23 @@ class LovableDetector {
       const style = document.createElement('style');
       style.id = 'chat-styles';
       style.textContent = `
-        #chat-messages::-webkit-scrollbar { width: 6px; }
-        #chat-messages::-webkit-scrollbar-track { background: transparent; }
-        #chat-messages::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
-        #chat-messages::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+        #dialog-content::-webkit-scrollbar,
+        #chat-messages::-webkit-scrollbar { 
+          width: 4px; 
+        }
+        #dialog-content::-webkit-scrollbar-track,
+        #chat-messages::-webkit-scrollbar-track { 
+          background: transparent; 
+        }
+        #dialog-content::-webkit-scrollbar-thumb,
+        #chat-messages::-webkit-scrollbar-thumb { 
+          background: rgba(203, 213, 224, 0.6); 
+          border-radius: 2px; 
+        }
+        #dialog-content::-webkit-scrollbar-thumb:hover,
+        #chat-messages::-webkit-scrollbar-thumb:hover { 
+          background: rgba(160, 174, 192, 0.8); 
+        }
         @keyframes pulse { 0%, 60%, 100% { opacity: 0.4; transform: scale(1); } 30% { opacity: 1; transform: scale(1.2); } }
       `;
       document.head.appendChild(style);
@@ -296,7 +309,7 @@ class LovableDetector {
           <h3 id="dialog-title" style="margin: 0; font-size: 16px;">🤖 Lovable Assistant</h3>
           <button id="close-btn" style="
             background: rgba(255,255,255,0.2); border: none; color: white;
-            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 16px;
+            padding: 0px 6px; border-radius: 4px; cursor: pointer; font-size: 16px;
           ">×</button>
         </div>
         
@@ -330,7 +343,7 @@ class LovableDetector {
             Welcome! 👋
           </h2>
           <p style="margin: 0; color: #4a5568; font-size: 16px;">
-            AI Assistant for <strong style="color: #667eea;">${projectName}</strong>
+            AI Assistant for project <strong style="color: #667eea;">${projectName}</strong>
           </p>
         </div>
         
@@ -375,19 +388,14 @@ class LovableDetector {
               ">📚</div>
               <div style="flex: 1;">
                 <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Prompt History
+                  Development History
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
-                  Browse and search your past conversations and prompts
+                  Browse and search your past conversations and development activities
                 </p>
               </div>
               <div style="color: #cbd5e0; font-size: 18px;">→</div>
             </div>
-            <div style="
-              position: absolute; top: 8px; right: 8px;
-              background: #fed7d7; color: #c53030; padding: 2px 6px;
-              border-radius: 4px; font-size: 10px; font-weight: 600;
-            ">COMING SOON</div>
           </div>
           
           <!-- Project Knowledge -->
@@ -692,7 +700,7 @@ class LovableDetector {
         this.showChatInterface();
         break;
       case 'history':
-        this.showComingSoon('Prompt History');
+        this.showDevelopmentHistory();
         break;
       case 'knowledge':
         this.showComingSoon('Project Knowledge');
@@ -724,12 +732,14 @@ class LovableDetector {
         <p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.5;">
           This feature is coming soon! We're working hard to bring you the best experience.
         </p>
-        <button onclick="window.lovableDetector.showWelcomePage()" style="
+        <button id="back-to-welcome-btn" style="
           background: #667eea; color: white; border: none; padding: 12px 24px;
           border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
         ">← Back to Welcome</button>
       </div>
     `;
+    
+    this.setupBackButton();
   }
 
   showChatInterface() {
@@ -754,7 +764,7 @@ class LovableDetector {
           padding: 12px 16px; margin-bottom: 12px; font-size: 14px; color: #234e52;
           align-self: flex-start; max-width: 85%;
         ">
-          👋 Hello! I'm your AI assistant for <strong>${projectName}</strong>. I support full markdown formatting - try asking me to create code examples, lists, or formatted responses!
+          👋 Hello! I'm your AI assistant for project <strong>${projectName}</strong>.
         </div>
       </div>
       
@@ -763,7 +773,7 @@ class LovableDetector {
         border-radius: 0 0 12px 12px;
       ">
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <button onclick="window.lovableDetector.showWelcomePage()" style="
+          <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
             padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
           ">← Back</button>
@@ -782,6 +792,7 @@ class LovableDetector {
       </div>
     `;
     
+    this.setupBackButton();
     this.setupChatFunctionality();
   }
 
@@ -798,7 +809,7 @@ class LovableDetector {
     content.innerHTML = `
       <div style="padding: 20px;">
         <div style="margin-bottom: 20px;">
-          <button onclick="window.lovableDetector.showWelcomePage()" style="
+          <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
             padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
           ">← Back to Welcome</button>
@@ -836,6 +847,451 @@ class LovableDetector {
         </div>
       </div>
     `;
+    
+    this.setupBackButton();
+  }
+
+  setupBackButton() {
+    const backBtn = document.getElementById('back-to-welcome-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        this.showWelcomePage();
+      });
+    }
+  }
+
+  showDevelopmentHistory() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '📚 Development History';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 16px; height: 100%; display: flex; flex-direction: column;">
+        <!-- Header with Back Button -->
+        <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <button id="back-to-welcome-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+          ">← Back</button>
+          <div style="color: #718096; font-size: 12px;">
+            <span id="conversation-count">0</span> conversations found
+          </div>
+        </div>
+        
+        <!-- Filters Section -->
+        <div style="
+          background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+          padding: 16px; margin-bottom: 16px;
+        ">
+          <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+            🔍 Filters
+          </h3>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <!-- Date Filter -->
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
+                Date Range
+              </label>
+              <select id="date-filter" style="
+                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
+                font-size: 12px; background: white;
+              ">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+            
+            <!-- Category Filter -->
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
+                Category
+              </label>
+              <select id="category-filter" style="
+                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
+                font-size: 12px; background: white;
+              ">
+                <option value="all">All Categories</option>
+                <option value="coding">🔧 Coding</option>
+                <option value="debugging">🐛 Debugging</option>
+                <option value="design">🎨 Design</option>
+                <option value="deployment">🚀 Deployment</option>
+                <option value="planning">📋 Planning</option>
+                <option value="other">📁 Other</option>
+              </select>
+            </div>
+            
+            <!-- Speaker Filter -->
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
+                Speaker
+              </label>
+              <select id="speaker-filter" style="
+                width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px;
+                font-size: 12px; background: white;
+              ">
+                <option value="all">All Messages</option>
+                <option value="user">👤 You</option>
+                <option value="lovable">🤖 Lovable</option>
+                <option value="assistant">💬 AI Assistant</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Search Field -->
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #4a5568; font-weight: 500;">
+              Search in conversations
+            </label>
+            <input type="text" id="search-input" placeholder="Search messages, code, or any content..." style="
+              width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px;
+              font-size: 14px; outline: none; box-sizing: border-box;
+            ">
+          </div>
+          
+          <!-- Filter Actions -->
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button id="apply-filters-btn" style="
+              background: #667eea; color: white; border: none; padding: 6px 12px;
+              border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;
+            ">Apply Filters</button>
+            <button id="clear-filters-btn" style="
+              background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+              padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            ">Clear All</button>
+          </div>
+        </div>
+        
+        <!-- Conversations List -->
+        <div style="flex: 1; overflow-y: auto;">
+          <div id="conversations-container" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Conversations will be loaded here -->
+          </div>
+          
+          <!-- Empty State -->
+          <div id="empty-state" style="
+            text-align: center; padding: 40px 20px; color: #718096;
+            display: none;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+            <h3 style="margin: 0 0 8px 0; color: #4a5568; font-size: 16px;">
+              No conversations found
+            </h3>
+            <p style="margin: 0; font-size: 14px;">
+              Start chatting to see your development history here!
+            </p>
+          </div>
+          
+          <!-- Loading State -->
+          <div id="loading-state" style="
+            text-align: center; padding: 40px 20px; color: #718096;
+          ">
+            <div style="font-size: 24px; margin-bottom: 12px;">⏳</div>
+            <p style="margin: 0; font-size: 14px;">Loading conversations...</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    this.setupBackButton();
+    this.setupHistoryFilters();
+    this.loadConversations();
+  }
+
+  setupHistoryFilters() {
+    const applyBtn = document.getElementById('apply-filters-btn');
+    const clearBtn = document.getElementById('clear-filters-btn');
+    const searchInput = document.getElementById('search-input');
+    
+    // Apply filters
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        this.applyFilters();
+      });
+    }
+    
+    // Clear filters
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        this.clearFilters();
+      });
+    }
+    
+    // Real-time search
+    if (searchInput) {
+      searchInput.addEventListener('input', this.debounce(() => {
+        this.applyFilters();
+      }, 300));
+    }
+    
+    // Auto-apply on filter change
+    const filters = ['date-filter', 'category-filter', 'speaker-filter'];
+    filters.forEach(filterId => {
+      const element = document.getElementById(filterId);
+      if (element) {
+        element.addEventListener('change', () => {
+          this.applyFilters();
+        });
+      }
+    });
+  }
+
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  async loadConversations() {
+    // For now, we'll create some sample data
+    // In the future, this will load from Supabase
+    this.allConversations = this.generateSampleConversations();
+    this.filteredConversations = [...this.allConversations];
+    this.renderConversations();
+  }
+
+  generateSampleConversations() {
+    const projectName = this.extractProjectName();
+    const sampleConversations = [
+      {
+        id: 1,
+        timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+        category: 'coding',
+        messages: [
+          { speaker: 'user', content: 'How do I add a dark mode toggle to my React app?' },
+          { speaker: 'assistant', content: 'I can help you implement a dark mode toggle! Here\'s a complete solution using React hooks and CSS variables...' }
+        ]
+      },
+      {
+        id: 2,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+        category: 'debugging',
+        messages: [
+          { speaker: 'user', content: 'I\'m getting a "Cannot read property of undefined" error in my component' },
+          { speaker: 'assistant', content: 'This error typically occurs when trying to access a property on an undefined object. Let me help you debug this...' }
+        ]
+      },
+      {
+        id: 3,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // Yesterday
+        category: 'design',
+        messages: [
+          { speaker: 'user', content: 'What are some good color schemes for a SaaS dashboard?' },
+          { speaker: 'assistant', content: 'For SaaS dashboards, I recommend using neutral base colors with strategic accent colors. Here are some proven combinations...' }
+        ]
+      },
+      {
+        id: 4,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
+        category: 'deployment',
+        messages: [
+          { speaker: 'user', content: 'How do I deploy this to Vercel with environment variables?' },
+          { speaker: 'lovable', content: 'I\'ve updated your project configuration. Here are the deployment steps...' }
+        ]
+      }
+    ];
+    
+    return sampleConversations;
+  }
+
+  applyFilters() {
+    const dateFilter = document.getElementById('date-filter')?.value || 'all';
+    const categoryFilter = document.getElementById('category-filter')?.value || 'all';
+    const speakerFilter = document.getElementById('speaker-filter')?.value || 'all';
+    const searchTerm = document.getElementById('search-input')?.value.toLowerCase() || '';
+    
+    this.filteredConversations = this.allConversations.filter(conv => {
+      // Date filter
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        const convDate = new Date(conv.timestamp);
+        
+        switch (dateFilter) {
+          case 'today':
+            if (convDate.toDateString() !== now.toDateString()) return false;
+            break;
+          case 'yesterday':
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (convDate.toDateString() !== yesterday.toDateString()) return false;
+            break;
+          case 'week':
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (convDate < weekAgo) return false;
+            break;
+          case 'month':
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            if (convDate < monthAgo) return false;
+            break;
+        }
+      }
+      
+      // Category filter
+      if (categoryFilter !== 'all' && conv.category !== categoryFilter) {
+        return false;
+      }
+      
+      // Speaker filter
+      if (speakerFilter !== 'all') {
+        const hasMatchingSpeaker = conv.messages.some(msg => msg.speaker === speakerFilter);
+        if (!hasMatchingSpeaker) return false;
+      }
+      
+      // Search filter
+      if (searchTerm) {
+        const searchableText = conv.messages
+          .map(msg => msg.content)
+          .join(' ')
+          .toLowerCase();
+        if (!searchableText.includes(searchTerm)) return false;
+      }
+      
+      return true;
+    });
+    
+    this.renderConversations();
+  }
+
+  clearFilters() {
+    document.getElementById('date-filter').value = 'all';
+    document.getElementById('category-filter').value = 'all';
+    document.getElementById('speaker-filter').value = 'all';
+    document.getElementById('search-input').value = '';
+    
+    this.filteredConversations = [...this.allConversations];
+    this.renderConversations();
+  }
+
+  renderConversations() {
+    const container = document.getElementById('conversations-container');
+    const emptyState = document.getElementById('empty-state');
+    const loadingState = document.getElementById('loading-state');
+    const countElement = document.getElementById('conversation-count');
+    
+    if (!container) return;
+    
+    // Hide loading state
+    if (loadingState) loadingState.style.display = 'none';
+    
+    // Update count
+    if (countElement) {
+      countElement.textContent = this.filteredConversations.length;
+    }
+    
+    // Show/hide empty state
+    if (this.filteredConversations.length === 0) {
+      if (emptyState) emptyState.style.display = 'block';
+      container.innerHTML = '';
+      return;
+    } else {
+      if (emptyState) emptyState.style.display = 'none';
+    }
+    
+    // Render conversations
+    container.innerHTML = this.filteredConversations
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .map(conv => this.renderConversationCard(conv))
+      .join('');
+  }
+
+  renderConversationCard(conversation) {
+    const timeAgo = this.getTimeAgo(conversation.timestamp);
+    const categoryIcon = this.getCategoryIcon(conversation.category);
+    const firstMessage = conversation.messages[0];
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    
+    return `
+      <div class="conversation-card" data-id="${conversation.id}" style="
+        background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 16px; cursor: pointer; transition: all 0.2s ease;
+      ">
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">${categoryIcon}</span>
+            <span style="
+              background: #f7fafc; color: #4a5568; padding: 2px 8px;
+              border-radius: 12px; font-size: 11px; font-weight: 500; text-transform: uppercase;
+            ">${conversation.category}</span>
+          </div>
+          <div style="color: #718096; font-size: 12px;">${timeAgo}</div>
+        </div>
+        
+        <!-- Preview -->
+        <div style="margin-bottom: 8px;">
+          <div style="color: #2d3748; font-size: 14px; line-height: 1.4; margin-bottom: 4px;">
+            <strong>You:</strong> ${this.truncateText(firstMessage.content, 80)}
+          </div>
+          ${lastMessage.speaker !== firstMessage.speaker ? `
+            <div style="color: #4a5568; font-size: 13px; line-height: 1.4;">
+              <strong>${this.getSpeakerName(lastMessage.speaker)}:</strong> ${this.truncateText(lastMessage.content, 60)}
+            </div>
+          ` : ''}
+        </div>
+        
+        <!-- Footer -->
+        <div style="display: flex; justify-content: between; align-items: center; font-size: 12px; color: #718096;">
+          <span>${conversation.messages.length} messages</span>
+        </div>
+      </div>
+    `;
+  }
+
+  getCategoryIcon(category) {
+    const icons = {
+      coding: '🔧',
+      debugging: '🐛',
+      design: '🎨',
+      deployment: '🚀',
+      planning: '📋',
+      other: '📁'
+    };
+    return icons[category] || '📁';
+  }
+
+  getSpeakerName(speaker) {
+    const names = {
+      user: 'You',
+      assistant: 'AI Assistant',
+      lovable: 'Lovable'
+    };
+    return names[speaker] || speaker;
+  }
+
+  truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  }
+
+  getTimeAgo(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return time.toLocaleDateString();
   }
 }
 
