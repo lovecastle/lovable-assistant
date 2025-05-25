@@ -2138,16 +2138,16 @@ class ComprehensiveMessageScraper {
         await this.tryAlternativeScrollMethods();
       }
       
-      // Wait for new messages to load
-      await this.wait(this.scrollDelay);
+      // Wait for new messages to load (reduced for faster scraping)
+      await this.wait(300);
       
       // Trigger scan in simple capture system
       if (window.simpleConversationCapture) {
         window.simpleConversationCapture.scanForNewGroups();
       }
       
-      // Wait a bit more for processing
-      await this.wait(500);
+      // Wait a bit more for processing (reduced for faster scraping)
+      await this.wait(200);
       
       // Check if we got new message groups
       const newCount = window.simpleConversationCapture?.messageGroups?.size || 0;
@@ -2168,26 +2168,26 @@ class ComprehensiveMessageScraper {
         }
       }
       
-      // Shorter delay between scroll attempts for faster scraping
-      await this.wait(800);
+      // Shorter delay between scroll attempts for much faster scraping
+      await this.wait(400);
     }
   }
 
   async scrollUpAndWait() {
     const initialScrollTop = this.chatContainer.scrollTop;
     
-    // Simple scroll up strategy
-    this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 1000);
+    // Enhanced scroll up strategy - 5x longer and quicker
+    this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 5000);
     
-    // Wait for potential loading
-    await this.wait(1000);
+    // Reduced wait time for faster scraping
+    await this.wait(400);
     
     // Check if scroll position actually changed
     const finalScrollTop = this.chatContainer.scrollTop;
     const scrollChanged = Math.abs(finalScrollTop - initialScrollTop) > 10;
     
     if (scrollChanged) {
-      console.log('⬆️ Scrolling up');
+      console.log('⬆️ Scrolling up (5x distance, faster speed)');
       return true;
     } else {
       return false;
@@ -2197,12 +2197,12 @@ class ComprehensiveMessageScraper {
   async tryAlternativeScrollMethods() {
     // Try jumping to absolute top
     this.chatContainer.scrollTop = 0;
-    await this.wait(500);
+    await this.wait(250);
     
-    // Try keyboard simulation
+    // Try keyboard simulation  
     this.chatContainer.focus();
     this.chatContainer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true }));
-    await this.wait(300);
+    await this.wait(150);
   }
 
   checkIfAtTop() {
