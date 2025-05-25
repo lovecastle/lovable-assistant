@@ -1356,36 +1356,49 @@ class LovableDetector {
   }
 
   cleanAllFilteredMessages() {
+    if (!this.filteredHistoryMessages || this.filteredHistoryMessages.length === 0) {
+      console.log('No filtered messages to clean');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete all ${this.filteredHistoryMessages.length} filtered messages? This action cannot be undone.`)) {
       return;
     }
 
-    // Get the IDs of messages to remove
-    const idsToRemove = new Set(this.filteredHistoryMessages.map(msg => msg.id));
-    
-    // Remove from allHistoryMessages
-    this.allHistoryMessages = this.allHistoryMessages.filter(msg => !idsToRemove.has(msg.id));
-    
-    // Remove from message groups in simple conversation capture if available
-    if (window.simpleConversationCapture && window.simpleConversationCapture.messageGroups) {
-      // Remove groups that contain any of the IDs to remove
-      for (const [groupId, group] of window.simpleConversationCapture.messageGroups.entries()) {
-        if (idsToRemove.has(group.userId) || idsToRemove.has(group.lovableId)) {
-          window.simpleConversationCapture.messageGroups.delete(groupId);
-          // Also remove from processed IDs
-          window.simpleConversationCapture.processedLovableIds.delete(group.lovableId);
+    try {
+      // Get the IDs of messages to remove
+      const idsToRemove = new Set(this.filteredHistoryMessages.map(msg => msg.id));
+      
+      // Remove from allHistoryMessages
+      this.allHistoryMessages = this.allHistoryMessages.filter(msg => !idsToRemove.has(msg.id));
+      
+      // Remove from message groups in simple conversation capture if available
+      if (window.simpleConversationCapture && window.simpleConversationCapture.messageGroups) {
+        // Remove groups that contain any of the IDs to remove
+        for (const [groupId, group] of window.simpleConversationCapture.messageGroups.entries()) {
+          if (idsToRemove.has(group.userId) || idsToRemove.has(group.lovableId)) {
+            window.simpleConversationCapture.messageGroups.delete(groupId);
+            // Also remove from processed IDs
+            if (window.simpleConversationCapture.processedLovableIds) {
+              window.simpleConversationCapture.processedLovableIds.delete(group.lovableId);
+            }
+          }
         }
       }
-      if (window.conversationCapture.processedMessageIds) {
-        idsToRemove.forEach(id => window.conversationCapture.processedMessageIds.delete(id));
-      }
+      
+      // Update filtered messages
+      this.filteredHistoryMessages = [...this.allHistoryMessages];
+      this.applyHistoryFilters();
+      
+      console.log(`🗑️ Cleaned ${idsToRemove.size} messages from history`);
+      
+      // Refresh the display
+      this.renderHistoryMessages();
+      
+    } catch (error) {
+      console.error('Error cleaning filtered messages:', error);
+      alert('An error occurred while cleaning messages. Please try again.');
     }
-    
-    // Update filtered messages
-    this.filteredHistoryMessages = [...this.allHistoryMessages];
-    this.applyHistoryFilters();
-    
-    console.log(`🗑️ Cleaned ${idsToRemove.size} messages from history`);
   }
 
   renderHistoryMessages() {
@@ -1413,7 +1426,12 @@ class LovableDetector {
       if (cleanAllElement) {
         cleanAllElement.addEventListener('click', (e) => {
           e.preventDefault();
-          this.cleanAllFilteredMessages();
+          console.log('🗑️ Clean all button clicked');
+          try {
+            this.cleanAllFilteredMessages();
+          } catch (error) {
+            console.error('Error in cleanAllFilteredMessages:', error);
+          }
         });
       }
     }

@@ -23,7 +23,7 @@ class SimpleConversationCapture {
     if (this.isMonitoring) return;
     
     this.isMonitoring = true;
-    console.log('👀 Starting simple chat monitoring...');
+    console.log('👀 Starting chat monitoring...');
     
     // Find and monitor chat container
     this.findAndSetupMonitoring();
@@ -40,7 +40,9 @@ class SimpleConversationCapture {
     // Find chat container
     const chatContainer = this.findChatContainer();
     if (!chatContainer) {
-      console.log('⚠️ Chat container not found, will retry...');
+      if (this.verboseLogging) {
+        console.log('⚠️ Chat container not found, will retry...');
+      }
       return;
     }
 
@@ -62,7 +64,9 @@ class SimpleConversationCapture {
       const containers = document.querySelectorAll(selector);
       for (const container of containers) {
         if (container.querySelector('.ChatMessageContainer[data-message-id]')) {
-          console.log('✅ Found chat container');
+          if (this.verboseLogging) {
+            console.log('✅ Found chat container');
+          }
           return container;
         }
       }
@@ -101,7 +105,9 @@ class SimpleConversationCapture {
       attributeFilter: ['data-message-id']
     });
 
-    console.log('👀 Chat observer set up');
+    if (this.verboseLogging) {
+      console.log('👀 Chat observer set up');
+    }
   }
 
   scanForNewGroups() {
@@ -122,10 +128,6 @@ class SimpleConversationCapture {
     }
 
     let newGroupsFound = 0;
-    let skippedAlreadyProcessed = 0;
-    let skippedNoContent = 0;
-    let skippedIgnored = 0;
-    let skippedNoUser = 0;
 
     lovableMessages.forEach((lovableElement, index) => {
       const lovableId = lovableElement.getAttribute('data-message-id');
@@ -136,7 +138,6 @@ class SimpleConversationCapture {
       
       // Skip if already processed
       if (this.processedLovableIds.has(lovableId)) {
-        skippedAlreadyProcessed++;
         if (this.verboseLogging) {
           console.log(`⏭️ Already processed: ${lovableId}`);
         }
@@ -146,7 +147,6 @@ class SimpleConversationCapture {
       // Extract Lovable response content
       const lovableContent = this.extractContent(lovableElement);
       if (!lovableContent) {
-        skippedNoContent++;
         if (this.verboseLogging) {
           console.log(`⚠️ No content found for Lovable message: ${lovableId}`);
         }
@@ -160,7 +160,6 @@ class SimpleConversationCapture {
       // Find the user message that comes before this Lovable response
       const userElement = this.findPrecedingUserMessage(lovableElement);
       if (!userElement) {
-        skippedNoUser++;
         if (this.verboseLogging) {
           console.log(`⚠️ No user message found before Lovable: ${lovableId}`);
         }
@@ -170,7 +169,6 @@ class SimpleConversationCapture {
       const userId = userElement.getAttribute('data-message-id');
       const userContent = this.extractContent(userElement);
       if (!userContent) {
-        skippedNoContent++;
         if (this.verboseLogging) {
           console.log(`⚠️ No content found for user message: ${userId}`);
         }
@@ -183,7 +181,6 @@ class SimpleConversationCapture {
 
       // Check if we should ignore this group
       if (this.shouldIgnoreGroup(userContent, lovableContent)) {
-        skippedIgnored++;
         console.log(`🚫 Ignoring message group: ${userId} -> ${lovableId}`);
         this.processedLovableIds.add(lovableId);
         return;
@@ -217,16 +214,6 @@ class SimpleConversationCapture {
 
       console.log(`✅ New message group pending: [${userId.substring(0, 15)}...] -> [${lovableId.substring(0, 15)}...]`);
     });
-
-    // Summary logging
-    if (this.verboseLogging || newGroupsFound > 0) {
-      console.log(`\n📊 Scan Summary:`);
-      console.log(`  ✅ New groups found: ${newGroupsFound}`);
-      console.log(`  ⏭️ Already processed: ${skippedAlreadyProcessed}`);
-      console.log(`  ⚠️ No content: ${skippedNoContent}`);
-      console.log(`  🚫 Ignored: ${skippedIgnored}`);
-      console.log(`  ⚠️ No user message: ${skippedNoUser}`);
-    }
 
     if (newGroupsFound > 0) {
       console.log(`📊 Found ${newGroupsFound} new message groups`);
@@ -465,102 +452,10 @@ class SimpleConversationCapture {
     }));
   }
 
-  // Debug functions
+  // Essential production methods only
   setVerbose(enabled) {
     this.verboseLogging = enabled;
     console.log(`🔊 Verbose logging ${enabled ? 'enabled' : 'disabled'}`);
-  }
-
-  // Test specific message group by IDs
-  testSpecificMessageGroup(lovableId, userId = null) {
-    console.log(`🔍 Testing specific message group: ${lovableId}`);
-    
-    // Find the Lovable message
-    const lovableElement = document.querySelector(`[data-message-id="${lovableId}"]`);
-    if (!lovableElement) {
-      console.log(`❌ Lovable message not found: ${lovableId}`);
-      return false;
-    }
-    
-    console.log('✅ Found Lovable message element');
-    
-    // Extract Lovable content
-    const lovableContent = this.extractContent(lovableElement);
-    console.log(`📝 Lovable content (${lovableContent.length} chars):`, lovableContent);
-    
-    // Find user message
-    let userElement;
-    if (userId) {
-      userElement = document.querySelector(`[data-message-id="${userId}"]`);
-    } else {
-      userElement = this.findPrecedingUserMessage(lovableElement);
-    }
-    
-    if (!userElement) {
-      console.log(`❌ User message not found`);
-      return false;
-    }
-    
-    console.log('✅ Found user message element:', userElement.getAttribute('data-message-id'));
-    
-    // Extract user content
-    const userContent = this.extractContent(userElement);
-    console.log(`📝 User content (${userContent.length} chars):`, userContent);
-    
-    // Test ignore rules
-    const shouldIgnore = this.shouldIgnoreGroup(userContent, lovableContent);
-    console.log(`🚫 Should ignore: ${shouldIgnore}`);
-    
-    if (shouldIgnore) {
-      console.log('❌ Group would be ignored by filter rules');
-      return false;
-    }
-    
-    // Check if already processed
-    const alreadyProcessed = this.processedLovableIds.has(lovableId);
-    console.log(`📊 Already processed: ${alreadyProcessed}`);
-    
-    console.log('✅ This message group should be captured successfully');
-    return true;
-  }
-
-  // Find all missing message groups
-  findMissingGroups() {
-    console.log('🔍 Scanning for missing message groups...');
-    
-    const allLovableMessages = Array.from(document.querySelectorAll('[data-message-id^="aimsg_"]'));
-    const missingGroups = [];
-    
-    allLovableMessages.forEach(lovableElement => {
-      const lovableId = lovableElement.getAttribute('data-message-id');
-      
-      if (!this.processedLovableIds.has(lovableId)) {
-        const userElement = this.findPrecedingUserMessage(lovableElement);
-        if (userElement) {
-          const userId = userElement.getAttribute('data-message-id');
-          const lovableContent = this.extractContent(lovableElement);
-          const userContent = this.extractContent(userElement);
-          
-          if (lovableContent && userContent && !this.shouldIgnoreGroup(userContent, lovableContent)) {
-            missingGroups.push({
-              lovableId,
-              userId,
-              userContent: userContent.substring(0, 100) + '...',
-              lovableContent: lovableContent.substring(0, 100) + '...'
-            });
-          }
-        }
-      }
-    });
-    
-    console.log(`📊 Found ${missingGroups.length} missing message groups:`);
-    missingGroups.forEach((group, index) => {
-      console.log(`  ${index + 1}. ${group.userId} -> ${group.lovableId}`);
-      console.log(`     User: "${group.userContent}"`);
-      console.log(`     Lovable: "${group.lovableContent}"`);
-    });
-    
-    return missingGroups;
   }
 
   getStats() {
@@ -572,23 +467,8 @@ class SimpleConversationCapture {
     };
   }
 
-  debugInfo() {
-    console.log('🔧 ===== SIMPLE CAPTURE DEBUG =====');
-    console.log('📊 Stats:', this.getStats());
-    console.log('📋 Recent Groups:');
-    Array.from(this.messageGroups.values()).slice(-3).forEach((group, index) => {
-      console.log(`  ${index + 1}. ${group.id}: "${group.userContent.substring(0, 50)}..." -> "${group.lovableContent.substring(0, 50)}..."`);
-    });
-    
-    if (this.pendingGroup) {
-      console.log('⏳ Pending Group:', this.pendingGroup.id);
-    }
-    
-    console.log('===============================');
-  }
-
   restart() {
-    console.log('🔄 Restarting simple capture...');
+    console.log('🔄 Restarting capture...');
     if (this.chatObserver) {
       this.chatObserver.disconnect();
       this.chatObserver = null;
@@ -600,7 +480,7 @@ class SimpleConversationCapture {
   }
 
   destroy() {
-    console.log('🧹 Cleaning up simple capture...');
+    console.log('🧹 Cleaning up capture...');
     if (this.chatObserver) {
       this.chatObserver.disconnect();
     }
@@ -615,53 +495,49 @@ const simpleConversationCapture = new SimpleConversationCapture();
 // Make it globally accessible
 window.simpleConversationCapture = simpleConversationCapture;
 
-  // Manually capture missing groups
-  captureMissingGroups() {
-    console.log('🔄 Manually capturing missing groups...');
-    
-    const missingGroups = this.findMissingGroups();
-    let capturedCount = 0;
-    
-    missingGroups.forEach(group => {
-      const lovableElement = document.querySelector(`[data-message-id="${group.lovableId}"]`);
-      const userElement = document.querySelector(`[data-message-id="${group.userId}"]`);
-      
-      if (lovableElement && userElement) {
-        const lovableContent = this.extractContent(lovableElement);
-        const userContent = this.extractContent(userElement);
-        
-        if (lovableContent && userContent && !this.shouldIgnoreGroup(userContent, lovableContent)) {
-          const messageGroup = {
-            id: `group_${group.lovableId}`,
-            userId: group.userId,
-            lovableId: group.lovableId,
-            userContent: userContent.trim(),
-            lovableContent: lovableContent.trim(),
-            timestamp: this.extractTimestamp(lovableElement),
-            categories: this.categorizeUserMessage(userContent),
-            projectId: this.extractProjectId(),
-            createdAt: new Date().toISOString()
-          };
-          
-          this.saveCompletedGroup(messageGroup);
-          this.processedLovableIds.add(group.lovableId);
-          capturedCount++;
-          
-          console.log(`✅ Manually captured: ${group.userId} -> ${group.lovableId}`);
-        }
+// Create compatibility layer for old system references
+window.conversationCapture = {
+  // Redirect to new system methods
+  setVerbose: (enabled) => {
+    return window.simpleConversationCapture.setVerbose(enabled);
+  },
+  
+  scanForNewLovableMessages: () => {
+    return window.simpleConversationCapture.scanForNewGroups();
+  },
+  
+  restart: () => {
+    return window.simpleConversationCapture.restart();
+  },
+  
+  // Legacy properties for compatibility
+  get detectedMessages() {
+    // Convert message groups back to individual messages
+    const messages = [];
+    if (window.simpleConversationCapture.messageGroups) {
+      for (const group of window.simpleConversationCapture.messageGroups.values()) {
+        messages.push({
+          id: group.userId,
+          content: group.userContent,
+          speaker: 'user',
+          timestamp: group.timestamp,
+          categories: group.categories
+        });
+        messages.push({
+          id: group.lovableId,
+          content: group.lovableContent,
+          speaker: 'lovable',
+          timestamp: group.timestamp,
+          categories: group.categories
+        });
       }
-    });
-    
-    console.log(`🎉 Manually captured ${capturedCount} missing groups`);
-    return capturedCount;
+    }
+    return messages;
+  },
+  
+  get processedMessageIds() {
+    return new Set(); // Return empty set for compatibility
   }
+};
 
-console.log('✅ Simple Conversation Capture ready!');
-console.log('📋 Available commands:');
-console.log('  • window.simpleConversationCapture.debugInfo() - Show stats');
-console.log('  • window.simpleConversationCapture.setVerbose(true/false) - Toggle logging');
-console.log('  • window.simpleConversationCapture.getStats() - Get current stats');
-console.log('  • window.simpleConversationCapture.restart() - Restart monitoring');
-console.log('  • window.simpleConversationCapture.findMissingGroups() - Find uncaptured groups');
-console.log('  • window.simpleConversationCapture.captureMissingGroups() - Capture missing groups');
-console.log('  • window.simpleConversationCapture.testSpecificMessageGroup("aimsg_id", "umsg_id") - Test specific group');
+console.log('✅ Lovable.dev Simple Conversation Capture ready');
