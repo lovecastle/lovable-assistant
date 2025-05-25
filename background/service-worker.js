@@ -1,5 +1,10 @@
 // Service Worker for Chrome Extension Background Tasks
+import { SupabaseClient } from './database-sync.js';
+
 console.log('Service worker starting...');
+
+// Initialize database client
+const supabase = new SupabaseClient();
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
@@ -20,6 +25,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'chatMessage':
       handleChatMessage(request.message, request.context).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'saveConversation':
+      handleSaveConversation(request.data).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'bulkSaveConversations':
+      handleBulkSaveConversations(request.data).then(result => {
         sendResponse(result);
       });
       break;
@@ -57,6 +74,54 @@ async function handleChatMessage(message, context) {
     return { success: true, data: response };
     
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSaveConversation(conversationData) {
+  try {
+    console.log('💾 Saving conversation to database:', conversationData.id);
+    
+    const result = await supabase.saveConversation(conversationData);
+    console.log('✅ Conversation saved successfully:', result);
+    
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('❌ Failed to save conversation:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleBulkSaveConversations(conversationsArray) {
+  try {
+    console.log(`💾 Bulk saving ${conversationsArray.length} conversations...`);
+    
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const conversationData of conversationsArray) {
+      try {
+        const result = await supabase.saveConversation(conversationData);
+        results.push({ success: true, data: result });
+        successCount++;
+      } catch (error) {
+        console.error(`❌ Failed to save conversation ${conversationData.id}:`, error);
+        results.push({ success: false, error: error.message });
+        errorCount++;
+      }
+    }
+    
+    console.log(`✅ Bulk save complete: ${successCount} saved, ${errorCount} errors`);
+    return { 
+      success: errorCount === 0, 
+      data: { 
+        results, 
+        summary: { successCount, errorCount, total: conversationsArray.length }
+      }
+    };
+  } catch (error) {
+    console.error('❌ Bulk save operation failed:', error);
     return { success: false, error: error.message };
   }
 }
