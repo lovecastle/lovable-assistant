@@ -2016,15 +2016,12 @@ class ComprehensiveMessageScraper {
     this.statusDiv = statusDiv;
     this.btn = btn;
     this.chatContainer = null;
-    this.scrapedMessages = new Map(); // Use Map to avoid duplicates by message ID
-    this.lastMessageCount = 0;
+    this.lastMessageGroupCount = 0;
     this.scrollAttempts = 0;
-    this.maxScrollAttempts = 100; // Prevent infinite loops
-    this.scrollDelay = 5000; // Wait between scroll attempts (increased to 5 seconds for more thorough scraping)
+    this.noNewDataCounter = 0;
+    this.maxNoNewDataAttempts = 10; // Stop after 10 scrolls with no new data
+    this.scrollDelay = 1500; // Reduced from 5000ms for faster scraping
     this.isRunning = false;
-    this.stuckCounter = 0;
-    this.maxStuckAttempts = 5;
-    this.initialBottomMessage = null;
     this.hasReachedTop = false;
   }
 
@@ -2040,10 +2037,11 @@ class ComprehensiveMessageScraper {
     
     this.updateStatus('📝 Recording initial state...', '#667eea');
     
-    // Record the initial bottom message to know when we've scrolled through everything
+    // Record initial message group count
     await this.recordInitialState();
     
     this.updateStatus('🚀 Starting comprehensive message scraping...', '#667eea');
+    console.log('🚀 Starting comprehensive message scraping');
     
     // Start the scraping process
     await this.performComprehensiveScrape();
@@ -2059,9 +2057,6 @@ class ComprehensiveMessageScraper {
       'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
       // Alternative containers that might contain messages
       'div[class*="overflow-y-auto"][class*="h-full"]',
-      'div[class*="chat"][class*="overflow"]',
-      '[data-testid*="chat-container"]',
-      '[data-testid*="messages-container"]',
       // Fallback: any scrollable container with ChatMessageContainer children
       'div[class*="overflow-y-auto"]'
     ];
@@ -2072,7 +2067,6 @@ class ComprehensiveMessageScraper {
         // Check if this container has ChatMessageContainer children
         const messages = container.querySelectorAll('.ChatMessageContainer[data-message-id]');
         if (messages.length > 0) {
-          console.log(`✅ Found chat container with ${messages.length} messages using selector: ${selector}`);
           return container;
         }
       }
@@ -2086,7 +2080,6 @@ class ComprehensiveMessageScraper {
       while (container && container.parentElement) {
         const style = window.getComputedStyle(container);
         if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-          console.log(`✅ Found scrollable ancestor container with ${messageContainers.length} messages`);
           return container;
         }
         container = container.parentElement;
@@ -2099,43 +2092,34 @@ class ComprehensiveMessageScraper {
   async recordInitialState() {
     // Scroll to bottom first to establish baseline
     this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
-    await this.wait(1000);
+    await this.wait(500);
     
-    // Capture initial messages at the bottom
-    await this.captureCurrentMessages();
+    // Get initial message group count from simple capture system
+    const initialCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+    this.lastMessageGroupCount = initialCount;
     
-    // Record the last message for reference
-    const messages = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
-    if (messages.length > 0) {
-      this.initialBottomMessage = messages[messages.length - 1].getAttribute('data-message-id');
-      console.log(`📍 Initial bottom message recorded: ${this.initialBottomMessage}`);
-    }
-    
-    this.lastMessageCount = this.scrapedMessages.size;
+    console.log(`📍 Initial message group count: ${initialCount}`);
   }
 
   async performComprehensiveScrape() {
     this.scrollAttempts = 0;
-    this.stuckCounter = 0;
+    this.noNewDataCounter = 0;
     
-    while (this.isRunning && this.scrollAttempts < this.maxScrollAttempts && !this.hasReachedTop) {
+    while (this.isRunning && !this.hasReachedTop) {
       this.scrollAttempts++;
       
-      // Update status with progress
+      // Get current message group count
+      const currentCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+      
+      // Update status
       this.updateStatus(
-        `⬆️ Scrolling up (attempt ${this.scrollAttempts}/${this.maxScrollAttempts}) - Found ${this.scrapedMessages.size} messages`,
+        `⬆️ Scrolling up - Found ${currentCount} message groups`,
         '#667eea'
       );
       
-      // Capture messages before scrolling (in case they disappear)
-      await this.captureCurrentMessages();
-      
-      // Wait a moment to ensure message processing is complete
-      await this.wait(1500);
-      
       // Check if we've reached the top
       if (this.checkIfAtTop()) {
-        console.log('🔝 Reached the top of the chat!');
+        console.log('🔝 Reached the top of the chat');
         this.hasReachedTop = true;
         break;
       }
@@ -2144,168 +2128,108 @@ class ComprehensiveMessageScraper {
       const scrollSuccess = await this.scrollUpAndWait();
       
       if (!scrollSuccess) {
-        this.stuckCounter++;
-        console.log(`⚠️ Scroll attempt ${this.scrollAttempts} seems stuck (${this.stuckCounter}/${this.maxStuckAttempts})`);
-        
-        if (this.stuckCounter >= this.maxStuckAttempts) {
-          console.log('🛑 Too many stuck attempts, stopping scrape');
+        // If scroll failed, we might be at the top
+        if (this.checkIfAtTop()) {
+          console.log('🔝 Reached the top (scroll failed)');
+          this.hasReachedTop = true;
           break;
         }
-        
-        // Try different scroll strategies when stuck
+        // Try alternative scroll methods
         await this.tryAlternativeScrollMethods();
-      } else {
-        this.stuckCounter = 0; // Reset stuck counter on successful scroll
       }
       
-      // Wait longer to ensure new messages are fully loaded and rendered
-      await this.wait(2000);
-      
-      // Capture messages after scrolling
-      await this.captureCurrentMessages();
-      
-      // Wait a moment to ensure message processing is complete
-      await this.wait(1500);
-      
-      // Check if we're making progress
-      if (this.scrapedMessages.size === this.lastMessageCount) {
-        this.stuckCounter++;
-      } else {
-        this.lastMessageCount = this.scrapedMessages.size;
-        this.stuckCounter = 0;
-      }
-      
-      // Add delay to allow for loading and avoid overwhelming the system
+      // Wait for new messages to load
       await this.wait(this.scrollDelay);
       
-      // Additional safety check - wait for message rendering to complete
-      await this.waitForMessageStability();
-      
-      // Handle background operation - reduce delay if tab is not visible
-      if (document.hidden) {
-        await this.wait(1000); // Longer delay when in background to ensure complete processing
+      // Trigger scan in simple capture system
+      if (window.simpleConversationCapture) {
+        window.simpleConversationCapture.scanForNewGroups();
       }
+      
+      // Wait a bit more for processing
+      await this.wait(500);
+      
+      // Check if we got new message groups
+      const newCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+      
+      if (newCount > this.lastMessageGroupCount) {
+        // We got new data
+        const newGroups = newCount - this.lastMessageGroupCount;
+        console.log(`✅ New message group detected: +${newGroups} (total: ${newCount})`);
+        this.lastMessageGroupCount = newCount;
+        this.noNewDataCounter = 0; // Reset counter
+      } else {
+        // No new data
+        this.noNewDataCounter++;
+        
+        if (this.noNewDataCounter >= this.maxNoNewDataAttempts) {
+          console.log(`🛑 No new data after ${this.maxNoNewDataAttempts} scroll attempts, stopping`);
+          break;
+        }
+      }
+      
+      // Shorter delay between scroll attempts for faster scraping
+      await this.wait(800);
     }
   }
 
   async scrollUpAndWait() {
     const initialScrollTop = this.chatContainer.scrollTop;
     
-    // Try multiple scroll strategies
-    const scrollStrategies = [
-      () => { this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 1000); },
-      () => { this.chatContainer.scrollBy(0, -1000); },
-      () => { this.chatContainer.scrollTop = 0; }, // Jump to absolute top
-      () => { 
-        // Smooth scroll up
-        this.chatContainer.scrollTo({ 
-          top: Math.max(0, this.chatContainer.scrollTop - 800), 
-          behavior: 'smooth' 
-        }); 
-      }
-    ];
+    // Simple scroll up strategy
+    this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 1000);
     
-    // Try first strategy
-    scrollStrategies[this.scrollAttempts % scrollStrategies.length]();
-    
-    // Wait for potential loading (increased delay for thorough message capture)
-    await this.wait(2500);
+    // Wait for potential loading
+    await this.wait(1000);
     
     // Check if scroll position actually changed
     const finalScrollTop = this.chatContainer.scrollTop;
     const scrollChanged = Math.abs(finalScrollTop - initialScrollTop) > 10;
     
     if (scrollChanged) {
-      console.log(`✅ Scroll successful: ${initialScrollTop} → ${finalScrollTop}`);
+      console.log('⬆️ Scrolling up');
       return true;
     } else {
-      console.log(`⚠️ Scroll failed: position unchanged at ${initialScrollTop}`);
       return false;
     }
   }
 
   async tryAlternativeScrollMethods() {
-    console.log('🔄 Trying alternative scroll methods...');
+    // Try jumping to absolute top
+    this.chatContainer.scrollTop = 0;
+    await this.wait(500);
     
-    // Method 1: Try keyboard simulation
+    // Try keyboard simulation
     this.chatContainer.focus();
     this.chatContainer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true }));
-    await this.wait(500);
-    
-    // Method 2: Try wheel events
-    this.chatContainer.dispatchEvent(new WheelEvent('wheel', {
-      deltaY: -500,
-      bubbles: true
-    }));
-    await this.wait(500);
-    
-    // Method 3: Try scrollIntoView on first visible message
-    const firstMessage = this.chatContainer.querySelector('.ChatMessageContainer[data-message-id]');
-    if (firstMessage) {
-      firstMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      await this.wait(500);
-    }
+    await this.wait(300);
   }
 
   checkIfAtTop() {
-    const isAtTop = this.chatContainer.scrollTop <= 5; // Small threshold for rounding errors
-    
-    if (isAtTop) {
-      // Double-check by looking for any load more indicators or if scroll top hasn't changed
-      const hasMoreContent = this.chatContainer.scrollHeight > this.chatContainer.clientHeight;
-      return !hasMoreContent || this.chatContainer.scrollTop === 0;
-    }
-    
-    return false;
-  }
-
-  async captureCurrentMessages() {
-    // With the new simple capture system, we don't need complex message processing
-    // Just let the simple system handle detection automatically
-    if (!window.simpleConversationCapture) {
-      console.warn('⚠️ Simple ConversationCapture not available');
-      return;
-    }
-    
-    // Get all visible message containers for counting purposes
-    const messageContainers = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
-    
-    console.log(`📊 Found ${messageContainers.length} visible messages. Simple capture will process them automatically.`);
-    
-    // Just trigger a scan in the simple system
-    window.simpleConversationCapture.scanForNewGroups();
+    return this.chatContainer.scrollTop <= 5; // Small threshold for rounding errors
   }
 
   async finalizeScraping() {
     this.isRunning = false;
     
-    // Final capture to make sure we got everything
-    await this.captureCurrentMessages();
-    
-    const totalMessages = this.scrapedMessages.size;
-    console.log(`🎉 Scraping complete! Total messages captured: ${totalMessages}`);
-    
-    // Integrate with simple conversation capture system
+    // Final scan to ensure we captured everything
     if (window.simpleConversationCapture) {
-      console.log(`🔄 Triggering simple capture re-scan after comprehensive scraping...`);
-      
-      // Trigger a re-scan to pick up any newly loaded messages
       window.simpleConversationCapture.scanForNewGroups();
-      
-      this.updateStatus(
-        `🎉 Scraping complete! Found ${totalMessages} total messages. Simple capture will process them into groups.`,
-        '#48bb78'
-      );
-      
-      // Refresh history if available
-      if (window.lovableDetector && window.lovableDetector.loadHistoryMessages) {
-        await window.lovableDetector.loadHistoryMessages();
-      }
-    } else {
-      this.updateStatus(
-        `✅ Scraping complete! Found ${totalMessages} messages`,
-        '#48bb78'
-      );
+    }
+    
+    // Get final count
+    const finalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+    
+    console.log(`🎉 Scraping complete! Total message groups captured: ${finalCount}`);
+    
+    this.updateStatus(
+      `🎉 Scraping complete! Found ${finalCount} message groups`,
+      '#48bb78'
+    );
+    
+    // Refresh history if available
+    if (window.lovableDetector && window.lovableDetector.loadHistoryMessages) {
+      await window.lovableDetector.loadHistoryMessages();
     }
     
     // Reset UI elements
@@ -2317,62 +2241,29 @@ class ComprehensiveMessageScraper {
     const stopBtn = document.getElementById('stop-scraping-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     
-    // Clear status after 10 seconds and hide status area
+    // Clear status after 8 seconds and hide status area
     setTimeout(() => {
       if (this.statusDiv) {
         this.statusDiv.innerHTML = '';
         this.statusDiv.style.display = 'none';
       }
-    }, 10000);
+    }, 8000);
   }
 
   updateStatus(message, color = '#4a5568') {
     if (this.statusDiv) {
       this.statusDiv.innerHTML = `<span style="color: ${color};">${message}</span>`;
     }
-    console.log(`📊 Scraper: ${message}`);
   }
 
   wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Wait for message stability to ensure all messages are fully loaded and rendered
-  async waitForMessageStability() {
-    let stableChecks = 0;
-    const maxStableChecks = 3;
-    let previousMessageCount = 0;
-    
-    console.log('⏳ Waiting for message stability...');
-    
-    for (let i = 0; i < maxStableChecks; i++) {
-      await this.wait(1000); // Wait 1 second between checks
-      
-      const currentMessageCount = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]').length;
-      
-      if (currentMessageCount === previousMessageCount) {
-        stableChecks++;
-        console.log(`✅ Message count stable (${currentMessageCount}) - check ${stableChecks}/${maxStableChecks}`);
-      } else {
-        stableChecks = 0; // Reset if count changed
-        console.log(`🔄 Message count changed: ${previousMessageCount} → ${currentMessageCount}, resetting stability check`);
-      }
-      
-      previousMessageCount = currentMessageCount;
-      
-      // If we've had enough stable checks, consider it stable
-      if (stableChecks >= 2) {
-        console.log('✅ Messages are stable, continuing...');
-        return;
-      }
-    }
-    
-    console.log('⚠️ Message stability timeout reached, continuing anyway...');
-  }
-
   // Method to stop scraping if needed
   stop() {
     this.isRunning = false;
+    console.log('🛑 Scraping stopped by user');
     this.updateStatus('🛑 Scraping stopped by user', '#f56565');
     
     // Reset UI elements
@@ -2391,10 +2282,6 @@ class ComprehensiveMessageScraper {
         this.statusDiv.style.display = 'none';
       }
     }, 5000);
-  }
-
-  escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
 
