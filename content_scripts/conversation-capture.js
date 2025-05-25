@@ -9,7 +9,7 @@ class ConversationCapture {
     this.detectedMessages = [];
     this.processedMessageIds = new Set(); // Track processed messages to avoid duplicates
     this.lastScanTime = 0;
-    this.scanCooldown = 5000; // 5 seconds between scans (user requested)
+    this.scanCooldown = 20000; // 20 seconds between scans (user requested)
     this.verboseLogging = false; // Reduce console flooding
     this.categories = {
       primary: ['Planning', 'Functioning', 'Designing', 'Debugging', 'Deployment'],
@@ -292,6 +292,7 @@ class ConversationCapture {
     let newMessagesCount = 0;
     let ignoredMessagesCount = 0;
     let duplicateMessagesCount = 0;
+    let incompleteMessagesCount = 0;
     let lastProcessedMessage = null;
     
     messagesInOrder.forEach((container, index) => {
@@ -301,6 +302,23 @@ class ConversationCapture {
         if (this.processedMessageIds.has(messageData.id)) {
           duplicateMessagesCount++;
           return; // Skip already processed messages
+        }
+        
+        // Special handling for Lovable messages - check completeness before processing
+        if (messageData.speaker === 'lovable') {
+          if (!this.isLovableMessageComplete(messageData, container)) {
+            // Message is not complete yet, don't process it
+            incompleteMessagesCount++;
+            if (this.verboseLogging) {
+              console.log(`⏳ Lovable message ${messageData.id} not complete yet, will retry in next scan`);
+            }
+            return; // Skip this message for now, will be picked up in next scan
+          }
+          
+          // Message is complete, continue with processing
+          if (this.verboseLogging) {
+            console.log(`✅ Lovable message ${messageData.id} is complete, processing now`);
+          }
         }
         
         // Check if we should ignore this message
@@ -334,10 +352,95 @@ class ConversationCapture {
       this.applyMessagePairing();
     }
     
-    // Only show summary if there were new messages or in verbose mode
-    if (newMessagesCount > 0 || this.verboseLogging) {
-      console.log(`📊 Scan Summary: ${newMessagesCount} new | ${ignoredMessagesCount} ignored | ${duplicateMessagesCount} duplicates | Total: ${this.detectedMessages.length}`);
+    // Only show summary if there were new messages, incomplete messages, or in verbose mode
+    if (newMessagesCount > 0 || incompleteMessagesCount > 0 || this.verboseLogging) {
+      console.log(`📊 Scan Summary: ${newMessagesCount} new | ${incompleteMessagesCount} incomplete | ${ignoredMessagesCount} ignored | ${duplicateMessagesCount} duplicates | Total: ${this.detectedMessages.length}`);
     }
+  }
+
+  isLovableMessageComplete(messageData, container) {
+    if (messageData.speaker !== 'lovable') return true; // User messages are always complete
+    
+    const content = messageData.content.toLowerCase();
+    
+    // Check for all 3 parts of a complete Lovable response:
+    // 1. Thinking part (usually starts with explanations, "you're right", "i'll fix", etc.)
+    // 2. Coding part (contains code blocks, implementations)  
+    // 3. Summary part (explains what was done, "now the...", "this will...")
+    
+    const hasThinkingPart = content.includes('you\'re right') || 
+                           content.includes('i\'ll fix') ||
+                           content.includes('let me fix') ||
+                           content.includes('the issue is') ||
+                           content.includes('i understand') ||
+                           content.includes('i\'ll help') ||
+                           content.includes('i\'ll update') ||
+                           content.length > 100; // At least some substantial thinking
+    
+    const hasCodingPart = content.includes('```') || // Code blocks
+                         content.includes('here\'s the') ||
+                         content.includes('updated code') ||
+                         content.includes('i\'ll update') ||
+                         container.querySelectorAll('.prose').length > 1; // Multiple prose sections
+    
+    const hasSummaryPart = content.includes('now the') ||
+                          content.includes('this should') ||
+                          content.includes('this will') ||
+                          content.includes('the button will') ||
+                          content.includes('this fix') ||
+                          content.includes('this update') ||
+                          (content.length > 300 && content.includes('.')); // Substantial content with proper ending
+    
+    // Consider complete if it has thinking + summary (coding is optional for some responses)
+    const isComplete = hasThinkingPart && hasSummaryPart && messageData.content.length > 200;
+    
+    if (this.verboseLogging) {
+      console.log(`🔍 Lovable message completeness check for ${messageData.id}:`, {
+        hasThinkingPart,
+        hasCodingPart, 
+        hasSummaryPart,
+        contentLength: messageData.content.length,
+        isComplete
+      });
+    }
+    
+    return isComplete;
+  }
+
+  isLovableMessageStreaming(messageData, container) {
+    if (messageData.speaker !== 'lovable') return false;
+    
+    // Check if this appears to be a partial/streaming message
+    const indicators = {
+      // Short content might indicate it's still being written
+      isShort: messageData.content.length < 200,
+      
+      // Check if content ends abruptly (no proper conclusion)
+      endsAbruptly: !messageData.content.match(/[.!?]\s*$/),
+      
+      // Check for streaming indicators in the content
+      hasStreamingIndicators: messageData.content.includes('...') || 
+                             messageData.content.trim().endsWith(''),
+      
+      // Check if there are visible loading/streaming elements in the container
+      hasLoadingElements: container.querySelector('.animate-pulse, .loading, .streaming, [class*="typing"]'),
+      
+      // Check if this looks like just the "thinking" part
+      looksIncomplete: !this.isLovableMessageComplete(messageData, container),
+      
+      // Check if there are incomplete prose containers (still being populated)
+      hasIncompleteProse: container.querySelectorAll('.prose').length === 1 && messageData.content.length < 300
+    };
+    
+    // Consider it streaming if multiple indicators suggest so or if it's not complete
+    const streamingScore = Object.values(indicators).filter(Boolean).length;
+    const isStreaming = streamingScore >= 2 || indicators.looksIncomplete;
+    
+    if (this.verboseLogging && isStreaming) {
+      console.log(`⏳ Message ${messageData.id} appears to be streaming:`, indicators);
+    }
+    
+    return isStreaming;
   }
 
   getElementTop(element) {
@@ -664,6 +767,18 @@ class ConversationCapture {
       captured_at: new Date().toISOString()
     });
 
+    // Notify the main detector about new message with error handling
+    this.safeSendMessage({
+      action: 'messageDetected',
+      data: messageData
+    }).then(() => {
+      if (this.verboseLogging) {
+        console.log('✅ Message sent to background script');
+      }
+    }).catch(() => {
+      // Silently handle - error already logged in safeSendMessage
+    });
+
     // Notify the main detector about new message
     if (window.lovableDetector && window.lovableDetector.addDetectedMessage) {
       window.lovableDetector.addDetectedMessage(messageData);
@@ -678,6 +793,34 @@ class ConversationCapture {
     window.dispatchEvent(new CustomEvent('lovable-message-captured', {
       detail: messageData
     }));
+  }
+
+  // Utility function to safely send messages to background script
+  async safeSendMessage(message) {
+    try {
+      const response = await chrome.runtime.sendMessage(message);
+      return response;
+    } catch (error) {
+      // Handle extension context invalidation gracefully
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Extension context invalidated - background communication unavailable');
+        }
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      // Handle other chrome.runtime errors
+      if (error.message && error.message.includes('receiving end does not exist')) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Background script not available');
+        }
+        return { success: false, error: 'Background script not available' };
+      }
+      
+      // Log other unexpected errors
+      console.error('Chrome runtime message error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   extractProjectId() {
@@ -759,27 +902,25 @@ class ConversationCapture {
   }
 
   async saveConversation(messageData) {
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'saveConversation',
-        data: {
-          id: messageData.id,
-          projectId: messageData.projectId,
-          userMessage: messageData.speaker === 'user' ? messageData.content : '',
-          lovableResponse: messageData.speaker === 'lovable' ? messageData.content : '',
-          timestamp: messageData.timestamp,
-          categories: messageData.categories,
-          techTerms: messageData.techTerms || [],
-          codeSnippets: messageData.codeSnippets || [],
-          pageContext: messageData.pageContext || {}
-        }
-      });
-
-      if (response?.success) {
-        console.log('💾 Conversation saved successfully:', messageData.id);
+    const response = await this.safeSendMessage({
+      action: 'saveConversation',
+      data: {
+        id: messageData.id,
+        projectId: messageData.projectId,
+        userMessage: messageData.speaker === 'user' ? messageData.content : '',
+        lovableResponse: messageData.speaker === 'lovable' ? messageData.content : '',
+        timestamp: messageData.timestamp,
+        categories: messageData.categories,
+        techTerms: messageData.techTerms || [],
+        codeSnippets: messageData.codeSnippets || [],
+        pageContext: messageData.pageContext || {}
       }
-    } catch (error) {
-      console.error('Error saving conversation:', error);
+    });
+
+    if (response?.success) {
+      console.log('💾 Conversation saved successfully:', messageData.id);
+    } else if (this.verboseLogging && response?.error && !response.error.includes('Extension context invalidated')) {
+      console.warn('⚠️ Conversation save failed:', response.error);
     }
   }
 

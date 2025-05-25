@@ -367,6 +367,31 @@ class LovableDetector {
             ">COMING SOON</div>
           </div>
           
+          <!-- Utilities -->
+          <div class="feature-card" data-feature="utilities" style="
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">🛠️</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Utilities
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  Advanced tools for message scraping, notifications, and prompt enhancement
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+          </div>
+          
           <!-- Settings -->
           <div class="feature-card" data-feature="settings" style="
             background: white; border: 2px solid #c9cfd7; border-radius: 12px;
@@ -635,6 +660,9 @@ class LovableDetector {
       case 'history':
         this.showDevelopmentHistory();
         break;
+      case 'utilities':
+        this.showUtilitiesPage();
+        break;
       case 'knowledge':
         this.showComingSoon('Project Knowledge');
         break;
@@ -782,6 +810,155 @@ class LovableDetector {
     `;
     
     this.setupBackButton();
+  }
+
+  showUtilitiesPage() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '🛠️ Utilities';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-welcome-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Welcome</button>
+        </div>
+        
+        <!-- Message Scraping -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            📥 Comprehensive Message Scraping
+          </h3>
+          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
+            Intelligently scroll through the entire chat history to capture all messages, including older ones that aren't currently visible.
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button id="scrape-messages-btn" style="
+              background: #667eea; color: white; border: none; padding: 10px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+            ">Scrape All Messages</button>
+            <button id="stop-scraping-btn" style="
+              background: #f56565; color: white; border: none; padding: 10px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+              display: none;
+            ">Stop Scraping</button>
+          </div>
+          <div id="scrape-status" style="
+            margin-top: 10px; font-size: 13px; color: #4a5568;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 8px 12px; min-height: 20px; display: none;
+          "></div>
+          <div style="
+            background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
+            padding: 10px; margin-top: 12px; font-size: 13px; color: #0369a1;
+          ">
+            <strong>💡 How it works:</strong> This feature automatically scrolls up through your chat history, 
+            capturing messages as they load. It handles Lovable's lazy loading and will continue running 
+            even if you switch browser tabs. The process may take a few minutes for long conversations.
+          </div>
+        </div>
+        
+        <!-- Notifications -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            🔔 Notifications
+          </h3>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <label style="color: #4a5568; font-size: 14px;">Show notification when Lovable finishes response</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="notification-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label style="color: #4a5568; font-size: 14px;">Auto switch to Lovable tab after response</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="auto-switch-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Input Enhancement -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            ✨ Input Enhancement
+          </h3>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="color: #4a5568; font-size: 14px;">Auto-expand input area on new lines</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="auto-expand-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
+            <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+              Prompt Enhancement (Ctrl+Enter / Cmd+Enter)
+            </h4>
+            <p style="margin: 0 0 8px 0; color: #4a5568; font-size: 13px;">
+              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to get prompt suggestions:
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #718096;">
+              <div>
+                <strong>🎨 Designing:</strong><br>
+                • UI Change<br>
+                • Optimize for Mobile
+              </div>
+              <div>
+                <strong>⚙️ Functioning:</strong><br>
+                • Modifying Function
+              </div>
+              <div>
+                <strong>🐛 Debugging:</strong><br>
+                • Minor Errors<br>
+                • Persistent Errors<br>
+                • Major Errors<br>
+                • Critical Errors
+              </div>
+              <div>
+                <strong>🔄 Refactoring:</strong><br>
+                • Code Refactoring
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Settings -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            ⚙️ Utility Settings
+          </h3>
+          <button id="reset-utilities-btn" style="
+            background: #f56565; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 8px;
+          ">Reset All Settings</button>
+          <button id="export-settings-btn" style="
+            background: #48bb78; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">Export Settings</button>
+        </div>
+      </div>
+    `;
+    
+    this.setupBackButton();
+    this.setupUtilitiesEvents();
+    this.loadUtilitiesSettings();
   }
 
   setupBackButton() {
@@ -1025,8 +1202,8 @@ class LovableDetector {
       console.log(`📚 Loaded ${detectedMessages.length} real conversations and ${this.allHistoryMessages.length - detectedMessages.length} sample messages`);
     }
     
-    // Sort all messages by timestamp (newest first for better UX)
-    this.allHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Sort all messages by timestamp (chronological order: oldest first)
+    this.allHistoryMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     
     this.filteredHistoryMessages = [...this.allHistoryMessages];
     this.renderHistoryMessages();
@@ -1104,8 +1281,8 @@ class LovableDetector {
     if (!this.allHistoryMessages.find(msg => msg.id === formattedMessage.id)) {
       this.allHistoryMessages.push(formattedMessage);
       
-      // Re-sort messages by timestamp (newest first)
-      this.allHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      // Re-sort messages by timestamp (chronological order: oldest first)
+      this.allHistoryMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       
       // Update filtered messages if currently viewing history
       if (this.filteredHistoryMessages) {
@@ -1166,8 +1343,8 @@ class LovableDetector {
       return true;
     });
     
-    // Sort filtered messages by timestamp (newest first)
-    this.filteredHistoryMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Sort filtered messages by timestamp (chronological order: oldest first)
+    this.filteredHistoryMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     
     this.renderHistoryMessages();
   }
@@ -1269,8 +1446,8 @@ class LovableDetector {
       this.updateSearchMatches();
     }, 100);
     
-    // Scroll to top to show newest messages first
-    container.scrollTop = 0;
+    // Scroll to bottom to show newest messages in viewport (while maintaining chronological order)
+    container.scrollTop = container.scrollHeight;
   }
 
   addHistoryMessage(content, speaker, timestamp, messageData = {}) {
@@ -1362,6 +1539,838 @@ class LovableDetector {
       
       console.log(`📍 Highlighting match ${this.currentSearchIndex + 1} of ${this.searchMatches.length}`);
     }
+  }
+
+  setupUtilitiesEvents() {
+    // Message scraping
+    const scrapeBtn = document.getElementById('scrape-messages-btn');
+    const stopBtn = document.getElementById('stop-scraping-btn');
+    
+    if (scrapeBtn) {
+      scrapeBtn.addEventListener('click', () => this.scrapeAllMessages());
+    }
+    
+    if (stopBtn) {
+      stopBtn.addEventListener('click', () => {
+        if (window.currentMessageScraper) {
+          window.currentMessageScraper.stop();
+          stopBtn.style.display = 'none';
+          scrapeBtn.style.display = 'inline-block';
+        }
+      });
+    }
+
+    // Toggle switches
+    this.setupToggleSwitch('notification-toggle', 'lovable-notifications');
+    this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
+    this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
+
+    // Settings buttons
+    const resetBtn = document.getElementById('reset-utilities-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => this.resetUtilitiesSettings());
+    }
+
+    const exportBtn = document.getElementById('export-settings-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportUtilitiesSettings());
+    }
+
+    // Initialize toggle CSS
+    this.addToggleCSS();
+    
+    // Setup prompt enhancement
+    this.setupPromptEnhancement();
+    
+    // Setup input auto-expansion
+    this.setupInputAutoExpansion();
+    
+    // Setup Lovable response monitoring
+    this.setupLovableResponseMonitoring();
+  }
+
+  setupToggleSwitch(toggleId, settingKey) {
+    const toggle = document.getElementById(toggleId);
+    if (!toggle) return;
+
+    toggle.addEventListener('change', () => {
+      const isEnabled = toggle.checked;
+      localStorage.setItem(settingKey, isEnabled.toString());
+      console.log(`🔧 ${settingKey} ${isEnabled ? 'enabled' : 'disabled'}`);
+    });
+  }
+
+  addToggleCSS() {
+    if (document.getElementById('toggle-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'toggle-styles';
+    style.textContent = `
+      .toggle-switch input:checked + .toggle-slider {
+        background-color: #667eea;
+      }
+      
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+      
+      .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(26px);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  loadUtilitiesSettings() {
+    // Load saved settings from localStorage
+    const settings = [
+      { id: 'notification-toggle', key: 'lovable-notifications' },
+      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
+      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' }
+    ];
+
+    settings.forEach(({ id, key }) => {
+      const toggle = document.getElementById(id);
+      if (toggle) {
+        const saved = localStorage.getItem(key);
+        toggle.checked = saved === 'true';
+      }
+    });
+  }
+
+  async scrapeAllMessages() {
+    const statusDiv = document.getElementById('scrape-status');
+    const btn = document.getElementById('scrape-messages-btn');
+    const stopBtn = document.getElementById('stop-scraping-btn');
+    
+    if (!statusDiv || !btn) return;
+    
+    // Show status area and stop button
+    statusDiv.style.display = 'block';
+    btn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'inline-block';
+    
+    btn.disabled = true;
+    btn.textContent = 'Scraping...';
+    statusDiv.innerHTML = '<span style="color: #667eea;">🔄 Initializing comprehensive message scraping...</span>';
+    
+    try {
+      // Initialize the comprehensive scraper
+      const scraper = new ComprehensiveMessageScraper(statusDiv, btn);
+      
+      // Store globally so stop button can access it
+      window.currentMessageScraper = scraper;
+      
+      await scraper.startScraping();
+      
+      // Clean up
+      window.currentMessageScraper = null;
+      
+    } catch (error) {
+      console.error('Scraping error:', error);
+      statusDiv.innerHTML = '<span style="color: #f56565;">❌ Error during scraping: ' + error.message + '</span>';
+      
+      // Reset UI
+      btn.disabled = false;
+      btn.textContent = 'Scrape All Messages';
+      btn.style.display = 'inline-block';
+      if (stopBtn) stopBtn.style.display = 'none';
+      
+      // Hide status after error
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 5000);
+    }
+  }
+
+  setupPromptEnhancement() {
+    // Monitor for Ctrl+Enter / Cmd+Enter in Lovable input fields
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const target = e.target;
+        
+        // Check if we're in a Lovable input field
+        if (this.isLovableInputField(target)) {
+          e.preventDefault();
+          this.showPromptEnhancementMenu(target);
+        }
+      }
+    });
+  }
+
+  isLovableInputField(element) {
+    // Check if the element is likely a Lovable input field
+    if (!element || element.tagName !== 'TEXTAREA') return false;
+    
+    // Look for common Lovable input characteristics
+    const commonSelectors = [
+      'textarea[placeholder*="Message"]',
+      'textarea[placeholder*="message"]',
+      'textarea[placeholder*="Ask"]',
+      'textarea[placeholder*="ask"]',
+      'textarea[data-testid*="input"]',
+      'textarea[class*="input"]'
+    ];
+    
+    return commonSelectors.some(selector => element.matches(selector)) ||
+           element.closest('[class*="chat"]') ||
+           element.closest('[class*="input"]') ||
+           element.closest('[data-testid*="chat"]');
+  }
+
+  showPromptEnhancementMenu(inputElement) {
+    // Remove existing menu
+    const existingMenu = document.getElementById('prompt-enhancement-menu');
+    if (existingMenu) existingMenu.remove();
+    
+    const menu = document.createElement('div');
+    menu.id = 'prompt-enhancement-menu';
+    menu.innerHTML = `
+      <div style="
+        position: absolute; z-index: 10002; background: white; 
+        border: 1px solid #c9cfd7; border-radius: 8px; box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        padding: 16px; min-width: 300px; font-family: system-ui, sans-serif;
+      ">
+        <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+          ✨ Enhance Your Prompt
+        </h4>
+        <div style="display: grid; gap: 8px;">
+          <div class="prompt-category" data-category="designing">
+            <div style="font-weight: 600; color: #667eea; margin-bottom: 4px;">🎨 Designing</div>
+            <button class="prompt-option" data-text="Please help me with UI changes - ">UI Change</button>
+            <button class="prompt-option" data-text="Please optimize this for mobile devices - ">Optimize for Mobile</button>
+          </div>
+          
+          <div class="prompt-category" data-category="functioning">
+            <div style="font-weight: 600; color: #48bb78; margin-bottom: 4px;">⚙️ Functioning</div>
+            <button class="prompt-option" data-text="I need to modify this function - ">Modifying Function</button>
+          </div>
+          
+          <div class="prompt-category" data-category="debugging">
+            <div style="font-weight: 600; color: #f56565; margin-bottom: 4px;">🐛 Debugging</div>
+            <button class="prompt-option" data-text="I'm experiencing minor errors - ">Minor Errors</button>
+            <button class="prompt-option" data-text="I have persistent errors that keep occurring - ">Persistent Errors</button>
+            <button class="prompt-option" data-text="There are major errors affecting functionality - ">Major Errors</button>
+            <button class="prompt-option" data-text="URGENT: Critical errors need immediate attention - ">Critical Errors</button>
+          </div>
+          
+          <div class="prompt-category" data-category="refactoring">
+            <div style="font-weight: 600; color: #805ad5; margin-bottom: 4px;">🔄 Refactoring</div>
+            <button class="prompt-option" data-text="Please help me refactor this code to improve - ">Code Refactoring</button>
+          </div>
+        </div>
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <button id="close-prompt-menu" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+          ">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    // Position menu near the input
+    const rect = inputElement.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.top - 200) + 'px';
+    menu.style.left = rect.left + 'px';
+    
+    // Add menu styles
+    if (!document.getElementById('prompt-menu-styles')) {
+      const style = document.createElement('style');
+      style.id = 'prompt-menu-styles';
+      style.textContent = `
+        .prompt-option {
+          display: block; width: 100%; text-align: left; 
+          background: #f8fafc; border: 1px solid #e2e8f0; 
+          padding: 6px 10px; margin: 2px 0; border-radius: 4px; 
+          cursor: pointer; font-size: 13px; color: #4a5568;
+        }
+        .prompt-option:hover {
+          background: #667eea; color: white;
+        }
+        .prompt-category {
+          margin-bottom: 12px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(menu);
+    
+    // Add event listeners
+    menu.querySelectorAll('.prompt-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const enhancementText = btn.getAttribute('data-text');
+        const currentValue = inputElement.value;
+        inputElement.value = enhancementText + currentValue;
+        inputElement.focus();
+        menu.remove();
+      });
+    });
+    
+    document.getElementById('close-prompt-menu')?.addEventListener('click', () => {
+      menu.remove();
+    });
+    
+    // Close menu when clicking outside
+    const closeMenu = (e) => {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 100);
+  }
+
+  setupInputAutoExpansion() {
+    // Monitor for input changes and auto-expand
+    document.addEventListener('input', (e) => {
+      if (localStorage.getItem('lovable-auto-expand') !== 'true') return;
+      
+      const target = e.target;
+      if (this.isLovableInputField(target)) {
+        this.autoExpandTextarea(target);
+      }
+    });
+  }
+
+  autoExpandTextarea(textarea) {
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+    
+    // Set new height based on content
+    const newHeight = Math.min(textarea.scrollHeight, 200); // Max 200px
+    textarea.style.height = newHeight + 'px';
+  }
+
+  setupLovableResponseMonitoring() {
+    // Monitor for Lovable response completion
+    if (!window.lovableResponseMonitor) {
+      window.lovableResponseMonitor = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList') {
+            // Check if a Lovable response just completed
+            this.checkForLovableResponseCompletion(mutation);
+          }
+        });
+      });
+      
+      // Start observing
+      window.lovableResponseMonitor.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+
+  checkForLovableResponseCompletion(mutation) {
+    // Look for signs that Lovable finished responding
+    const addedNodes = Array.from(mutation.addedNodes);
+    
+    addedNodes.forEach(node => {
+      if (node.nodeType === 1 && node.textContent) {
+        // Check for completion indicators
+        const completionIndicators = [
+          'I\'ve made some changes',
+          'The updates have been',
+          'I\'ve updated the',
+          'Changes have been applied'
+        ];
+        
+        const hasCompletionIndicator = completionIndicators.some(indicator => 
+          node.textContent.includes(indicator)
+        );
+        
+        if (hasCompletionIndicator) {
+          this.onLovableResponseComplete();
+        }
+      }
+    });
+  }
+
+  onLovableResponseComplete() {
+    // Show notification if enabled
+    if (localStorage.getItem('lovable-notifications') === 'true') {
+      this.showLovableCompletionNotification();
+    }
+    
+    // Auto-switch to tab if enabled
+    if (localStorage.getItem('lovable-auto-switch') === 'true') {
+      this.switchToLovableTab();
+    }
+  }
+
+  showLovableCompletionNotification() {
+    // Check if browser supports notifications
+    if (!('Notification' in window)) return;
+    
+    // Request permission if needed
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          this.createNotification();
+        }
+      });
+    } else if (Notification.permission === 'granted') {
+      this.createNotification();
+    }
+  }
+
+  createNotification() {
+    const notification = new Notification('Lovable Response Complete', {
+      body: 'Your Lovable.dev assistant has finished responding',
+      icon: '/favicon.ico',
+      badge: '/favicon.ico'
+    });
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
+    
+    // Click to focus tab
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  }
+
+  switchToLovableTab() {
+    // Focus the current window/tab
+    window.focus();
+    
+    // Scroll to top to ensure visibility
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  resetUtilitiesSettings() {
+    if (!confirm('Are you sure you want to reset all utility settings? This will disable all features.')) return;
+    
+    const settings = [
+      'lovable-notifications',
+      'lovable-auto-switch', 
+      'lovable-auto-expand'
+    ];
+    
+    settings.forEach(key => localStorage.removeItem(key));
+    
+    // Reload settings
+    this.loadUtilitiesSettings();
+    
+    console.log('🔧 All utility settings reset');
+  }
+
+  exportUtilitiesSettings() {
+    const settings = {
+      notifications: localStorage.getItem('lovable-notifications') === 'true',
+      autoSwitch: localStorage.getItem('lovable-auto-switch') === 'true',
+      autoExpand: localStorage.getItem('lovable-auto-expand') === 'true',
+      exportDate: new Date().toISOString(),
+      projectId: this.projectId
+    };
+    
+    const dataStr = JSON.stringify(settings, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lovable-utilities-settings-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('📥 Settings exported');
+  }
+}
+
+// Comprehensive Message Scraper Class
+class ComprehensiveMessageScraper {
+  constructor(statusDiv, btn) {
+    this.statusDiv = statusDiv;
+    this.btn = btn;
+    this.chatContainer = null;
+    this.scrapedMessages = new Map(); // Use Map to avoid duplicates by message ID
+    this.lastMessageCount = 0;
+    this.scrollAttempts = 0;
+    this.maxScrollAttempts = 100; // Prevent infinite loops
+    this.scrollDelay = 1500; // Wait between scroll attempts
+    this.isRunning = false;
+    this.stuckCounter = 0;
+    this.maxStuckAttempts = 5;
+    this.initialBottomMessage = null;
+    this.hasReachedTop = false;
+  }
+
+  async startScraping() {
+    this.isRunning = true;
+    this.updateStatus('🔍 Finding chat container...', '#667eea');
+    
+    // Find the chat container
+    this.chatContainer = this.findChatContainer();
+    if (!this.chatContainer) {
+      throw new Error('Could not find chat container. Make sure you are on a Lovable project page with chat messages.');
+    }
+    
+    this.updateStatus('📝 Recording initial state...', '#667eea');
+    
+    // Record the initial bottom message to know when we've scrolled through everything
+    await this.recordInitialState();
+    
+    this.updateStatus('🚀 Starting comprehensive message scraping...', '#667eea');
+    
+    // Start the scraping process
+    await this.performComprehensiveScrape();
+    
+    // Final processing
+    await this.finalizeScraping();
+  }
+
+  findChatContainer() {
+    // Look for Lovable's chat scroll container
+    const possibleSelectors = [
+      // Main chat container with scrolling
+      'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
+      // Alternative containers that might contain messages
+      'div[class*="overflow-y-auto"][class*="h-full"]',
+      'div[class*="chat"][class*="overflow"]',
+      '[data-testid*="chat-container"]',
+      '[data-testid*="messages-container"]',
+      // Fallback: any scrollable container with ChatMessageContainer children
+      'div[class*="overflow-y-auto"]'
+    ];
+    
+    for (const selector of possibleSelectors) {
+      const containers = document.querySelectorAll(selector);
+      for (const container of containers) {
+        // Check if this container has ChatMessageContainer children
+        const messages = container.querySelectorAll('.ChatMessageContainer[data-message-id]');
+        if (messages.length > 0) {
+          console.log(`✅ Found chat container with ${messages.length} messages using selector: ${selector}`);
+          return container;
+        }
+      }
+    }
+    
+    // Final fallback: find any container that has ChatMessageContainer descendants
+    const messageContainers = document.querySelectorAll('.ChatMessageContainer[data-message-id]');
+    if (messageContainers.length > 0) {
+      // Find the common scrollable ancestor
+      let container = messageContainers[0];
+      while (container && container.parentElement) {
+        const style = window.getComputedStyle(container);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          console.log(`✅ Found scrollable ancestor container with ${messageContainers.length} messages`);
+          return container;
+        }
+        container = container.parentElement;
+      }
+    }
+    
+    return null;
+  }
+
+  async recordInitialState() {
+    // Scroll to bottom first to establish baseline
+    this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+    await this.wait(1000);
+    
+    // Capture initial messages at the bottom
+    await this.captureCurrentMessages();
+    
+    // Record the last message for reference
+    const messages = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
+    if (messages.length > 0) {
+      this.initialBottomMessage = messages[messages.length - 1].getAttribute('data-message-id');
+      console.log(`📍 Initial bottom message recorded: ${this.initialBottomMessage}`);
+    }
+    
+    this.lastMessageCount = this.scrapedMessages.size;
+  }
+
+  async performComprehensiveScrape() {
+    this.scrollAttempts = 0;
+    this.stuckCounter = 0;
+    
+    while (this.isRunning && this.scrollAttempts < this.maxScrollAttempts && !this.hasReachedTop) {
+      this.scrollAttempts++;
+      
+      // Update status with progress
+      this.updateStatus(
+        `⬆️ Scrolling up (attempt ${this.scrollAttempts}/${this.maxScrollAttempts}) - Found ${this.scrapedMessages.size} messages`,
+        '#667eea'
+      );
+      
+      // Capture messages before scrolling (in case they disappear)
+      await this.captureCurrentMessages();
+      
+      // Check if we've reached the top
+      if (this.checkIfAtTop()) {
+        console.log('🔝 Reached the top of the chat!');
+        this.hasReachedTop = true;
+        break;
+      }
+      
+      // Scroll up to load older messages
+      const scrollSuccess = await this.scrollUpAndWait();
+      
+      if (!scrollSuccess) {
+        this.stuckCounter++;
+        console.log(`⚠️ Scroll attempt ${this.scrollAttempts} seems stuck (${this.stuckCounter}/${this.maxStuckAttempts})`);
+        
+        if (this.stuckCounter >= this.maxStuckAttempts) {
+          console.log('🛑 Too many stuck attempts, stopping scrape');
+          break;
+        }
+        
+        // Try different scroll strategies when stuck
+        await this.tryAlternativeScrollMethods();
+      } else {
+        this.stuckCounter = 0; // Reset stuck counter on successful scroll
+      }
+      
+      // Capture messages after scrolling
+      await this.captureCurrentMessages();
+      
+      // Check if we're making progress
+      if (this.scrapedMessages.size === this.lastMessageCount) {
+        this.stuckCounter++;
+      } else {
+        this.lastMessageCount = this.scrapedMessages.size;
+        this.stuckCounter = 0;
+      }
+      
+      // Add delay to allow for loading and avoid overwhelming the system
+      await this.wait(this.scrollDelay);
+      
+      // Handle background operation - reduce delay if tab is not visible
+      if (document.hidden) {
+        await this.wait(500); // Shorter delay when in background
+      }
+    }
+  }
+
+  async scrollUpAndWait() {
+    const initialScrollTop = this.chatContainer.scrollTop;
+    
+    // Try multiple scroll strategies
+    const scrollStrategies = [
+      () => { this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 1000); },
+      () => { this.chatContainer.scrollBy(0, -1000); },
+      () => { this.chatContainer.scrollTop = 0; }, // Jump to absolute top
+      () => { 
+        // Smooth scroll up
+        this.chatContainer.scrollTo({ 
+          top: Math.max(0, this.chatContainer.scrollTop - 800), 
+          behavior: 'smooth' 
+        }); 
+      }
+    ];
+    
+    // Try first strategy
+    scrollStrategies[this.scrollAttempts % scrollStrategies.length]();
+    
+    // Wait for potential loading
+    await this.wait(800);
+    
+    // Check if scroll position actually changed
+    const finalScrollTop = this.chatContainer.scrollTop;
+    const scrollChanged = Math.abs(finalScrollTop - initialScrollTop) > 10;
+    
+    if (scrollChanged) {
+      console.log(`✅ Scroll successful: ${initialScrollTop} → ${finalScrollTop}`);
+      return true;
+    } else {
+      console.log(`⚠️ Scroll failed: position unchanged at ${initialScrollTop}`);
+      return false;
+    }
+  }
+
+  async tryAlternativeScrollMethods() {
+    console.log('🔄 Trying alternative scroll methods...');
+    
+    // Method 1: Try keyboard simulation
+    this.chatContainer.focus();
+    this.chatContainer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true }));
+    await this.wait(500);
+    
+    // Method 2: Try wheel events
+    this.chatContainer.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: -500,
+      bubbles: true
+    }));
+    await this.wait(500);
+    
+    // Method 3: Try scrollIntoView on first visible message
+    const firstMessage = this.chatContainer.querySelector('.ChatMessageContainer[data-message-id]');
+    if (firstMessage) {
+      firstMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      await this.wait(500);
+    }
+  }
+
+  checkIfAtTop() {
+    const isAtTop = this.chatContainer.scrollTop <= 5; // Small threshold for rounding errors
+    
+    if (isAtTop) {
+      // Double-check by looking for any load more indicators or if scroll top hasn't changed
+      const hasMoreContent = this.chatContainer.scrollHeight > this.chatContainer.clientHeight;
+      return !hasMoreContent || this.chatContainer.scrollTop === 0;
+    }
+    
+    return false;
+  }
+
+  async captureCurrentMessages() {
+    if (!window.conversationCapture) {
+      console.warn('⚠️ ConversationCapture not available');
+      return;
+    }
+    
+    // Get all visible message containers
+    const messageContainers = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
+    
+    console.log(`📊 Capturing ${messageContainers.length} visible messages...`);
+    
+    // Sort messages by their position in DOM to maintain conversation order
+    const sortedContainers = Array.from(messageContainers).sort((a, b) => {
+      const rectA = a.getBoundingClientRect();
+      const rectB = b.getBoundingClientRect();
+      return rectA.top - rectB.top;
+    });
+    
+    for (const container of sortedContainers) {
+      try {
+        const messageData = window.conversationCapture.extractLovableMessageData(container);
+        
+        if (messageData && !this.scrapedMessages.has(messageData.id)) {
+          // For Lovable messages, check if they're complete
+          if (messageData.speaker === 'lovable') {
+            const isComplete = window.conversationCapture.isLovableMessageComplete(messageData, container);
+            if (!isComplete) {
+              console.log(`⏳ Skipping incomplete Lovable message: ${messageData.id}`);
+              continue;
+            }
+          }
+          
+          // Add conversation pairing information for messages with same timestamp
+          messageData.conversationGroup = this.findConversationGroup(messageData);
+          
+          this.scrapedMessages.set(messageData.id, messageData);
+          console.log(`✅ Captured ${messageData.speaker} message: ${messageData.id.substring(0, 20)}... (group: ${messageData.conversationGroup})`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error capturing message:', error);
+      }
+    }
+  }
+
+  findConversationGroup(messageData) {
+    // Create a conversation group identifier based on timestamp and nearby messages
+    // This helps group user+lovable message pairs that belong together
+    const timestamp = new Date(messageData.timestamp).getTime();
+    const roundedTimestamp = Math.floor(timestamp / 60000) * 60000; // Round to nearest minute
+    
+    return `${roundedTimestamp}_${messageData.speaker === 'user' ? 'start' : 'response'}`;
+  }
+
+  async finalizeScraping() {
+    this.isRunning = false;
+    
+    // Final capture to make sure we got everything
+    await this.captureCurrentMessages();
+    
+    const totalMessages = this.scrapedMessages.size;
+    console.log(`🎉 Scraping complete! Total messages captured: ${totalMessages}`);
+    
+    // Integrate with existing conversation capture system
+    if (window.conversationCapture) {
+      const beforeCount = window.conversationCapture.detectedMessages?.length || 0;
+      
+      // Add all scraped messages to the detection system
+      for (const messageData of this.scrapedMessages.values()) {
+        if (!window.conversationCapture.processedMessageIds.has(messageData.id)) {
+          window.conversationCapture.detectedMessages.push(messageData);
+          window.conversationCapture.processedMessageIds.add(messageData.id);
+        }
+      }
+      
+      const afterCount = window.conversationCapture.detectedMessages.length;
+      const newMessages = afterCount - beforeCount;
+      
+      this.updateStatus(
+        `🎉 Scraping complete! Found ${totalMessages} total messages (${newMessages} new)`,
+        '#48bb78'
+      );
+      
+      // Refresh history if available
+      if (window.lovableDetector && window.lovableDetector.allHistoryMessages) {
+        await window.lovableDetector.loadHistoryMessages();
+      }
+    } else {
+      this.updateStatus(
+        `✅ Scraping complete! Found ${totalMessages} messages`,
+        '#48bb78'
+      );
+    }
+    
+    // Reset UI elements
+    this.btn.disabled = false;
+    this.btn.textContent = 'Scrape All Messages';
+    this.btn.style.display = 'inline-block';
+    
+    // Hide stop button
+    const stopBtn = document.getElementById('stop-scraping-btn');
+    if (stopBtn) stopBtn.style.display = 'none';
+    
+    // Clear status after 10 seconds and hide status area
+    setTimeout(() => {
+      if (this.statusDiv) {
+        this.statusDiv.innerHTML = '';
+        this.statusDiv.style.display = 'none';
+      }
+    }, 10000);
+  }
+
+  updateStatus(message, color = '#4a5568') {
+    if (this.statusDiv) {
+      this.statusDiv.innerHTML = `<span style="color: ${color};">${message}</span>`;
+    }
+    console.log(`📊 Scraper: ${message}`);
+  }
+
+  wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Method to stop scraping if needed
+  stop() {
+    this.isRunning = false;
+    this.updateStatus('🛑 Scraping stopped by user', '#f56565');
+    
+    // Reset UI elements
+    this.btn.disabled = false;
+    this.btn.textContent = 'Scrape All Messages';
+    this.btn.style.display = 'inline-block';
+    
+    // Hide stop button
+    const stopBtn = document.getElementById('stop-scraping-btn');
+    if (stopBtn) stopBtn.style.display = 'none';
+    
+    // Clear status after 5 seconds and hide status area
+    setTimeout(() => {
+      if (this.statusDiv) {
+        this.statusDiv.innerHTML = '';
+        this.statusDiv.style.display = 'none';
+      }
+    }, 5000);
   }
 
   escapeRegex(string) {
