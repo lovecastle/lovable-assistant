@@ -1183,13 +1183,45 @@ class LovableDetector {
     this.allHistoryMessages = [];
     
     // Add detected messages from conversation capture if available
-    if (window.conversationCapture && window.conversationCapture.detectedMessages) {
-      const detectedMessages = window.conversationCapture.detectedMessages.map(msg => ({
+    // Load messages from the new simple capture system
+    if (window.simpleConversationCapture && window.simpleConversationCapture.messageGroups) {
+      const allMessages = [];
+      
+      // Convert message groups back to individual messages for UI compatibility
+      for (const group of window.simpleConversationCapture.messageGroups.values()) {
+        // Add user message
+        allMessages.push({
+          id: group.userId,
+          timestamp: new Date(group.timestamp),
+          speaker: 'user',
+          content: group.userContent,
+          category: this.mapCategoriesToOldFormat(group.categories),
+          categories: group.categories,
+          isDetected: true,
+          techTerms: [],
+          projectId: group.projectId
+        });
+        
+        // Add lovable message
+        allMessages.push({
+          id: group.lovableId,
+          timestamp: new Date(group.timestamp),
+          speaker: 'lovable',
+          content: group.lovableContent,
+          category: this.mapCategoriesToOldFormat(group.categories),
+          categories: group.categories,
+          isDetected: true,
+          techTerms: [],
+          projectId: group.projectId
+        });
+      }
+      
+      const detectedMessages = allMessages.map(msg => ({
         id: msg.id,
-        timestamp: new Date(msg.timestamp),
+        timestamp: msg.timestamp,
         speaker: msg.speaker,
         content: msg.content,
-        category: this.mapCategoriesToOldFormat(msg.categories),
+        category: msg.category,
         categories: msg.categories,
         isDetected: true,
         techTerms: msg.techTerms || [],
@@ -1334,11 +1366,16 @@ class LovableDetector {
     // Remove from allHistoryMessages
     this.allHistoryMessages = this.allHistoryMessages.filter(msg => !idsToRemove.has(msg.id));
     
-    // Remove from detected messages in conversation capture if available
-    if (window.conversationCapture && window.conversationCapture.detectedMessages) {
-      window.conversationCapture.detectedMessages = window.conversationCapture.detectedMessages.filter(msg => !idsToRemove.has(msg.id));
-      
-      // Also update the processed message IDs to prevent re-adding
+    // Remove from message groups in simple conversation capture if available
+    if (window.simpleConversationCapture && window.simpleConversationCapture.messageGroups) {
+      // Remove groups that contain any of the IDs to remove
+      for (const [groupId, group] of window.simpleConversationCapture.messageGroups.entries()) {
+        if (idsToRemove.has(group.userId) || idsToRemove.has(group.lovableId)) {
+          window.simpleConversationCapture.messageGroups.delete(groupId);
+          // Also remove from processed IDs
+          window.simpleConversationCapture.processedLovableIds.delete(group.lovableId);
+        }
+      }
       if (window.conversationCapture.processedMessageIds) {
         idsToRemove.forEach(id => window.conversationCapture.processedMessageIds.delete(id));
       }
@@ -1965,7 +2002,7 @@ class ComprehensiveMessageScraper {
     this.lastMessageCount = 0;
     this.scrollAttempts = 0;
     this.maxScrollAttempts = 100; // Prevent infinite loops
-    this.scrollDelay = 1500; // Wait between scroll attempts
+    this.scrollDelay = 5000; // Wait between scroll attempts (increased to 5 seconds for more thorough scraping)
     this.isRunning = false;
     this.stuckCounter = 0;
     this.maxStuckAttempts = 5;
@@ -2075,6 +2112,9 @@ class ComprehensiveMessageScraper {
       // Capture messages before scrolling (in case they disappear)
       await this.captureCurrentMessages();
       
+      // Wait a moment to ensure message processing is complete
+      await this.wait(1500);
+      
       // Check if we've reached the top
       if (this.checkIfAtTop()) {
         console.log('🔝 Reached the top of the chat!');
@@ -2100,8 +2140,14 @@ class ComprehensiveMessageScraper {
         this.stuckCounter = 0; // Reset stuck counter on successful scroll
       }
       
+      // Wait longer to ensure new messages are fully loaded and rendered
+      await this.wait(2000);
+      
       // Capture messages after scrolling
       await this.captureCurrentMessages();
+      
+      // Wait a moment to ensure message processing is complete
+      await this.wait(1500);
       
       // Check if we're making progress
       if (this.scrapedMessages.size === this.lastMessageCount) {
@@ -2114,9 +2160,12 @@ class ComprehensiveMessageScraper {
       // Add delay to allow for loading and avoid overwhelming the system
       await this.wait(this.scrollDelay);
       
+      // Additional safety check - wait for message rendering to complete
+      await this.waitForMessageStability();
+      
       // Handle background operation - reduce delay if tab is not visible
       if (document.hidden) {
-        await this.wait(500); // Shorter delay when in background
+        await this.wait(1000); // Longer delay when in background to ensure complete processing
       }
     }
   }
@@ -2141,8 +2190,8 @@ class ComprehensiveMessageScraper {
     // Try first strategy
     scrollStrategies[this.scrollAttempts % scrollStrategies.length]();
     
-    // Wait for potential loading
-    await this.wait(800);
+    // Wait for potential loading (increased delay for thorough message capture)
+    await this.wait(2500);
     
     // Check if scroll position actually changed
     const finalScrollTop = this.chatContainer.scrollTop;
@@ -2193,104 +2242,20 @@ class ComprehensiveMessageScraper {
   }
 
   async captureCurrentMessages() {
-    if (!window.conversationCapture) {
-      console.warn('⚠️ ConversationCapture not available');
+    // With the new simple capture system, we don't need complex message processing
+    // Just let the simple system handle detection automatically
+    if (!window.simpleConversationCapture) {
+      console.warn('⚠️ Simple ConversationCapture not available');
       return;
     }
     
-    // Get all visible message containers
+    // Get all visible message containers for counting purposes
     const messageContainers = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
     
-    console.log(`📊 Capturing ${messageContainers.length} visible messages using two-pass approach...`);
+    console.log(`📊 Found ${messageContainers.length} visible messages. Simple capture will process them automatically.`);
     
-    // Sort messages by their position in DOM to maintain conversation order
-    const sortedContainers = Array.from(messageContainers).sort((a, b) => {
-      const rectA = a.getBoundingClientRect();
-      const rectB = b.getBoundingClientRect();
-      return rectA.top - rectB.top;
-    });
-    
-    // PASS 1: Primary detection using ID prefixes
-    const primaryDetected = [];
-    const unknownContainers = [];
-    
-    for (const container of sortedContainers) {
-      try {
-        const messageData = window.conversationCapture.extractLovableMessageData(container);
-        
-        if (messageData && !this.scrapedMessages.has(messageData.id)) {
-          // For Lovable messages, check if they're complete
-          if (messageData.speaker === 'lovable') {
-            const isComplete = window.conversationCapture.isLovableMessageComplete(messageData, container);
-            if (!isComplete) {
-              console.log(`⏳ Skipping incomplete Lovable message: ${messageData.id}`);
-              continue;
-            }
-          }
-          
-          primaryDetected.push({ container, messageData });
-        } else {
-          // Store containers that couldn't be identified for secondary detection
-          const messageId = container.getAttribute('data-message-id');
-          if (messageId && !messageId.startsWith('umsg_') && !messageId.startsWith('aimsg_')) {
-            unknownContainers.push(container);
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ Error in primary detection:', error);
-      }
-    }
-    
-    console.log(`📊 Pass 1: ${primaryDetected.length} detected, ${unknownContainers.length} unknown`);
-    
-    // PASS 2: Secondary detection for orphaned messages
-    const secondaryDetected = [];
-    
-    if (unknownContainers.length > 0) {
-      console.log(`🔍 Pass 2: Attempting structural detection on ${unknownContainers.length} unknown containers...`);
-      
-      for (const container of unknownContainers) {
-        try {
-          const messageData = window.conversationCapture.extractUnknownMessageByStructure(container);
-          
-          if (messageData && !this.scrapedMessages.has(messageData.id)) {
-            secondaryDetected.push({ container, messageData });
-            console.log(`🎯 Structural detection recovered: ${messageData.speaker} message: ${messageData.id}`);
-          }
-        } catch (error) {
-          console.warn('⚠️ Error in structural detection:', error);
-        }
-      }
-    }
-    
-    // PASS 3: Process all detected messages
-    const allDetected = [...primaryDetected, ...secondaryDetected];
-    
-    for (const { container, messageData } of allDetected) {
-      // Add conversation pairing information for messages with same timestamp
-      messageData.conversationGroup = this.findConversationGroup(messageData);
-      
-      this.scrapedMessages.set(messageData.id, messageData);
-      
-      const detectionMethod = messageData.detectedByStructure ? '[STRUCTURAL]' : '[PRIMARY]';
-      console.log(`✅ ${detectionMethod} Captured ${messageData.speaker} message: ${messageData.id.substring(0, 20)}... (group: ${messageData.conversationGroup})`);
-    }
-    
-    const totalCaptured = allDetected.length;
-    const structuralCount = secondaryDetected.length;
-    
-    if (totalCaptured > 0) {
-      console.log(`📊 Capture Summary: ${totalCaptured} total (${totalCaptured - structuralCount} primary, ${structuralCount} structural)`);
-    }
-  }
-
-  findConversationGroup(messageData) {
-    // Create a conversation group identifier based on timestamp and nearby messages
-    // This helps group user+lovable message pairs that belong together
-    const timestamp = new Date(messageData.timestamp).getTime();
-    const roundedTimestamp = Math.floor(timestamp / 60000) * 60000; // Round to nearest minute
-    
-    return `${roundedTimestamp}_${messageData.speaker === 'user' ? 'start' : 'response'}`;
+    // Just trigger a scan in the simple system
+    window.simpleConversationCapture.scanForNewGroups();
   }
 
   async finalizeScraping() {
@@ -2302,28 +2267,20 @@ class ComprehensiveMessageScraper {
     const totalMessages = this.scrapedMessages.size;
     console.log(`🎉 Scraping complete! Total messages captured: ${totalMessages}`);
     
-    // Integrate with existing conversation capture system
-    if (window.conversationCapture) {
-      const beforeCount = window.conversationCapture.detectedMessages?.length || 0;
+    // Integrate with simple conversation capture system
+    if (window.simpleConversationCapture) {
+      console.log(`🔄 Triggering simple capture re-scan after comprehensive scraping...`);
       
-      // Add all scraped messages to the detection system
-      for (const messageData of this.scrapedMessages.values()) {
-        if (!window.conversationCapture.processedMessageIds.has(messageData.id)) {
-          window.conversationCapture.detectedMessages.push(messageData);
-          window.conversationCapture.processedMessageIds.add(messageData.id);
-        }
-      }
-      
-      const afterCount = window.conversationCapture.detectedMessages.length;
-      const newMessages = afterCount - beforeCount;
+      // Trigger a re-scan to pick up any newly loaded messages
+      window.simpleConversationCapture.scanForNewGroups();
       
       this.updateStatus(
-        `🎉 Scraping complete! Found ${totalMessages} total messages (${newMessages} new)`,
+        `🎉 Scraping complete! Found ${totalMessages} total messages. Simple capture will process them into groups.`,
         '#48bb78'
       );
       
       // Refresh history if available
-      if (window.lovableDetector && window.lovableDetector.allHistoryMessages) {
+      if (window.lovableDetector && window.lovableDetector.loadHistoryMessages) {
         await window.lovableDetector.loadHistoryMessages();
       }
     } else {
@@ -2360,6 +2317,39 @@ class ComprehensiveMessageScraper {
 
   wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Wait for message stability to ensure all messages are fully loaded and rendered
+  async waitForMessageStability() {
+    let stableChecks = 0;
+    const maxStableChecks = 3;
+    let previousMessageCount = 0;
+    
+    console.log('⏳ Waiting for message stability...');
+    
+    for (let i = 0; i < maxStableChecks; i++) {
+      await this.wait(1000); // Wait 1 second between checks
+      
+      const currentMessageCount = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]').length;
+      
+      if (currentMessageCount === previousMessageCount) {
+        stableChecks++;
+        console.log(`✅ Message count stable (${currentMessageCount}) - check ${stableChecks}/${maxStableChecks}`);
+      } else {
+        stableChecks = 0; // Reset if count changed
+        console.log(`🔄 Message count changed: ${previousMessageCount} → ${currentMessageCount}, resetting stability check`);
+      }
+      
+      previousMessageCount = currentMessageCount;
+      
+      // If we've had enough stable checks, consider it stable
+      if (stableChecks >= 2) {
+        console.log('✅ Messages are stable, continuing...');
+        return;
+      }
+    }
+    
+    console.log('⚠️ Message stability timeout reached, continuing anyway...');
   }
 
   // Method to stop scraping if needed
