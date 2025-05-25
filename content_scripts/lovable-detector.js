@@ -2358,9 +2358,9 @@ class ComprehensiveMessageScraper {
 
   async saveConversationGroup(groupId, group, forceSave = false) {
     try {
-      // Prepare conversation data for database
+      // Prepare conversation data for database with proper UUID
       const conversationData = {
-        id: groupId, // Use groupId as unique identifier
+        id: this.generateUUID(), // Always generate a proper UUID for database
         projectId: this.extractProjectId(),
         userMessage: group.userMessage?.content || '',
         lovableResponse: group.lovableMessage?.content || '',
@@ -2369,7 +2369,7 @@ class ComprehensiveMessageScraper {
           url: window.location.href,
           projectId: this.extractProjectId(),
           scrapedAt: new Date().toISOString(),
-          messageGroupId: groupId,
+          messageGroupId: groupId, // Keep original groupId in context
           userMessageId: group.userMessage?.id,
           lovableMessageId: group.lovableMessage?.id
         },
@@ -2383,6 +2383,8 @@ class ComprehensiveMessageScraper {
         return 'skipped';
       }
 
+      console.log(`🔍 Saving conversation with UUID: ${conversationData.id} (from group: ${groupId})`);
+
       // Send to background script for database saving
       const response = await this.safeSendMessage({
         action: 'saveConversation',
@@ -2390,7 +2392,7 @@ class ComprehensiveMessageScraper {
       });
 
       if (response?.success) {
-        console.log(`✅ Saved conversation group: ${groupId}`);
+        console.log(`✅ Saved conversation group: ${groupId} → UUID: ${conversationData.id}`);
         return true;
       } else {
         console.warn(`❌ Failed to save conversation ${groupId}: ${response?.error || 'Unknown error'}`);
@@ -2576,9 +2578,9 @@ class ComprehensiveMessageScraper {
         return false;
       }
       
-      // Test saving a sample conversation
+      // Test saving a sample conversation with proper UUID
       const sampleConversation = {
-        id: 'test_' + Date.now(),
+        id: this.generateUUID(), // Use proper UUID format
         projectId: this.extractProjectId() || 'test_project',
         userMessage: 'Test user message',
         lovableResponse: 'Test Lovable response',
@@ -2591,7 +2593,7 @@ class ComprehensiveMessageScraper {
         effectivenessScore: null
       };
       
-      console.log('🧪 Testing conversation save with sample data...');
+      console.log('🧪 Testing conversation save with sample data (UUID:', sampleConversation.id, ')...');
       const saveResponse = await this.safeSendMessage({
         action: 'saveConversation',
         data: sampleConversation
