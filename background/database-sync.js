@@ -23,6 +23,8 @@ export class SupabaseClient {
     await this.init();
     
     const url = `${this.baseURL}/rest/v1/${endpoint}`;
+    console.log(`🔍 Database request: ${options.method || 'GET'} ${url}`);
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -34,29 +36,52 @@ export class SupabaseClient {
       }
     });
 
+    console.log(`🔍 Database response: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       const error = await response.text();
+      console.error(`❌ Database request failed: ${response.status} ${response.statusText}`, error);
       throw new Error(`Supabase request failed: ${error}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log(`✅ Database response data:`, result);
+    return result;
   }
   async saveConversation(data) {
+    console.log('🔍 Database-sync: Saving conversation:', data.id);
+    
     const conversation = {
       id: data.id || this.generateUUID(),
       project_id: data.projectId,
       user_message: data.userMessage,
       lovable_response: data.lovableResponse,
-      timestamp: new Date().toISOString(),
+      timestamp: data.timestamp || new Date().toISOString(), // Use provided timestamp
       project_context: data.projectContext || {},
       tags: data.tags || [],
       effectiveness_score: data.effectivenessScore || null
     };
 
-    return await this.request('conversations', {
-      method: 'POST',
-      body: JSON.stringify(conversation)
+    console.log('🔍 Database-sync: Prepared conversation data:', {
+      id: conversation.id,
+      project_id: conversation.project_id,
+      user_message_length: conversation.user_message?.length || 0,
+      lovable_response_length: conversation.lovable_response?.length || 0,
+      timestamp: conversation.timestamp
     });
+
+    try {
+      const result = await this.request('conversations', {
+        method: 'POST',
+        body: JSON.stringify(conversation)
+      });
+      
+      console.log('✅ Database-sync: Conversation saved successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save conversation:', error);
+      throw error;
+    }
   }
 
   async saveProject(projectData) {

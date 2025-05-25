@@ -80,14 +80,32 @@ async function handleChatMessage(message, context) {
 
 async function handleSaveConversation(conversationData) {
   try {
-    console.log('💾 Saving conversation to database:', conversationData.id);
+    console.log('🔍 Service Worker: Received saveConversation request:', {
+      id: conversationData.id,
+      projectId: conversationData.projectId,
+      userMessageLength: conversationData.userMessage?.length || 0,
+      lovableResponseLength: conversationData.lovableResponse?.length || 0,
+      timestamp: conversationData.timestamp
+    });
+    
+    // Check if Supabase is properly configured
+    const config = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
+    if (!config.supabaseUrl || !config.supabaseKey) {
+      console.error('❌ Service Worker: Supabase not configured!');
+      return { 
+        success: false, 
+        error: 'Supabase not configured. Please set up Supabase URL and API key in extension settings.' 
+      };
+    }
+    
+    console.log('✅ Service Worker: Supabase configuration found');
     
     const result = await supabase.saveConversation(conversationData);
-    console.log('✅ Conversation saved successfully:', result);
+    console.log('✅ Service Worker: Conversation saved successfully:', result);
     
     return { success: true, data: result };
   } catch (error) {
-    console.error('❌ Failed to save conversation:', error);
+    console.error('❌ Service Worker: Failed to save conversation:', error);
     return { success: false, error: error.message };
   }
 }

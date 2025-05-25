@@ -2029,6 +2029,16 @@ class ComprehensiveMessageScraper {
     this.isRunning = true;
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
+    // Test database connection first
+    this.updateStatus('🧪 Testing database connection...', '#667eea');
+    const dbTestResult = await this.testDatabaseConnection();
+    
+    if (!dbTestResult) {
+      throw new Error('Database connection test failed. Please check your Supabase configuration in extension settings.');
+    }
+    
+    this.updateStatus('✅ Database connection verified', '#48bb78');
+    
     // Find the chat container
     this.chatContainer = this.findChatContainer();
     if (!this.chatContainer) {
@@ -2040,8 +2050,8 @@ class ComprehensiveMessageScraper {
     // Record initial message group count
     await this.recordInitialState();
     
-    this.updateStatus('🚀 Starting comprehensive message scraping...', '#667eea');
-    console.log('🚀 Starting comprehensive message scraping');
+    this.updateStatus('🚀 Starting continuous message scraping...', '#667eea');
+    console.log('🚀 Starting continuous message scraping with database saving');
     
     // Start the scraping process
     await this.performComprehensiveScrape();
@@ -2102,68 +2112,116 @@ class ComprehensiveMessageScraper {
   }
 
   async performComprehensiveScrape() {
-    console.log('🚀 Starting optimized scraping - jumping directly to top');
+    console.log('🚀 Starting continuous scrolling scraping...');
+    this.scrollAttempts = 0;
+    this.noNewDataCounter = 0;
+    this.maxNoNewDataAttempts = 5; // Stop after 5 scrolls with no new data
     
-    // Jump directly to the top like pressing "Home" button
-    this.chatContainer.scrollTop = 0;
-    this.updateStatus('⬆️ Jumped to top of conversation', '#667eea');
-    
-    // Wait for content to load after jumping to top
-    await this.wait(1000);
-    
-    // Try multiple methods to ensure we're at the top
-    this.chatContainer.focus();
-    this.chatContainer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true }));
+    // Start from bottom and scroll up continuously
+    this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     await this.wait(500);
     
-    // Ensure scroll position is at top
-    this.chatContainer.scrollTo({ top: 0, behavior: 'instant' });
-    await this.wait(500);
+    // Record initial state
+    const initialCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+    this.lastMessageGroupCount = initialCount;
+    console.log(`📍 Starting with ${initialCount} message groups`);
     
-    this.updateStatus('📚 Scanning all messages from top to bottom...', '#667eea');
-    
-    // Now scan all messages from top to bottom
-    if (window.simpleConversationCapture) {
-      // Clear any existing data
-      window.simpleConversationCapture.messageGroups?.clear();
-      window.simpleConversationCapture.processedMessageIds?.clear();
+    while (this.isRunning && !this.hasReachedTop && this.noNewDataCounter < this.maxNoNewDataAttempts) {
+      this.scrollAttempts++;
       
-      // Perform comprehensive scan
-      window.simpleConversationCapture.scanForNewGroups();
-      await this.wait(1000);
+      // Get current message group count before scrolling
+      const beforeScrollCount = window.simpleConversationCapture?.messageGroups?.size || 0;
       
-      // Force a second scan to ensure we captured everything
-      window.simpleConversationCapture.scanForNewGroups();
-      await this.wait(500);
+      this.updateStatus(
+        `⬆️ Scroll attempt ${this.scrollAttempts} - Found ${beforeScrollCount} message groups`,
+        '#667eea'
+      );
+      
+      // Check if we've reached the top
+      if (this.checkIfAtTop()) {
+        console.log('🔝 Reached the top of the chat');
+        this.hasReachedTop = true;
+        break;
+      }
+      
+      // Scroll up to load older messages
+      const scrollSuccess = await this.scrollUpAndWait();
+      console.log(`📜 Scroll ${this.scrollAttempts}: ${scrollSuccess ? 'Success' : 'Failed'}`);
+      
+      if (!scrollSuccess) {
+        // If scroll failed, we might be at the top
+        if (this.checkIfAtTop()) {
+          console.log('🔝 Reached the top (scroll failed)');
+          this.hasReachedTop = true;
+          break;
+        }
+        // Try alternative scroll methods
+        await this.tryAlternativeScrollMethods();
+      }
+      
+      // Wait for new messages to load
+      await this.wait(800);
+      
+      // Trigger scan in simple capture system
+      if (window.simpleConversationCapture) {
+        window.simpleConversationCapture.scanForNewGroups();
+      }
+      
+      // Wait a bit more for processing
+      await this.wait(400);
+      
+      // Check if we got new message groups
+      const afterScrollCount = window.simpleConversationCapture?.messageGroups?.size || 0;
+      
+      if (afterScrollCount > beforeScrollCount) {
+        // We got new data
+        const newGroups = afterScrollCount - beforeScrollCount;
+        console.log(`✅ New data detected: +${newGroups} groups (total: ${afterScrollCount})`);
+        this.noNewDataCounter = 0; // Reset counter
+        
+        // Save new conversations to database after each successful scroll
+        this.updateStatus(`💾 Saving ${newGroups} new conversations...`, '#48bb78');
+        await this.saveNewConversationsToDatabase(beforeScrollCount, afterScrollCount);
+        
+      } else {
+        // No new data
+        this.noNewDataCounter++;
+        console.log(`⚠️ No new data on attempt ${this.scrollAttempts} (${this.noNewDataCounter}/${this.maxNoNewDataAttempts})`);
+        
+        if (this.noNewDataCounter >= this.maxNoNewDataAttempts) {
+          console.log(`🛑 No new data after ${this.maxNoNewDataAttempts} scroll attempts, stopping`);
+          break;
+        }
+      }
+      
+      // Update last count for next iteration
+      this.lastMessageGroupCount = afterScrollCount;
+      
+      // Brief delay between scroll attempts
+      await this.wait(300);
     }
     
-    // Get final count
-    const totalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
-    console.log(`✅ Comprehensive scan complete: ${totalCount} message groups found`);
-    
-    this.updateStatus(`💾 Saving ${totalCount} conversations to database...`, '#48bb78');
-    
-    // Save all messages to database
-    await this.saveMessagesToDatabase();
-    
-    this.hasReachedTop = true;
+    // Final comprehensive save of any remaining data
+    console.log('🔚 Performing final database save...');
+    await this.saveAllRemainingConversations();
   }
 
   async scrollUpAndWait() {
     const initialScrollTop = this.chatContainer.scrollTop;
     
-    // Enhanced scroll up strategy - 5x longer and quicker
-    this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - 5000);
+    // More aggressive scroll up strategy - scroll larger distances
+    const scrollDistance = Math.min(this.chatContainer.scrollTop, 3000); // Scroll up to 3000px or to top
+    this.chatContainer.scrollTop = Math.max(0, this.chatContainer.scrollTop - scrollDistance);
     
-    // Reduced wait time for faster scraping
-    await this.wait(400);
+    // Wait for content to load
+    await this.wait(600);
     
     // Check if scroll position actually changed
     const finalScrollTop = this.chatContainer.scrollTop;
     const scrollChanged = Math.abs(finalScrollTop - initialScrollTop) > 10;
     
     if (scrollChanged) {
-      console.log('⬆️ Scrolling up (5x distance, faster speed)');
+      console.log(`⬆️ Scrolled up ${initialScrollTop - finalScrollTop}px (from ${initialScrollTop} to ${finalScrollTop})`);
       return true;
     } else {
       return false;
@@ -2171,14 +2229,178 @@ class ComprehensiveMessageScraper {
   }
 
   async tryAlternativeScrollMethods() {
-    // Try jumping to absolute top
-    this.chatContainer.scrollTop = 0;
-    await this.wait(250);
+    console.log('🔄 Trying alternative scroll methods...');
     
-    // Try keyboard simulation  
+    // Method 1: Try jumping to absolute top
+    const beforeTop = this.chatContainer.scrollTop;
+    this.chatContainer.scrollTop = 0;
+    await this.wait(400);
+    
+    // Method 2: Try keyboard simulation  
     this.chatContainer.focus();
     this.chatContainer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', ctrlKey: true }));
-    await this.wait(150);
+    await this.wait(300);
+    
+    // Method 3: Try scrollTo with behavior
+    this.chatContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    await this.wait(400);
+    
+    const afterTop = this.chatContainer.scrollTop;
+    console.log(`🔄 Alternative scroll: ${beforeTop} → ${afterTop}`);
+  }
+
+  async saveNewConversationsToDatabase(startIndex, endIndex) {
+    try {
+      if (!window.simpleConversationCapture?.messageGroups) {
+        console.warn('⚠️ No message groups found for incremental save');
+        return;
+      }
+
+      const messageGroups = window.simpleConversationCapture.messageGroups;
+      const messageGroupsArray = Array.from(messageGroups.entries());
+      
+      // Get only the new message groups (this is approximate since we're using Map)
+      const newGroups = messageGroupsArray.slice(startIndex);
+      
+      if (newGroups.length === 0) {
+        console.log('📝 No new conversations to save');
+        return;
+      }
+      
+      console.log(`💾 Saving ${newGroups.length} new conversations incrementally...`);
+      
+      let savedCount = 0;
+      let errorCount = 0;
+      
+      for (const [groupId, group] of newGroups) {
+        try {
+          const success = await this.saveConversationGroup(groupId, group);
+          if (success) {
+            savedCount++;
+          } else {
+            errorCount++;
+          }
+          
+          // Small delay to prevent API overwhelming
+          await this.wait(50);
+          
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error saving conversation group ${groupId}:`, error);
+        }
+      }
+      
+      console.log(`✅ Incremental save complete: ${savedCount} saved, ${errorCount} errors`);
+      
+    } catch (error) {
+      console.error('❌ Incremental database save failed:', error);
+    }
+  }
+
+  async saveAllRemainingConversations() {
+    try {
+      console.log('💾 Final save: Ensuring all conversations are in database...');
+      
+      if (!window.simpleConversationCapture?.messageGroups) {
+        console.warn('⚠️ No message groups found for final save');
+        return;
+      }
+
+      const messageGroups = window.simpleConversationCapture.messageGroups;
+      let savedCount = 0;
+      let errorCount = 0;
+      let skippedCount = 0;
+
+      this.updateStatus(`💾 Final save: Processing ${messageGroups.size} conversations...`, '#48bb78');
+
+      // Save all conversations (with duplicate checking)
+      for (const [groupId, group] of messageGroups) {
+        try {
+          const success = await this.saveConversationGroup(groupId, group, true); // Force save
+          if (success === true) {
+            savedCount++;
+          } else if (success === 'skipped') {
+            skippedCount++;
+          } else {
+            errorCount++;
+          }
+
+          // Update progress every 10 items
+          if ((savedCount + errorCount + skippedCount) % 10 === 0) {
+            this.updateStatus(
+              `💾 Final save: ${savedCount} saved, ${skippedCount} skipped, ${errorCount} errors`, 
+              '#48bb78'
+            );
+          }
+
+          // Small delay
+          await this.wait(100);
+
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error in final save for ${groupId}:`, error);
+        }
+      }
+
+      // Final status update
+      this.updateStatus(
+        `✅ Final save complete! ${savedCount} saved, ${skippedCount} skipped, ${errorCount} errors`,
+        '#48bb78'
+      );
+      
+      console.log(`✅ Final database save complete: ${savedCount} saved, ${skippedCount} already existed, ${errorCount} errors`);
+
+    } catch (error) {
+      console.error('❌ Final database save operation failed:', error);
+      this.updateStatus('❌ Final save failed: ' + error.message, '#f56565');
+    }
+  }
+
+  async saveConversationGroup(groupId, group, forceSave = false) {
+    try {
+      // Prepare conversation data for database
+      const conversationData = {
+        id: groupId, // Use groupId as unique identifier
+        projectId: this.extractProjectId(),
+        userMessage: group.userMessage?.content || '',
+        lovableResponse: group.lovableMessage?.content || '',
+        timestamp: group.userMessage?.timestamp || group.lovableMessage?.timestamp || new Date().toISOString(),
+        projectContext: {
+          url: window.location.href,
+          projectId: this.extractProjectId(),
+          scrapedAt: new Date().toISOString(),
+          messageGroupId: groupId,
+          userMessageId: group.userMessage?.id,
+          lovableMessageId: group.lovableMessage?.id
+        },
+        tags: this.extractTagsFromMessages(group),
+        effectivenessScore: null
+      };
+
+      // Only save if we have meaningful content
+      if (!conversationData.userMessage && !conversationData.lovableResponse) {
+        console.warn(`⚠️ Skipping empty conversation group: ${groupId}`);
+        return 'skipped';
+      }
+
+      // Send to background script for database saving
+      const response = await this.safeSendMessage({
+        action: 'saveConversation',
+        data: conversationData
+      });
+
+      if (response?.success) {
+        console.log(`✅ Saved conversation group: ${groupId}`);
+        return true;
+      } else {
+        console.warn(`❌ Failed to save conversation ${groupId}: ${response?.error || 'Unknown error'}`);
+        return false;
+      }
+
+    } catch (error) {
+      console.error(`❌ Error saving conversation group ${groupId}:`, error);
+      return false;
+    }
   }
 
   checkIfAtTop() {
@@ -2306,7 +2528,20 @@ class ComprehensiveMessageScraper {
 
   async safeSendMessage(message) {
     try {
+      console.log('🔍 Content Script: Sending message to background:', {
+        action: message.action,
+        dataId: message.data?.id,
+        dataKeys: message.data ? Object.keys(message.data) : []
+      });
+      
       const response = await chrome.runtime.sendMessage(message);
+      
+      console.log('🔍 Content Script: Received response from background:', {
+        success: response?.success,
+        error: response?.error,
+        hasData: !!response?.data
+      });
+      
       return response;
     } catch (error) {
       if (error.message && error.message.includes('Extension context invalidated')) {
@@ -2319,8 +2554,62 @@ class ComprehensiveMessageScraper {
         return { success: false, error: 'Background script not available' };
       }
       
-      console.error('Chrome runtime message error:', error);
+      console.error('❌ Chrome runtime message error:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  // Test database connection and saving functionality
+  async testDatabaseConnection() {
+    console.log('🧪 Testing database connection...');
+    
+    try {
+      // Test basic connection
+      const testResponse = await this.safeSendMessage({
+        action: 'testConnection'
+      });
+      
+      console.log('🔍 Connection test result:', testResponse);
+      
+      if (!testResponse?.success) {
+        console.error('❌ Database connection test failed');
+        return false;
+      }
+      
+      // Test saving a sample conversation
+      const sampleConversation = {
+        id: 'test_' + Date.now(),
+        projectId: this.extractProjectId() || 'test_project',
+        userMessage: 'Test user message',
+        lovableResponse: 'Test Lovable response',
+        timestamp: new Date().toISOString(),
+        projectContext: {
+          url: window.location.href,
+          test: true
+        },
+        tags: ['test'],
+        effectivenessScore: null
+      };
+      
+      console.log('🧪 Testing conversation save with sample data...');
+      const saveResponse = await this.safeSendMessage({
+        action: 'saveConversation',
+        data: sampleConversation
+      });
+      
+      console.log('🔍 Save test result:', saveResponse);
+      
+      if (saveResponse?.success) {
+        console.log('✅ Database connection and saving test PASSED');
+        return true;
+      } else {
+        console.error('❌ Database saving test FAILED:', saveResponse?.error);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Database test error:', error);
+      return false;
     }
   }
 
@@ -2403,3 +2692,35 @@ class ComprehensiveMessageScraper {
 // Initialize the detector
 const lovableDetector = new LovableDetector();
 window.lovableDetector = lovableDetector;
+
+// Global debugging and testing functions
+window.testDatabaseConnection = async function() {
+  if (window.currentMessageScraper) {
+    return await window.currentMessageScraper.testDatabaseConnection();
+  } else {
+    console.log('🧪 Creating temporary scraper for database test...');
+    const tempScraper = new ComprehensiveMessageScraper(null, null);
+    return await tempScraper.testDatabaseConnection();
+  }
+};
+
+window.debugScrapingIssues = function() {
+  console.log('🔧 ===== SCRAPING DEBUG INFORMATION =====');
+  console.log('📊 Current State:');
+  console.log(`  - Message groups: ${window.simpleConversationCapture?.messageGroups?.size || 0}`);
+  console.log(`  - Scraper running: ${window.currentMessageScraper?.isRunning || false}`);
+  console.log(`  - Chat containers: ${document.querySelectorAll('.ChatMessageContainer[data-message-id]').length}`);
+  
+  console.log('\n🧪 Testing Database Connection...');
+  window.testDatabaseConnection().then(result => {
+    console.log(`Database test result: ${result ? '✅ PASSED' : '❌ FAILED'}`);
+  });
+  
+  console.log('\n💡 Available Commands:');
+  console.log('  - window.testDatabaseConnection() - Test database connection');
+  console.log('  - window.debugScrapingIssues() - Show this debug info');
+  console.log('===============================');
+};
+
+console.log('🚀 Lovable Assistant: Enhanced scraping with database saving ready!');
+console.log('💡 Debug commands: window.testDatabaseConnection(), window.debugScrapingIssues()');
