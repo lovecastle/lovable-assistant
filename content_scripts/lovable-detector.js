@@ -1179,8 +1179,8 @@ class LovableDetector {
   }
 
   async loadHistoryMessages() {
-    // Load both sample messages and captured real conversations
-    this.allHistoryMessages = this.generateSampleMessages();
+    // Load real conversations from conversation capture
+    this.allHistoryMessages = [];
     
     // Add detected messages from conversation capture if available
     if (window.conversationCapture && window.conversationCapture.detectedMessages) {
@@ -1196,10 +1196,14 @@ class LovableDetector {
         codeSnippets: msg.codeSnippets || []
       }));
       
-      // Add to the beginning so real conversations appear first
-      this.allHistoryMessages.unshift(...detectedMessages);
+      this.allHistoryMessages = detectedMessages;
       
-      console.log(`📚 Loaded ${detectedMessages.length} real conversations and ${this.allHistoryMessages.length - detectedMessages.length} sample messages`);
+      console.log(`📚 Loaded ${detectedMessages.length} real conversations`);
+    }
+    
+    // If no real messages, show helpful empty state message
+    if (this.allHistoryMessages.length === 0) {
+      console.log('📝 No conversation history found. Try using "Scrape All Messages" in Utilities to capture your chat history.');
     }
     
     // Sort all messages by timestamp (chronological order: oldest first)
@@ -1207,46 +1211,6 @@ class LovableDetector {
     
     this.filteredHistoryMessages = [...this.allHistoryMessages];
     this.renderHistoryMessages();
-  }
-
-  generateSampleMessages() {
-    const sampleMessages = [
-      // Extension Development Conversations
-      {
-        id: 'sample_1',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-        speaker: 'user',
-        content: 'Let\'s create a Chrome extension for Lovable.dev that provides AI assistance',
-        category: 'planning',
-        isSample: true
-      },
-      {
-        id: 'sample_2',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 + 120000),
-        speaker: 'lovable',
-        content: 'Great idea! I\'ll help you create a powerful Chrome extension. Here\'s what we can build:\n\n**Core Features:**\n1. 🤖 AI Chat Assistant\n2. 📚 Development History\n3. 🧠 Project Knowledge Base\n4. ⚙️ Settings & Configuration\n\nLet\'s start with the manifest.json and basic structure.',
-        category: 'planning',
-        isSample: true
-      },
-      {
-        id: 'sample_3',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-        speaker: 'user',
-        content: 'How do we detect when we\'re on a Lovable.dev project page?',
-        category: 'coding',
-        isSample: true
-      },
-      {
-        id: 'sample_4',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12 + 120000),
-        speaker: 'lovable',
-        content: 'We can use content scripts to detect Lovable.dev project pages. Here\'s the approach:\n\n```javascript\nclass LovableDetector {\n  detectLovablePage() {\n    const url = window.location.href;\n    const isProjectPage = url.includes(\'lovable.dev/projects/\');\n    \n    if (isProjectPage) {\n      this.projectId = this.extractProjectId(url);\n      this.showReadyNotification();\n    }\n  }\n}\n```\n\nThis will monitor the URL and activate when we\'re on a project page.',
-        category: 'coding',
-        isSample: true
-      }
-    ];
-    
-    return sampleMessages;
   }
 
   mapCategoriesToOldFormat(categories) {
@@ -2237,7 +2201,7 @@ class ComprehensiveMessageScraper {
     // Get all visible message containers
     const messageContainers = this.chatContainer.querySelectorAll('.ChatMessageContainer[data-message-id]');
     
-    console.log(`📊 Capturing ${messageContainers.length} visible messages...`);
+    console.log(`📊 Capturing ${messageContainers.length} visible messages using two-pass approach...`);
     
     // Sort messages by their position in DOM to maintain conversation order
     const sortedContainers = Array.from(messageContainers).sort((a, b) => {
@@ -2245,6 +2209,10 @@ class ComprehensiveMessageScraper {
       const rectB = b.getBoundingClientRect();
       return rectA.top - rectB.top;
     });
+    
+    // PASS 1: Primary detection using ID prefixes
+    const primaryDetected = [];
+    const unknownContainers = [];
     
     for (const container of sortedContainers) {
       try {
@@ -2260,15 +2228,59 @@ class ComprehensiveMessageScraper {
             }
           }
           
-          // Add conversation pairing information for messages with same timestamp
-          messageData.conversationGroup = this.findConversationGroup(messageData);
-          
-          this.scrapedMessages.set(messageData.id, messageData);
-          console.log(`✅ Captured ${messageData.speaker} message: ${messageData.id.substring(0, 20)}... (group: ${messageData.conversationGroup})`);
+          primaryDetected.push({ container, messageData });
+        } else {
+          // Store containers that couldn't be identified for secondary detection
+          const messageId = container.getAttribute('data-message-id');
+          if (messageId && !messageId.startsWith('umsg_') && !messageId.startsWith('aimsg_')) {
+            unknownContainers.push(container);
+          }
         }
       } catch (error) {
-        console.warn('⚠️ Error capturing message:', error);
+        console.warn('⚠️ Error in primary detection:', error);
       }
+    }
+    
+    console.log(`📊 Pass 1: ${primaryDetected.length} detected, ${unknownContainers.length} unknown`);
+    
+    // PASS 2: Secondary detection for orphaned messages
+    const secondaryDetected = [];
+    
+    if (unknownContainers.length > 0) {
+      console.log(`🔍 Pass 2: Attempting structural detection on ${unknownContainers.length} unknown containers...`);
+      
+      for (const container of unknownContainers) {
+        try {
+          const messageData = window.conversationCapture.extractUnknownMessageByStructure(container);
+          
+          if (messageData && !this.scrapedMessages.has(messageData.id)) {
+            secondaryDetected.push({ container, messageData });
+            console.log(`🎯 Structural detection recovered: ${messageData.speaker} message: ${messageData.id}`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Error in structural detection:', error);
+        }
+      }
+    }
+    
+    // PASS 3: Process all detected messages
+    const allDetected = [...primaryDetected, ...secondaryDetected];
+    
+    for (const { container, messageData } of allDetected) {
+      // Add conversation pairing information for messages with same timestamp
+      messageData.conversationGroup = this.findConversationGroup(messageData);
+      
+      this.scrapedMessages.set(messageData.id, messageData);
+      
+      const detectionMethod = messageData.detectedByStructure ? '[STRUCTURAL]' : '[PRIMARY]';
+      console.log(`✅ ${detectionMethod} Captured ${messageData.speaker} message: ${messageData.id.substring(0, 20)}... (group: ${messageData.conversationGroup})`);
+    }
+    
+    const totalCaptured = allDetected.length;
+    const structuralCount = secondaryDetected.length;
+    
+    if (totalCaptured > 0) {
+      console.log(`📊 Capture Summary: ${totalCaptured} total (${totalCaptured - structuralCount} primary, ${structuralCount} structural)`);
     }
   }
 
