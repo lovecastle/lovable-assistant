@@ -3071,6 +3071,15 @@ class ComprehensiveMessageScraper {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  async waitWithCountdown(ms, message, color = '#667eea') {
+    const totalSeconds = Math.ceil(ms / 1000);
+    for (let remaining = totalSeconds; remaining > 0; remaining--) {
+      const statusMessage = `${message} ${remaining}s...`;
+      this.updateStatus(statusMessage, color);
+      await this.wait(1000);
+    }
+  }
+
   // Method to stop scraping if needed
   stop() {
     console.log('🛑 Manually stopping scraper...');
