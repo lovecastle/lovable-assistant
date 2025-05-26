@@ -345,17 +345,9 @@ class SimpleConversationCapture {
     // Rule 2: Ignore if Lovable response starts with refactoring
     // Be more specific - only check the actual response text, not button text
     const lovableMainContent = lovableContent.trim();
-    if (lovableMainContent.startsWith('I\'ll refactor') || lovableMainContent.startsWith('I will refactor')) {
+    if (userContent.trim().startsWith('Refactor')) {
       if (this.verboseLogging) {
-        console.log('🚫 Ignoring: Lovable message starts with refactoring');
-      }
-      return true;
-    }
-
-    // Additional check: If content seems to be just UI text or very short
-    if (userContent.length < 10 || lovableContent.length < 50) {
-      if (this.verboseLogging) {
-        console.log(`🚫 Ignoring: Content too short (user: ${userContent.length}, lovable: ${lovableContent.length})`);
+        console.log('🚫 Ignoring: User message starts with refactoring');
       }
       return true;
     }

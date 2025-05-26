@@ -39,9 +39,22 @@ export class SupabaseClient {
     console.log(`🔍 Database response: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error(`❌ Database request failed: ${response.status} ${response.statusText}`, error);
-      throw new Error(`Supabase request failed: ${error}`);
+      const errorText = await response.text();
+      
+      // Handle unique constraint violations (409 with 23505 code) specially
+      if (response.status === 409 && errorText.includes('"code":"23505"')) {
+        console.log(`🔄 Database-sync: Unique constraint violation detected (expected behavior)`);
+        return { 
+          constraintViolation: true, 
+          status: 409, 
+          error: errorText,
+          message: 'Duplicate key value violates unique constraint'
+        };
+      }
+      
+      // For other errors, log and throw as before
+      console.error(`❌ Database request failed: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`Supabase request failed: ${errorText}`);
     }
 
     const result = await response.json();
@@ -180,11 +193,27 @@ export class SupabaseClient {
         body: JSON.stringify(conversation)
       });
       
+      // Check if result indicates a constraint violation
+      if (result.constraintViolation) {
+        console.log(`🔄 Database-sync: Conversation already exists (constraint violation), skipping: ${conversation.id}`);
+        return { 
+          success: true, 
+          skipped: true, 
+          reason: 'Unique constraint violation - conversation already exists',
+          lovableMessageId: conversation.lovable_message_id || conversation.project_context?.lovableId
+        };
+      }
+      
       console.log('✅ Database-sync: Conversation saved successfully:', result);
       return { success: true, data: result };
     } catch (error) {
+      // Handle any unexpected errors that weren't caught by the constraint violation check
       console.error('❌ Database-sync: Failed to save conversation:', error);
-      throw error;
+      return { 
+        success: false, 
+        error: error.message,
+        conversationId: conversation.id
+      };
     }
   }
 

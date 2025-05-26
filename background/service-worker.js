@@ -119,9 +119,30 @@ async function handleSaveConversation(conversationData) {
     console.log('✅ Service Worker: Supabase configuration found');
     
     const result = await supabase.saveConversation(conversationData);
-    console.log('✅ Service Worker: Conversation saved successfully:', result);
     
-    return { success: true, data: result };
+    // Handle constraint violations and skipped duplicates
+    if (result.skipped) {
+      console.log('🔄 Service Worker: Conversation skipped (duplicate):', result.reason);
+      return { 
+        success: true, 
+        skipped: true, 
+        reason: result.reason,
+        lovableMessageId: result.lovableMessageId
+      };
+    }
+    
+    // Handle save errors
+    if (!result.success) {
+      console.error('❌ Service Worker: Save failed:', result.error);
+      return { 
+        success: false, 
+        error: result.error || 'Unknown database error'
+      };
+    }
+    
+    console.log('✅ Service Worker: Conversation saved successfully:', result);
+    return { success: true, data: result.data };
+    
   } catch (error) {
     console.error('❌ Service Worker: Failed to save conversation:', error);
     return { success: false, error: error.message };
@@ -135,12 +156,22 @@ async function handleBulkSaveConversations(conversationsArray) {
     const results = [];
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
     
     for (const conversationData of conversationsArray) {
       try {
         const result = await supabase.saveConversation(conversationData);
-        results.push({ success: true, data: result });
-        successCount++;
+        
+        if (result.skipped) {
+          results.push({ success: true, skipped: true, reason: result.reason });
+          skippedCount++;
+        } else if (result.success) {
+          results.push({ success: true, data: result.data });
+          successCount++;
+        } else {
+          results.push({ success: false, error: result.error });
+          errorCount++;
+        }
       } catch (error) {
         console.error(`❌ Failed to save conversation ${conversationData.id}:`, error);
         results.push({ success: false, error: error.message });
@@ -148,12 +179,12 @@ async function handleBulkSaveConversations(conversationsArray) {
       }
     }
     
-    console.log(`✅ Bulk save complete: ${successCount} saved, ${errorCount} errors`);
+    console.log(`✅ Bulk save complete: ${successCount} saved, ${skippedCount} skipped, ${errorCount} errors`);
     return { 
       success: errorCount === 0, 
       data: { 
         results, 
-        summary: { successCount, errorCount, total: conversationsArray.length }
+        summary: { successCount, skippedCount, errorCount, total: conversationsArray.length }
       }
     };
   } catch (error) {
@@ -192,9 +223,30 @@ async function handleSaveMessageGroup(messageGroup) {
     });
 
     const result = await supabase.saveConversation(conversationData);
-    console.log('✅ Service Worker: Auto-captured conversation saved:', result);
     
-    return { success: true, data: result };
+    // Handle constraint violations and skipped duplicates
+    if (result.skipped) {
+      console.log('🔄 Service Worker: Auto-capture conversation skipped (duplicate):', result.reason);
+      return { 
+        success: true, 
+        skipped: true, 
+        reason: result.reason,
+        lovableMessageId: result.lovableMessageId
+      };
+    }
+    
+    // Handle save errors
+    if (!result.success) {
+      console.error('❌ Service Worker: Auto-capture save failed:', result.error);
+      return { 
+        success: false, 
+        error: result.error || 'Unknown database error'
+      };
+    }
+    
+    console.log('✅ Service Worker: Auto-captured conversation saved:', result);
+    return { success: true, data: result.data };
+    
   } catch (error) {
     console.error('❌ Service Worker: Failed to save auto-captured conversation:', error);
     return { success: false, error: error.message };
