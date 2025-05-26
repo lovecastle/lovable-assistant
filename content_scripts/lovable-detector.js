@@ -2341,8 +2341,13 @@ class ComprehensiveMessageScraper {
         const successCount = batchResult.saved || 0;
         const skippedCount = batchResult.skipped || 0;
         const errorCount = batchResult.errors || 0;
+        const cancelled = batchResult.cancelled || false;
         
-        if (successCount > 0) {
+        if (cancelled) {
+          console.log(`🛑 Batch processing cancelled - scraper stopped`);
+          this.updateStatus(`🛑 Processing cancelled by user`, '#f59e0b');
+          break; // Exit the main loop immediately
+        } else if (successCount > 0) {
           console.log(`✅ Success saved ${successCount}/${newGroupsCount} message groups to the database (${skippedCount} skipped, ${errorCount} errors)`);
           this.updateStatus(`✅ Saved ${successCount}/${newGroupsCount} groups successfully!`, '#48bb78');
         } else if (skippedCount > 0) {
@@ -2495,6 +2500,12 @@ class ComprehensiveMessageScraper {
       return { success: true, saved: 0, errors: 0, skipped: 0 };
     }
     
+    // Check if scraping was stopped
+    if (!this.isRunning) {
+      console.log('🛑 Batch processing cancelled - scraper stopped');
+      return { success: false, saved: 0, errors: 0, skipped: 0, cancelled: true };
+    }
+    
     let savedCount = 0;
     let errorCount = 0;
     let skippedCount = 0;
@@ -2505,6 +2516,12 @@ class ComprehensiveMessageScraper {
     const savePromises = [];
     
     for (const [groupId, group] of newGroups) {
+      // Check if scraping was stopped before each save
+      if (!this.isRunning) {
+        console.log('🛑 Stopping batch processing - scraper stopped');
+        break;
+      }
+      
       const savePromise = this.saveConversationGroup(groupId, group)
         .then(result => {
           if (result === true) {
@@ -2709,6 +2726,12 @@ class ComprehensiveMessageScraper {
 
   async saveConversationGroup(groupId, group, forceSave = false) {
     try {
+      // Check if scraping was stopped (unless forced)
+      if (!forceSave && !this.isRunning) {
+        console.log(`🛑 Save cancelled for ${groupId} - scraper stopped`);
+        return 'cancelled';
+      }
+      
       // Only show minimal debug info for batch processing
       if (this.verboseLogging) {
         console.log(`🔍 Processing ${groupId}: userContent=${group.userContent?.length || 0}chars, lovableContent=${group.lovableContent?.length || 0}chars`);
@@ -3091,19 +3114,20 @@ class ComprehensiveMessageScraper {
     this.isRunning = false;
     
     // Update status
-    this.updateStatus('🛑 Scraping stopped by user. Completing current saves...', '#f59e0b');
+    this.updateStatus('🛑 Scraping stopped by user. Cancelling pending operations...', '#f59e0b');
     
-    // Allow current batch saves to complete but don't start new ones
-    if (this.batchSavePromises.length > 0) {
-      console.log(`⏳ Waiting for ${this.batchSavePromises.length} current batch saves to complete...`);
-      
-      Promise.allSettled(this.batchSavePromises).then(() => {
-        console.log('✅ All current saves completed after manual stop');
-        this.cleanupAfterStop();
-      });
-    } else {
-      this.cleanupAfterStop();
-    }
+    // Clear all pending saves immediately
+    this.pendingSaves.clear();
+    
+    // Cancel batch save promises by clearing the array
+    // Note: Individual promises may still complete, but we won't wait for them
+    const pendingCount = this.batchSavePromises.length;
+    this.batchSavePromises = [];
+    
+    console.log(`🛑 Cancelled ${pendingCount} pending batch operations`);
+    
+    // Immediate cleanup
+    this.cleanupAfterStop();
   }
 
   cleanupAfterStop() {
