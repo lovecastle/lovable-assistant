@@ -1,6 +1,17 @@
-// Lovable.dev Page Detection and Enhanced Markdown Chat
-console.log('Lovable Assistant: Content script loaded');
+// ===========================
+// LOVABLE.DEV ASSISTANT - MAIN DETECTOR
+// ===========================
+// Organized into focused sections for better maintainability
+// Each section has a clear responsibility and purpose
 
+console.log('🚀 Lovable Assistant: Loading enhanced detector...');
+
+// ===========================
+// SECTION 1: CORE DETECTOR CLASS
+// ===========================
+// Handles page detection, keyboard shortcuts, and initialization
+
+// Lovable.dev Page Detection and Enhanced Markdown Chat
 class LovableDetector {
   constructor() {
     this.isLovablePage = false;
@@ -11,8 +22,6 @@ class LovableDetector {
 
   init() {
     this.detectLovablePage();
-    
-    // Setup keyboard shortcuts once
     this.setupKeyboardShortcuts();
   }
 
@@ -25,17 +34,9 @@ class LovableDetector {
       this.projectId = this.extractProjectId(url);
       
       console.log('✅ Lovable.dev project detected:', this.projectId);
-      console.log('🔍 Debug: this object:', this);
-      console.log('🔍 Debug: showReadyNotification exists:', typeof this.showReadyNotification);
       
-      // Ensure the method is called with proper context
       setTimeout(() => {
-        console.log('🔍 Debug: In setTimeout, this:', this);
-        if (typeof this.showReadyNotification === 'function') {
-          this.showReadyNotification();
-        } else {
-          console.warn('showReadyNotification method not found');
-        }
+        this.showReadyNotification();
       }, 100);
       
       chrome.runtime.sendMessage({
@@ -52,7 +53,6 @@ class LovableDetector {
   }
 
   setupKeyboardShortcuts() {
-    // Create bound function once
     this.handleKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         console.log('🤖 Assistant shortcut triggered');
@@ -63,11 +63,10 @@ class LovableDetector {
       }
     };
     
-    // Add listeners
     document.addEventListener('keydown', this.handleKeydown, true);
     window.addEventListener('keydown', this.handleKeydown, true);
     
-    console.log('🎹 Keyboard shortcuts registered at', new Date().toLocaleTimeString());
+    console.log('🎹 Keyboard shortcuts registered');
   }
 
 
@@ -2962,12 +2961,6 @@ class ComprehensiveMessageScraper {
     
     console.log('✅ All tracked operations completed');
   }
-      if (this.statusDiv) {
-        this.statusDiv.innerHTML = '';
-        this.statusDiv.style.display = 'none';
-      }
-    }, 8000);
-  }
 
   updateStatus(message, color = '#4a5568') {
     if (this.statusDiv) {
@@ -3023,20 +3016,6 @@ class ComprehensiveMessageScraper {
     // Hide status after 5 seconds
     setTimeout(() => {
       if (this.statusDiv) {
-        this.statusDiv.style.display = 'none';
-      }
-    }, 5000);
-  }
-    this.btn.style.display = 'inline-block';
-    
-    // Hide stop button
-    const stopBtn = document.getElementById('stop-scraping-btn');
-    if (stopBtn) stopBtn.style.display = 'none';
-    
-    // Clear status after 5 seconds and hide status area
-    setTimeout(() => {
-      if (this.statusDiv) {
-        this.statusDiv.innerHTML = '';
         this.statusDiv.style.display = 'none';
       }
     }, 5000);
