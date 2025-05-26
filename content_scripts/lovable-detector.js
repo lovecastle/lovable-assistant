@@ -334,7 +334,7 @@ class LovableDetector {
               ">📚</div>
               <div style="flex: 1;">
                 <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Development History
+                  Conversation History
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
                   Browse and search your past conversations and development activities
@@ -648,7 +648,7 @@ class LovableDetector {
         this.showChatInterface();
         break;
       case 'history':
-        this.showDevelopmentHistory();
+        this.showConversationHistory();
         break;
       case 'utilities':
         this.showUtilitiesPage();
@@ -973,17 +973,17 @@ class LovableDetector {
   }
 
   // ===========================
-  // SECTION 4: DEVELOPMENT HISTORY MANAGEMENT
+  // SECTION 4: CONVERSATION HISTORY MANAGEMENT
   // ===========================
   // Handles loading, filtering, searching, and displaying conversation history
-  // This section manages the development history view and all related functionality
+  // This section manages the conversation history view and all related functionality
 
-  showDevelopmentHistory() {
+  showConversationHistory() {
     const content = document.getElementById('dialog-content');
     const title = document.getElementById('dialog-title');
     
     if (title) {
-      title.textContent = '📚 Development History';
+      title.textContent = '📚 Conversation History';
     }
     
     if (!content) return;
@@ -2157,14 +2157,25 @@ class ComprehensiveMessageScraper {
     this.scrollAttempts = 0;
     this.noNewDataCounter = 0;
     this.maxNoNewDataAttempts = 10; // Stop after 10 scrolls with no new data
-    this.scrollDelay = 1500; // Reduced from 5000ms for faster scraping
+    this.scrollDelay = 2000; // Consistent 2-second delay before scrolling
+    this.saveSuccessDelay = 2000; // 2-second delay after successful batch saves
+    this.pendingSaveDelay = 2000; // 2-second delay for pending save completion
+    this.errorDelay = 2000; // 2-second delay for error cases
+    this.duplicateDelay = 2000; // 2-second delay for duplicate detection cases
     this.isRunning = false;
     this.hasReachedTop = false;
+    this.verboseLogging = false; // Set to true for detailed debugging
     
     // Add tracking for batch save completion
     this.pendingSaves = new Set(); // Track IDs of conversations being saved
     this.batchSavePromises = []; // Track active save promises
     this.saveCompletionCallbacks = new Map(); // Track completion callbacks for saves
+  }
+
+  // Control verbose logging for debugging
+  setVerboseLogging(enabled) {
+    this.verboseLogging = enabled;
+    console.log(`🔧 Verbose logging ${enabled ? 'enabled' : 'disabled'} for scraper`);
   }
 
   async startScraping() {
@@ -2302,31 +2313,51 @@ class ComprehensiveMessageScraper {
       // Wait a bit more for processing
       await this.wait(400);
       
-      // Check if we got new message groups
+      // Check if we got new message groups and batch them
       const afterScrollCount = window.simpleConversationCapture?.messageGroups?.size || 0;
       
       if (afterScrollCount > beforeScrollCount) {
-        // We got new data
-        const newGroups = afterScrollCount - beforeScrollCount;
-        console.log(`✅ New data detected: +${newGroups} groups (total: ${afterScrollCount})`);
+        // We got new data - collect the new message groups for batch processing
+        const newGroupsCount = afterScrollCount - beforeScrollCount;
+        console.log(`✅ New data detected: +${newGroupsCount} groups (total: ${afterScrollCount})`);
         this.noNewDataCounter = 0; // Reset counter
         
-        // Save new conversations to database after each successful scroll
-        this.updateStatus(`💾 Saving ${newGroups} new conversations...`, '#48bb78');
+        // Get the actual new message groups for batch processing
+        const messageGroups = window.simpleConversationCapture.messageGroups;
+        const messageGroupsArray = Array.from(messageGroups.entries());
+        const newGroups = messageGroupsArray.slice(beforeScrollCount); // Get only the new groups
         
-        // Track the batch save operation
-        const batchSavePromise = this.saveNewConversationsToDatabase(beforeScrollCount, afterScrollCount);
-        this.batchSavePromises.push(batchSavePromise);
+        // Process the batch of new message groups
+        this.updateStatus(`💾 Processing batch of ${newGroupsCount} new message groups...`, '#48bb78');
         
-        // Wait for this batch to complete before continuing
-        console.log(`⏳ Waiting for batch of ${newGroups} conversations to finish saving...`);
-        await batchSavePromise;
+        const batchResult = await this.processBatchOfMessageGroups(newGroups);
         
-        // Remove completed promise from tracking
-        this.batchSavePromises = this.batchSavePromises.filter(p => p !== batchSavePromise);
+        // Show clean summary message
+        const successCount = batchResult.saved || 0;
+        const skippedCount = batchResult.skipped || 0;
+        const errorCount = batchResult.errors || 0;
         
-        console.log(`✅ Batch save completed successfully for ${newGroups} conversations`);
-        this.updateStatus(`✅ Saved ${newGroups} conversations, continuing...`, '#48bb78');
+        if (successCount > 0) {
+          console.log(`✅ Success saved ${successCount}/${newGroupsCount} message groups to the database (${skippedCount} skipped, ${errorCount} errors)`);
+          this.updateStatus(`✅ Saved ${successCount}/${newGroupsCount} groups successfully!`, '#48bb78');
+        } else if (skippedCount > 0) {
+          console.log(`⚠️ Skipped ${skippedCount}/${newGroupsCount} message groups (duplicates)`);
+          this.updateStatus(`⚠️ Skipped ${skippedCount}/${newGroupsCount} groups (duplicates)`, '#f6ad55');
+        } else {
+          console.log(`❌ Failed to save any of ${newGroupsCount} message groups`);
+          this.updateStatus(`❌ Failed to save ${newGroupsCount} groups`, '#f56565');
+        }
+        
+        // Ensure all saves are completed before proceeding
+        if (this.batchSavePromises.length > 0) {
+          console.log(`⏳ Ensuring all ${this.batchSavePromises.length} batch saves are completed...`);
+          await Promise.allSettled(this.batchSavePromises);
+          this.batchSavePromises = [];
+          console.log(`✅ All batch saves verified complete`);
+        }
+        
+        // Add 2-second delay before next scroll to prevent backend overload and missing data
+        await this.waitWithCountdown(2000, `⏱️ Batch processing complete! Next scroll in`, '#48bb78');
         
       } else {
         // No new data
@@ -2335,10 +2366,15 @@ class ComprehensiveMessageScraper {
         
         // If no new data, still wait for any pending saves to complete
         if (this.batchSavePromises.length > 0) {
-          console.log(`⏳ No new data, but waiting for ${this.batchSavePromises.length} pending saves to complete...`);
-          await Promise.allSettled(this.batchSavePromises);
+          console.log(`⏳ No new data, waiting for ${this.batchSavePromises.length} pending saves...`);
+          await this.waitWithCountdown(this.pendingSaveDelay, `⏳ Completing pending saves. Next scroll in`, '#f6ad55');
+          
+          const pendingResults = await Promise.allSettled(this.batchSavePromises);
           this.batchSavePromises = [];
           console.log(`✅ All pending saves completed`);
+        } else {
+          // Add 2-second delay even when no new data to maintain consistent timing
+          await this.waitWithCountdown(2000, `⏱️ No new data found. Next scroll in`, '#f6ad55');
         }
         
         if (this.noNewDataCounter >= this.maxNoNewDataAttempts) {
@@ -2349,9 +2385,6 @@ class ComprehensiveMessageScraper {
       
       // Update last count for next iteration
       this.lastMessageGroupCount = afterScrollCount;
-      
-      // Brief delay between scroll attempts
-      await this.wait(300);
     }
     
     // Final comprehensive save of any remaining data
@@ -2449,6 +2482,62 @@ class ComprehensiveMessageScraper {
     
     const afterTop = this.chatContainer.scrollTop;
     console.log(`🔄 Alternative scroll: ${beforeTop} → ${afterTop}`);
+  }
+
+  async processBatchOfMessageGroups(newGroups) {
+    const batchSize = newGroups.length;
+    if (batchSize === 0) {
+      return { success: true, saved: 0, errors: 0, skipped: 0 };
+    }
+    
+    let savedCount = 0;
+    let errorCount = 0;
+    let skippedCount = 0;
+    
+    console.log(`🔍 Processing batch of ${batchSize} message groups...`);
+    
+    // Process each message group in the batch
+    const savePromises = [];
+    
+    for (const [groupId, group] of newGroups) {
+      const savePromise = this.saveConversationGroup(groupId, group)
+        .then(result => {
+          if (result === true) {
+            savedCount++;
+          } else if (result === 'skipped') {
+            skippedCount++;
+          } else {
+            errorCount++;
+          }
+          return result;
+        })
+        .catch(error => {
+          errorCount++;
+          console.error(`❌ Error in batch processing for ${groupId}:`, error);
+          return false;
+        });
+      
+      savePromises.push(savePromise);
+      
+      // Small delay between starting saves to prevent overwhelming
+      await this.wait(50);
+    }
+    
+    // Wait for all saves in this batch to complete
+    console.log(`⏳ Waiting for all ${savePromises.length} saves in batch to complete...`);
+    await Promise.allSettled(savePromises);
+    
+    // Return batch results
+    const result = {
+      success: errorCount === 0,
+      saved: savedCount,
+      errors: errorCount,
+      skipped: skippedCount,
+      total: batchSize
+    };
+    
+    console.log(`✅ Batch processing complete: ${savedCount} saved, ${skippedCount} skipped, ${errorCount} errors`);
+    return result;
   }
 
   async saveNewConversationsToDatabase(startIndex, endIndex) {
@@ -2615,15 +2704,10 @@ class ComprehensiveMessageScraper {
 
   async saveConversationGroup(groupId, group, forceSave = false) {
     try {
-      // Debug: Log the group structure
-      console.log(`🔍 Group structure for ${groupId}:`, {
-        hasUserContent: !!group.userContent,
-        hasLovableContent: !!group.lovableContent,
-        hasUserMessage: !!group.userMessage,
-        hasLovableMessage: !!group.lovableMessage,
-        userContentLength: group.userContent?.length || 0,
-        lovableContentLength: group.lovableContent?.length || 0
-      });
+      // Only show minimal debug info for batch processing
+      if (this.verboseLogging) {
+        console.log(`🔍 Processing ${groupId}: userContent=${group.userContent?.length || 0}chars, lovableContent=${group.lovableContent?.length || 0}chars`);
+      }
 
       // Prepare conversation data for database with proper UUID - same structure as auto-capture
       const conversationData = {
@@ -2644,17 +2728,11 @@ class ComprehensiveMessageScraper {
 
       // Only save if we have meaningful content
       if (!conversationData.userMessage && !conversationData.lovableResponse) {
-        console.warn(`⚠️ Skipping empty conversation group: ${groupId}`);
+        if (this.verboseLogging) {
+          console.warn(`⚠️ Skipping empty conversation group: ${groupId}`);
+        }
         return 'skipped';
       }
-
-      console.log(`🔍 Saving conversation:`, {
-        id: conversationData.id,
-        userMessageLength: conversationData.userMessage.length,
-        lovableResponseLength: conversationData.lovableResponse.length,
-        userPreview: conversationData.userMessage.substring(0, 50) + '...',
-        lovablePreview: conversationData.lovableResponse.substring(0, 50) + '...'
-      });
 
       // Send to background script for database saving
       const response = await this.safeSendMessage({
@@ -2664,19 +2742,23 @@ class ComprehensiveMessageScraper {
 
       if (response?.success) {
         if (response.skipped) {
-          console.log(`⚠️ Skipped duplicate conversation group: ${groupId} (lovableId: ${group.lovableId})`);
+          // Duplicate detected - this is expected with unique constraints
           return 'skipped';
         } else {
-          console.log(`✅ Saved conversation group: ${groupId} → UUID: ${conversationData.id}`);
+          // Successfully saved new conversation
           return true;
         }
       } else {
-        console.warn(`❌ Failed to save conversation ${groupId}: ${response?.error || 'Unknown error'}`);
+        if (this.verboseLogging) {
+          console.warn(`❌ Failed to save conversation ${groupId}: ${response?.error || 'Unknown error'}`);
+        }
         return false;
       }
 
     } catch (error) {
-      console.error(`❌ Error saving conversation group ${groupId}:`, error);
+      if (this.verboseLogging) {
+        console.error(`❌ Error saving conversation group ${groupId}:`, error);
+      }
       return false;
     }
   }

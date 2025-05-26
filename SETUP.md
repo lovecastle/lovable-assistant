@@ -20,7 +20,7 @@ Your Chrome extension has been successfully completed with **optimized conversat
    - Better mutation observer with debounced scanning
    - Only scans when actual changes occur
 
-3. **Enhanced Development History**:
+3. **Enhanced Conversation History**:
    - **FIXED**: Messages now properly sorted by timestamp (newest first)
    - Real-time sorting when new messages are added
    - Maintains sort order after filtering
@@ -90,7 +90,7 @@ window.conversationCapture.setScanCooldown(5000) // 5 seconds
 
 ### ✅ **Improved User Experience:**
 - **Clean console output** shows only essential information
-- **Sorted conversations** in Development History (newest first)
+- **Sorted conversations** in Conversation History (newest first)
 - **Real-time updates** without performance impact
 - **Debug mode** available when needed
 
@@ -115,14 +115,14 @@ window.conversationCapture.setScanCooldown(5000) // 5 seconds
 1. Navigate to Lovable.dev project page
 2. Send messages in chat
 3. Console shows: 🎯 [USER] "message..." | Categories: [...]
-4. Press Cmd+K → Development History to see sorted conversations
+4. Press Cmd+K → Conversation History to see sorted conversations
 ```
 
 ### 3. **Verify Sorting**
 ```bash
-1. Check Development History shows newest messages first
+1. Check Conversation History shows newest messages first
 2. Send new message
-3. Refresh Development History - new message appears at top
+3. Refresh Conversation History - new message appears at top
 4. Filter messages - sort order maintained
 ```
 
@@ -140,24 +140,24 @@ window.conversationCapture.setScanCooldown(1000) // Scan every 1 second
 window.conversationCapture.restart() // Restart monitoring
 ```
 
-### **If Development History shows wrong order:**
+### **If Conversation History shows wrong order:**
 ```javascript
 // Check if messages are being captured
 window.conversationCapture.detectedMessages
 
-// Reload Development History
-// Press Cmd+K → Development History (should auto-sort)
+// Reload Conversation History
+// Press Cmd+K → Conversation History (should auto-sort)
 ```
 
 ## 🎉 **Performance Summary**
 
 - ✅ **90% reduction** in console log volume
-- ✅ **Proper chronological sorting** in Development History
+- ✅ **Proper chronological sorting** in Conversation History
 - ✅ **Smart scanning** with cooldown prevention
 - ✅ **Real-time updates** without flooding
 - ✅ **Debug controls** for fine-tuning
 - ✅ **Efficient monitoring** that scales with usage
 
-The extension now runs in **"relaxed mode"** by default while maintaining full effectiveness for conversation capture and Development History functionality!
+The extension now runs in **"relaxed mode"** by default while maintaining full effectiveness for conversation capture and Conversation History functionality!
 
 Test it out and enjoy the cleaner, more efficient conversation monitoring! 🚀

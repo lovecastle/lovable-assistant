@@ -465,7 +465,7 @@ class SimpleConversationCapture {
   }
 
   notifyUI(group) {
-    // Notify Development History
+    // Notify Conversation History
     if (window.lovableDetector && window.lovableDetector.addDetectedMessage) {
       // Convert group format to expected message format
       const userMessage = {
