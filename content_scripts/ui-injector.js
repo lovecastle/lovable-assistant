@@ -547,12 +547,8 @@ class UIInjector {
   }
 
   formatMessageContent(content) {
-    // Simple markdown-like formatting
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br>');
+    // Use the advanced MarkdownFormatter for consistent Claude-like formatting
+    return MarkdownFormatter.format(content);
   }
 
   async getProjectContext() {

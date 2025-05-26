@@ -51,41 +51,66 @@ export class SupabaseClient {
   async saveConversation(data) {
     console.log('🔍 Database-sync: Saving conversation:', data.id);
     
-    // Check for duplicates based on lovable_message_id (with fallback to old method)
+    // Enhanced duplicate checking based on lovable_message_id
     const lovableMessageId = data.projectContext?.lovableId || data.lovable_message_id;
     if (lovableMessageId) {
       try {
         console.log('🔍 Database-sync: Checking for duplicate lovable_message_id:', lovableMessageId);
         
-        // Try new column first, fallback to old JSON method if column doesn't exist
-        let existingCheck;
+        // Check both new column and old JSON method for comprehensive duplicate detection
+        let existingCheck = [];
+        
         try {
-          // Try new column method
-          existingCheck = await this.request(`conversations?project_id=eq.${data.projectId}&lovable_message_id=eq.${lovableMessageId}&select=id`);
+          // Try new column method first
+          const newColumnCheck = await this.request(`conversations?project_id=eq.${data.projectId}&lovable_message_id=eq.${lovableMessageId}&select=id,auto_capture,timestamp`);
+          existingCheck = [...(newColumnCheck || [])];
+          console.log('🔍 Database-sync: New column check result:', newColumnCheck?.length || 0, 'matches');
         } catch (error) {
-          if (error.message.includes('lovable_message_id does not exist') || error.message.includes('PGRST204')) {
-            console.log('🔄 Database-sync: New column not found, using fallback method...');
-            // Fallback to old JSON method
-            existingCheck = await this.request(`conversations?project_id=eq.${data.projectId}&project_context->>lovableId=eq.${lovableMessageId}&select=id`);
+          if (error.message.includes('lovable_message_id') && error.message.includes('does not exist')) {
+            console.log('🔄 Database-sync: New column not found, skipping new column check');
           } else {
-            throw error;
+            console.warn('⚠️ Database-sync: Error in new column check:', error.message);
           }
         }
         
+        try {
+          // Also check old JSON method to catch any existing duplicates
+          const jsonCheck = await this.request(`conversations?project_id=eq.${data.projectId}&project_context->>lovableId=eq.${lovableMessageId}&select=id,auto_capture,timestamp`);
+          if (jsonCheck && jsonCheck.length > 0) {
+            console.log('🔍 Database-sync: JSON method check result:', jsonCheck.length, 'matches');
+            // Merge results and deduplicate by ID
+            const existingIds = new Set(existingCheck.map(item => item.id));
+            jsonCheck.forEach(item => {
+              if (!existingIds.has(item.id)) {
+                existingCheck.push(item);
+              }
+            });
+          }
+        } catch (error) {
+          console.warn('⚠️ Database-sync: Error in JSON method check:', error.message);
+        }
+        
+        // If any duplicates found, log details and skip save
         if (existingCheck && existingCheck.length > 0) {
-          console.log(`⚠️ Database-sync: Duplicate conversation found for lovable_message_id ${lovableMessageId}, skipping save`);
+          console.log(`⚠️ Database-sync: Found ${existingCheck.length} duplicate(s) for lovable_message_id ${lovableMessageId}:`);
+          existingCheck.forEach((dup, index) => {
+            console.log(`   Duplicate ${index + 1}: ID=${dup.id}, auto_capture=${dup.auto_capture}, timestamp=${dup.timestamp}`);
+          });
+          
           return { 
             success: true, 
             skipped: true, 
-            reason: 'Duplicate lovable_message_id',
-            existingId: existingCheck[0].id 
+            reason: `Duplicate lovable_message_id (${existingCheck.length} existing)`,
+            existingIds: existingCheck.map(item => item.id),
+            duplicateDetails: existingCheck
           };
         }
         
-        console.log('✅ Database-sync: No duplicate found, proceeding with save');
+        console.log('✅ Database-sync: No duplicates found, proceeding with save');
       } catch (error) {
-        console.warn('⚠️ Database-sync: Error checking for duplicates, proceeding with save:', error);
-        // Continue with save even if duplicate check fails
+        console.error('❌ Database-sync: Error checking for duplicates:', error);
+        // For safety, proceed with save even if duplicate check fails
+        console.log('🔄 Database-sync: Continuing with save despite duplicate check error');
       }
     } else {
       console.log('🔍 Database-sync: No lovable_message_id found, proceeding with save');

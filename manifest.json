@@ -21,6 +21,7 @@
     {
       "matches": ["https://lovable.dev/projects/*"],
       "js": [
+        "markdown-formatter.js",
         "content_scripts/lovable-detector.js",
         "content_scripts/conversation-capture-simple.js",
         "content_scripts/ui-injector.js"
@@ -47,7 +48,8 @@
     {
       "resources": [
         "assets/styles/*.css",
-        "content_scripts/*.js"
+        "content_scripts/*.js",
+        "markdown-formatter.js"
       ],
       "matches": ["https://lovable.dev/*"]
     }
