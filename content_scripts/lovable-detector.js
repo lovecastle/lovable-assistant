@@ -73,6 +73,13 @@ class LovableDetector {
 
 
 
+
+  // ===========================
+  // SECTION 2: UI DIALOG MANAGEMENT
+  // ===========================
+  // Handles dialog creation, styling, navigation, and user interactions
+  // This section manages the main assistant dialog and all its views
+
   toggleAssistant() {
     console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog);
     
@@ -513,6 +520,9 @@ class LovableDetector {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
+  // --- UI Helper Methods ---
+  // Message formatting, styling, and UI manipulation functions
+
   formatMessage(content) {
     return content
       .replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
@@ -703,6 +713,12 @@ class LovableDetector {
     this.setupBackButton();
   }
 
+  // ===========================
+  // SECTION 3: CHAT INTERFACE
+  // ===========================
+  // Handles chat functionality, message formatting, and Claude API integration
+  // This section manages the interactive chat experience with the AI assistant
+
   showChatInterface() {
     const content = document.getElementById('dialog-content');
     const title = document.getElementById('dialog-title');
@@ -811,6 +827,12 @@ class LovableDetector {
     
     this.setupBackButton();
   }
+
+  // ===========================
+  // SECTION 5: UTILITIES MANAGEMENT  
+  // ===========================
+  // Handles utilities page, settings, prompt enhancement, and advanced features
+  // This section manages all utility functions and user preferences
 
   showUtilitiesPage() {
     const content = document.getElementById('dialog-content');
@@ -969,6 +991,12 @@ class LovableDetector {
       });
     }
   }
+
+  // ===========================
+  // SECTION 4: DEVELOPMENT HISTORY MANAGEMENT
+  // ===========================
+  // Handles loading, filtering, searching, and displaying conversation history
+  // This section manages the development history view and all related functionality
 
   showDevelopmentHistory() {
     const content = document.getElementById('dialog-content');
@@ -2096,6 +2124,9 @@ class LovableDetector {
     console.log('📥 Settings exported');
   }
 
+  // --- Communication Helper Methods ---
+  // Safe message passing and error handling functions
+
   async safeSendMessage(message) {
     try {
       console.log('🔍 LovableDetector: Sending message to background:', {
@@ -2129,6 +2160,12 @@ class LovableDetector {
     }
   }
 }
+
+// ===========================
+// SECTION 6: COMPREHENSIVE MESSAGE SCRAPER
+// ===========================  
+// Handles intelligent scrolling, batch processing, and comprehensive message scraping
+// This section manages the advanced scraping functionality with progress tracking
 
 // Comprehensive Message Scraper Class
 class ComprehensiveMessageScraper {
@@ -3021,6 +3058,12 @@ class ComprehensiveMessageScraper {
     }, 5000);
   }
 }
+
+// ===========================
+// SECTION 7: INITIALIZATION
+// ===========================
+// Initializes the extension and makes it globally available
+// This section starts the extension and sets up global access
 
 // Initialize the detector
 const lovableDetector = new LovableDetector();
