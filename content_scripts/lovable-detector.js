@@ -528,6 +528,11 @@ class LovableDetector {
     return MarkdownFormatter.format(content);
   }
 
+  escapeRegex(string) {
+    // Escape special regex characters to treat them as literal characters
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   showTypingIndicator() {
     const messagesContainer = document.getElementById('chat-messages');
     if (!messagesContainer) return;
