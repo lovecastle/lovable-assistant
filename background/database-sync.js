@@ -51,13 +51,56 @@ export class SupabaseClient {
   async saveConversation(data) {
     console.log('🔍 Database-sync: Saving conversation:', data.id);
     
+    // Check for duplicates based on lovable_message_id
+    const lovableMessageId = data.projectContext?.lovableId || data.lovable_message_id;
+    if (lovableMessageId) {
+      try {
+        console.log('🔍 Database-sync: Checking for duplicate lovable_message_id:', lovableMessageId);
+        
+        // Query for existing conversation with same lovable_message_id in same project
+        const existingCheck = await this.request(`conversations?project_id=eq.${data.projectId}&lovable_message_id=eq.${lovableMessageId}&select=id`);
+        
+        if (existingCheck && existingCheck.length > 0) {
+          console.log(`⚠️ Database-sync: Duplicate conversation found for lovable_message_id ${lovableMessageId}, skipping save`);
+          return { 
+            success: true, 
+            skipped: true, 
+            reason: 'Duplicate lovable_message_id',
+            existingId: existingCheck[0].id 
+          };
+        }
+        
+        console.log('✅ Database-sync: No duplicate found, proceeding with save');
+      } catch (error) {
+        console.warn('⚠️ Database-sync: Error checking for duplicates, proceeding with save:', error);
+        // Continue with save even if duplicate check fails
+      }
+    } else {
+      console.log('🔍 Database-sync: No lovable_message_id found, proceeding with save');
+    }
+    
     const conversation = {
       id: data.id || this.generateUUID(),
       project_id: data.projectId,
       user_message: data.userMessage,
       lovable_response: data.lovableResponse,
-      timestamp: data.timestamp || new Date().toISOString(), // Use provided timestamp
-      project_context: data.projectContext || {},
+      timestamp: data.timestamp || new Date().toISOString(),
+      // Extract data from projectContext into separate columns
+      user_message_id: data.projectContext?.userId || data.user_message_id || null,
+      lovable_message_id: data.projectContext?.lovableId || data.lovable_message_id || null,
+      message_group_id: data.projectContext?.messageGroupId || data.message_group_id || null,
+      auto_capture: data.projectContext?.autoCapture || data.auto_capture || false,
+      // Keep project_context for any additional metadata
+      project_context: {
+        url: data.projectContext?.url || null,
+        scrapedAt: data.projectContext?.scrapedAt || null,
+        // Remove the fields we've moved to dedicated columns
+        ...Object.fromEntries(
+          Object.entries(data.projectContext || {}).filter(
+            ([key]) => !['userId', 'lovableId', 'messageGroupId', 'autoCapture'].includes(key)
+          )
+        )
+      },
       tags: data.categories || [], // Map categories to tags field in database
       effectiveness_score: null // Always null as requested
     };
@@ -68,8 +111,11 @@ export class SupabaseClient {
       user_message_length: conversation.user_message?.length || 0,
       lovable_response_length: conversation.lovable_response?.length || 0,
       timestamp: conversation.timestamp,
-      categories_count: conversation.tags?.length || 0,
-      priority_category: conversation.tags?.[0] || 'none'
+      user_message_id: conversation.user_message_id,
+      lovable_message_id: conversation.lovable_message_id,
+      message_group_id: conversation.message_group_id,
+      auto_capture: conversation.auto_capture,
+      categories_count: conversation.tags?.length || 0
     });
 
     try {
@@ -79,7 +125,7 @@ export class SupabaseClient {
       });
       
       console.log('✅ Database-sync: Conversation saved successfully:', result);
-      return result;
+      return { success: true, data: result };
     } catch (error) {
       console.error('❌ Database-sync: Failed to save conversation:', error);
       throw error;

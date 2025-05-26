@@ -410,23 +410,55 @@ class SimpleConversationCapture {
     try {
       console.log(`🔍 Auto-capture: Saving to database:`, {
         groupId: group.id,
+        lovableId: group.lovableId,
         userContentLength: group.userContent?.length || 0,
         lovableContentLength: group.lovableContent?.length || 0
       });
 
+      // Convert group to conversation format with proper lovableId checking
+      const conversationData = {
+        id: this.generateUUID(),
+        projectId: group.projectId,
+        userMessage: group.userContent || '',
+        lovableResponse: group.lovableContent || '',
+        timestamp: group.timestamp || new Date().toISOString(),
+        projectContext: {
+          messageGroupId: group.id,
+          userId: group.userId,
+          lovableId: group.lovableId, // Store lovableId for duplicate detection
+          autoCapture: true
+        },
+        categories: group.categories ? [
+          ...(group.categories.primary || []),
+          ...(group.categories.secondary || [])
+        ] : []
+      };
+
       const response = await this.safeSendMessage({
-        action: 'saveMessageGroup',
-        data: group
+        action: 'saveConversation', // Use saveConversation directly for better duplicate checking
+        data: conversationData
       });
 
       if (response?.success) {
-        console.log(`✅ Auto-capture: Successfully saved group ${group.id} to database`);
+        if (response.skipped) {
+          console.log(`⚠️ Auto-capture: Skipped duplicate group ${group.id} (lovableId: ${group.lovableId})`);
+        } else {
+          console.log(`✅ Auto-capture: Successfully saved group ${group.id} to database`);
+        }
       } else {
         console.warn(`⚠️ Auto-capture: Failed to save group ${group.id}:`, response?.error);
       }
     } catch (error) {
       console.error(`❌ Auto-capture: Error saving group ${group.id}:`, error);
     }
+  }
+
+  generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   async safeSendMessage(message) {
