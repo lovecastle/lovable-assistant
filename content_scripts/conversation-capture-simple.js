@@ -394,19 +394,39 @@ class SimpleConversationCapture {
   }
 
   saveCompletedGroup(group) {
-    console.log(`💾 Saving completed message group: ${group.id}`);
+    console.log(`💾 Auto-capture: Saving completed message group: ${group.id}`);
     
     // Store locally
     this.messageGroups.set(group.id, group);
     
-    // Send to background for persistence
-    this.safeSendMessage({
-      action: 'saveMessageGroup',
-      data: group
-    });
+    // Save to database via background script
+    this.saveToDatabaseAsync(group);
 
     // Notify UI components
     this.notifyUI(group);
+  }
+
+  async saveToDatabaseAsync(group) {
+    try {
+      console.log(`🔍 Auto-capture: Saving to database:`, {
+        groupId: group.id,
+        userContentLength: group.userContent?.length || 0,
+        lovableContentLength: group.lovableContent?.length || 0
+      });
+
+      const response = await this.safeSendMessage({
+        action: 'saveMessageGroup',
+        data: group
+      });
+
+      if (response?.success) {
+        console.log(`✅ Auto-capture: Successfully saved group ${group.id} to database`);
+      } else {
+        console.warn(`⚠️ Auto-capture: Failed to save group ${group.id}:`, response?.error);
+      }
+    } catch (error) {
+      console.error(`❌ Auto-capture: Error saving group ${group.id}:`, error);
+    }
   }
 
   async safeSendMessage(message) {

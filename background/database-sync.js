@@ -58,8 +58,8 @@ export class SupabaseClient {
       lovable_response: data.lovableResponse,
       timestamp: data.timestamp || new Date().toISOString(), // Use provided timestamp
       project_context: data.projectContext || {},
-      tags: data.tags || [],
-      effectiveness_score: data.effectivenessScore || null
+      tags: data.categories || [], // Map categories to tags field in database
+      effectiveness_score: null // Always null as requested
     };
 
     console.log('🔍 Database-sync: Prepared conversation data:', {
@@ -67,7 +67,9 @@ export class SupabaseClient {
       project_id: conversation.project_id,
       user_message_length: conversation.user_message?.length || 0,
       lovable_response_length: conversation.lovable_response?.length || 0,
-      timestamp: conversation.timestamp
+      timestamp: conversation.timestamp,
+      categories_count: conversation.tags?.length || 0,
+      priority_category: conversation.tags?.[0] || 'none'
     });
 
     try {
@@ -114,6 +116,48 @@ export class SupabaseClient {
       method: 'POST',
       body: JSON.stringify(embeddingData)
     });
+  }
+
+  async deleteConversations(filters = {}) {
+    console.log('🔍 Database-sync: Deleting conversations with filters:', filters);
+    
+    let endpoint = 'conversations';
+    const conditions = [];
+
+    // Apply filters for targeted deletion
+    if (filters.id) {
+      // Delete specific conversation by ID
+      conditions.push(`id=eq.${filters.id}`);
+    } else {
+      // Delete by other filters
+      if (filters.projectId) {
+        conditions.push(`project_id=eq.${filters.projectId}`);
+      }
+
+      if (filters.dateFrom) {
+        conditions.push(`timestamp=gte.${filters.dateFrom}`);
+      }
+
+      if (filters.dateTo) {
+        conditions.push(`timestamp=lte.${filters.dateTo}`);
+      }
+    }
+
+    if (conditions.length > 0) {
+      endpoint += '?' + conditions.join('&');
+    }
+
+    try {
+      const result = await this.request(endpoint, {
+        method: 'DELETE'
+      });
+      
+      console.log('✅ Database-sync: Conversations deleted successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to delete conversations:', error);
+      throw error;
+    }
   }
 
   async getConversations(projectId = null, limit = 50) {

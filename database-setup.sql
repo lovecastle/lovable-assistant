@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   lovable_response TEXT,
   timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   project_context JSONB DEFAULT '{}',
-  tags TEXT[] DEFAULT '{}',
+  tags TEXT[] DEFAULT '{}', -- Used for categories (first item is priority category)
   effectiveness_score INTEGER CHECK (effectiveness_score >= 1 AND effectiveness_score <= 10),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

@@ -1179,63 +1179,76 @@ class LovableDetector {
   }
 
   async loadHistoryMessages() {
-    // Load real conversations from conversation capture
+    console.log('📚 Loading history messages from Supabase database...');
+    
+    // Load conversations from Supabase database only
     this.allHistoryMessages = [];
     
-    // Add detected messages from conversation capture if available
-    // Load messages from the new simple capture system
-    if (window.simpleConversationCapture && window.simpleConversationCapture.messageGroups) {
-      const allMessages = [];
-      
-      // Convert message groups back to individual messages for UI compatibility
-      for (const group of window.simpleConversationCapture.messageGroups.values()) {
-        // Add user message
-        allMessages.push({
-          id: group.userId,
-          timestamp: new Date(group.timestamp),
-          speaker: 'user',
-          content: group.userContent,
-          category: this.mapCategoriesToOldFormat(group.categories),
-          categories: group.categories,
-          isDetected: true,
-          techTerms: [],
-          projectId: group.projectId
+    try {
+      const response = await this.safeSendMessage({
+        action: 'getConversations',
+        filters: {
+          projectId: this.extractProjectId(),
+          limit: 1000 // Get more conversations for full history
+        }
+      });
+
+      if (response?.success && response.data) {
+        console.log(`📊 Retrieved ${response.data.length} conversations from database`);
+        
+        // Convert database conversations to message format
+        const allMessages = [];
+        
+        response.data.forEach(conversation => {
+          // Add user message if exists
+          if (conversation.user_message) {
+            allMessages.push({
+              id: `user_${conversation.id}`,
+              timestamp: new Date(conversation.timestamp),
+              speaker: 'user',
+              content: conversation.user_message,
+              category: this.extractCategoryFromTags(conversation.tags),
+              categories: this.convertTagsToCategories(conversation.tags),
+              isDetected: true,
+              techTerms: [],
+              projectId: conversation.project_id,
+              conversationId: conversation.id
+            });
+          }
+          
+          // Add lovable message if exists
+          if (conversation.lovable_response) {
+            allMessages.push({
+              id: `lovable_${conversation.id}`,
+              timestamp: new Date(conversation.timestamp),
+              speaker: 'lovable',
+              content: conversation.lovable_response,
+              category: this.extractCategoryFromTags(conversation.tags),
+              categories: this.convertTagsToCategories(conversation.tags),
+              isDetected: true,
+              techTerms: [],
+              projectId: conversation.project_id,
+              conversationId: conversation.id
+            });
+          }
         });
         
-        // Add lovable message
-        allMessages.push({
-          id: group.lovableId,
-          timestamp: new Date(group.timestamp),
-          speaker: 'lovable',
-          content: group.lovableContent,
-          category: this.mapCategoriesToOldFormat(group.categories),
-          categories: group.categories,
-          isDetected: true,
-          techTerms: [],
-          projectId: group.projectId
-        });
+        this.allHistoryMessages = allMessages;
+        console.log(`📚 Loaded ${allMessages.length} messages from ${response.data.length} conversations`);
+      } else {
+        console.error('❌ Failed to load conversations from database:', response?.error);
+        throw new Error(`Database load failed: ${response?.error || 'Unknown error'}`);
       }
-      
-      const detectedMessages = allMessages.map(msg => ({
-        id: msg.id,
-        timestamp: msg.timestamp,
-        speaker: msg.speaker,
-        content: msg.content,
-        category: msg.category,
-        categories: msg.categories,
-        isDetected: true,
-        techTerms: msg.techTerms || [],
-        codeSnippets: msg.codeSnippets || []
-      }));
-      
-      this.allHistoryMessages = detectedMessages;
-      
-      console.log(`📚 Loaded ${detectedMessages.length} real conversations`);
+    } catch (error) {
+      console.error('❌ Error loading conversations from database:', error);
+      // Don't fallback to local storage - let the error surface
+      this.allHistoryMessages = [];
+      throw error;
     }
     
-    // If no real messages, show helpful empty state message
+    // If no messages found, that's fine - just show empty state
     if (this.allHistoryMessages.length === 0) {
-      console.log('📝 No conversation history found. Try using "Scrape All Messages" in Utilities to capture your chat history.');
+      console.log('📝 No conversation history found in database. Use "Scrape All Messages" or have conversations to populate history.');
     }
     
     // Sort all messages by timestamp (chronological order: oldest first)
@@ -1243,6 +1256,34 @@ class LovableDetector {
     
     this.filteredHistoryMessages = [...this.allHistoryMessages];
     this.renderHistoryMessages();
+  }
+
+  extractCategoryFromTags(tags) {
+    if (!tags || tags.length === 0) return 'other';
+    
+    const mapping = {
+      'Planning': 'planning',
+      'Functioning': 'coding',
+      'Designing': 'design',
+      'Debugging': 'debugging',
+      'Deployment': 'deployment'
+    };
+    
+    for (const tag of tags) {
+      if (mapping[tag]) return mapping[tag];
+    }
+    
+    return 'other';
+  }
+
+  convertTagsToCategories(tags) {
+    if (!tags || tags.length === 0) return { primary: [], secondary: [] };
+    
+    const primaryCategories = ['Planning', 'Functioning', 'Designing', 'Debugging', 'Deployment'];
+    const primary = tags.filter(tag => primaryCategories.includes(tag));
+    const secondary = tags.filter(tag => !primaryCategories.includes(tag) && tag !== 'scraped' && tag !== 'auto-captured');
+    
+    return { primary, secondary };
   }
 
   mapCategoriesToOldFormat(categories) {
@@ -1355,18 +1396,51 @@ class LovableDetector {
     this.renderHistoryMessages();
   }
 
-  cleanAllFilteredMessages() {
+  async cleanAllFilteredMessages() {
     if (!this.filteredHistoryMessages || this.filteredHistoryMessages.length === 0) {
       console.log('No filtered messages to clean');
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete all ${this.filteredHistoryMessages.length} filtered messages? This action cannot be undone.`)) {
+    const messageCount = this.filteredHistoryMessages.length;
+    if (!confirm(`Are you sure you want to delete all ${messageCount} filtered messages? This will permanently delete them from the database. This action cannot be undone.`)) {
       return;
     }
 
     try {
-      // Get the IDs of messages to remove
+      console.log(`🗑️ Starting cleanup of ${messageCount} messages...`);
+      
+      // Get conversation IDs to delete from database
+      const conversationIds = new Set();
+      this.filteredHistoryMessages.forEach(msg => {
+        if (msg.conversationId) {
+          conversationIds.add(msg.conversationId);
+        }
+      });
+
+      // Delete from Supabase database
+      if (conversationIds.size > 0) {
+        console.log(`🗑️ Deleting ${conversationIds.size} conversations from database...`);
+        
+        for (const conversationId of conversationIds) {
+          try {
+            const response = await this.safeSendMessage({
+              action: 'deleteConversations',
+              filters: { id: conversationId }
+            });
+            
+            if (!response?.success) {
+              console.warn(`⚠️ Failed to delete conversation ${conversationId}:`, response?.error);
+            }
+          } catch (error) {
+            console.error(`❌ Error deleting conversation ${conversationId}:`, error);
+          }
+        }
+        
+        console.log(`✅ Database cleanup completed`);
+      }
+      
+      // Get the IDs of messages to remove from local memory
       const idsToRemove = new Set(this.filteredHistoryMessages.map(msg => msg.id));
       
       // Remove from allHistoryMessages
@@ -1390,14 +1464,17 @@ class LovableDetector {
       this.filteredHistoryMessages = [...this.allHistoryMessages];
       this.applyHistoryFilters();
       
-      console.log(`🗑️ Cleaned ${idsToRemove.size} messages from history`);
+      console.log(`🗑️ Successfully cleaned ${idsToRemove.size} messages from history and database`);
       
       // Refresh the display
       this.renderHistoryMessages();
       
+      // Show success message
+      alert(`Successfully deleted ${messageCount} messages from the database.`);
+      
     } catch (error) {
-      console.error('Error cleaning filtered messages:', error);
-      alert('An error occurred while cleaning messages. Please try again.');
+      console.error('❌ Error cleaning filtered messages:', error);
+      alert('An error occurred while cleaning messages. Please check the console and try again.');
     }
   }
 
@@ -2029,16 +2106,6 @@ class ComprehensiveMessageScraper {
     this.isRunning = true;
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
-    // Test database connection first
-    this.updateStatus('🧪 Testing database connection...', '#667eea');
-    const dbTestResult = await this.testDatabaseConnection();
-    
-    if (!dbTestResult) {
-      throw new Error('Database connection test failed. Please check your Supabase configuration in extension settings.');
-    }
-    
-    this.updateStatus('✅ Database connection verified', '#48bb78');
-    
     // Find the chat container
     this.chatContainer = this.findChatContainer();
     if (!this.chatContainer) {
@@ -2358,23 +2425,31 @@ class ComprehensiveMessageScraper {
 
   async saveConversationGroup(groupId, group, forceSave = false) {
     try {
-      // Prepare conversation data for database with proper UUID
+      // Debug: Log the group structure
+      console.log(`🔍 Group structure for ${groupId}:`, {
+        hasUserContent: !!group.userContent,
+        hasLovableContent: !!group.lovableContent,
+        hasUserMessage: !!group.userMessage,
+        hasLovableMessage: !!group.lovableMessage,
+        userContentLength: group.userContent?.length || 0,
+        lovableContentLength: group.lovableContent?.length || 0
+      });
+
+      // Prepare conversation data for database with proper UUID - same structure as auto-capture
       const conversationData = {
         id: this.generateUUID(), // Always generate a proper UUID for database
         projectId: this.extractProjectId(),
-        userMessage: group.userMessage?.content || '',
-        lovableResponse: group.lovableMessage?.content || '',
-        timestamp: group.userMessage?.timestamp || group.lovableMessage?.timestamp || new Date().toISOString(),
+        // Fix: Use correct property names from conversation capture
+        userMessage: group.userContent || group.userMessage?.content || '',
+        lovableResponse: group.lovableContent || group.lovableMessage?.content || '',
+        timestamp: group.timestamp || new Date().toISOString(),
         projectContext: {
-          url: window.location.href,
-          projectId: this.extractProjectId(),
-          scrapedAt: new Date().toISOString(),
           messageGroupId: groupId, // Keep original groupId in context
-          userMessageId: group.userMessage?.id,
-          lovableMessageId: group.lovableMessage?.id
+          userId: group.userId,
+          lovableId: group.lovableId,
+          autoCapture: false // This is from scraping, not auto-capture
         },
-        tags: this.extractTagsFromMessages(group),
-        effectivenessScore: null
+        categories: this.extractCategoriesFromGroup(group)
       };
 
       // Only save if we have meaningful content
@@ -2383,7 +2458,13 @@ class ComprehensiveMessageScraper {
         return 'skipped';
       }
 
-      console.log(`🔍 Saving conversation with UUID: ${conversationData.id} (from group: ${groupId})`);
+      console.log(`🔍 Saving conversation:`, {
+        id: conversationData.id,
+        userMessageLength: conversationData.userMessage.length,
+        lovableResponseLength: conversationData.lovableResponse.length,
+        userPreview: conversationData.userMessage.substring(0, 50) + '...',
+        lovablePreview: conversationData.lovableResponse.substring(0, 50) + '...'
+      });
 
       // Send to background script for database saving
       const response = await this.safeSendMessage({
@@ -2492,26 +2573,62 @@ class ComprehensiveMessageScraper {
     }
   }
 
-  extractTagsFromMessages(group) {
-    const tags = [];
+  extractCategoriesFromGroup(group) {
+    const categories = [];
     
-    // Extract tags from user message categories
+    // Extract categories from group categories (if available)
+    if (group.categories) {
+      if (group.categories.primary) {
+        categories.push(...group.categories.primary);
+      }
+      if (group.categories.secondary) {
+        categories.push(...group.categories.secondary);
+      }
+    }
+    
+    // Extract categories from legacy message structure (fallback)
     if (group.userMessage?.categories) {
-      tags.push(...group.userMessage.categories.primary);
-      tags.push(...group.userMessage.categories.secondary);
+      categories.push(...group.userMessage.categories.primary);
+      categories.push(...group.userMessage.categories.secondary);
     }
     
-    // Extract tags from lovable message categories
     if (group.lovableMessage?.categories) {
-      tags.push(...group.lovableMessage.categories.primary);
-      tags.push(...group.lovableMessage.categories.secondary);
+      categories.push(...group.lovableMessage.categories.primary);
+      categories.push(...group.lovableMessage.categories.secondary);
     }
     
-    // Add scraping tag
-    tags.push('scraped');
+    // Remove duplicates and empty values, ensure first item is priority
+    const uniqueCategories = [...new Set(categories.filter(cat => cat && cat.trim()))];
     
-    // Remove duplicates and empty values
-    return [...new Set(tags.filter(tag => tag && tag.trim()))];
+    // Ensure priority categories come first
+    const priorityOrder = ['Planning', 'Functioning', 'Designing', 'Debugging', 'Deployment'];
+    const sorted = [];
+    
+    // Add priority categories first
+    priorityOrder.forEach(priority => {
+      if (uniqueCategories.includes(priority)) {
+        sorted.push(priority);
+      }
+    });
+    
+    // Add remaining categories
+    uniqueCategories.forEach(cat => {
+      if (!priorityOrder.includes(cat)) {
+        sorted.push(cat);
+      }
+    });
+    
+    return sorted;
+  }
+
+  extractTagsFromGroup(group) {
+    // Legacy method - redirect to new method
+    return this.extractCategoriesFromGroup(group);
+  }
+
+  extractTagsFromMessages(group) {
+    // Legacy method - redirect to new method
+    return this.extractCategoriesFromGroup(group);
   }
 
   extractProjectId() {
@@ -2558,60 +2675,6 @@ class ComprehensiveMessageScraper {
       
       console.error('❌ Chrome runtime message error:', error);
       return { success: false, error: error.message };
-    }
-  }
-
-  // Test database connection and saving functionality
-  async testDatabaseConnection() {
-    console.log('🧪 Testing database connection...');
-    
-    try {
-      // Test basic connection
-      const testResponse = await this.safeSendMessage({
-        action: 'testConnection'
-      });
-      
-      console.log('🔍 Connection test result:', testResponse);
-      
-      if (!testResponse?.success) {
-        console.error('❌ Database connection test failed');
-        return false;
-      }
-      
-      // Test saving a sample conversation with proper UUID
-      const sampleConversation = {
-        id: this.generateUUID(), // Use proper UUID format
-        projectId: this.extractProjectId() || 'test_project',
-        userMessage: 'Test user message',
-        lovableResponse: 'Test Lovable response',
-        timestamp: new Date().toISOString(),
-        projectContext: {
-          url: window.location.href,
-          test: true
-        },
-        tags: ['test'],
-        effectivenessScore: null
-      };
-      
-      console.log('🧪 Testing conversation save with sample data (UUID:', sampleConversation.id, ')...');
-      const saveResponse = await this.safeSendMessage({
-        action: 'saveConversation',
-        data: sampleConversation
-      });
-      
-      console.log('🔍 Save test result:', saveResponse);
-      
-      if (saveResponse?.success) {
-        console.log('✅ Database connection and saving test PASSED');
-        return true;
-      } else {
-        console.error('❌ Database saving test FAILED:', saveResponse?.error);
-        return false;
-      }
-      
-    } catch (error) {
-      console.error('❌ Database test error:', error);
-      return false;
     }
   }
 
@@ -2695,34 +2758,4 @@ class ComprehensiveMessageScraper {
 const lovableDetector = new LovableDetector();
 window.lovableDetector = lovableDetector;
 
-// Global debugging and testing functions
-window.testDatabaseConnection = async function() {
-  if (window.currentMessageScraper) {
-    return await window.currentMessageScraper.testDatabaseConnection();
-  } else {
-    console.log('🧪 Creating temporary scraper for database test...');
-    const tempScraper = new ComprehensiveMessageScraper(null, null);
-    return await tempScraper.testDatabaseConnection();
-  }
-};
-
-window.debugScrapingIssues = function() {
-  console.log('🔧 ===== SCRAPING DEBUG INFORMATION =====');
-  console.log('📊 Current State:');
-  console.log(`  - Message groups: ${window.simpleConversationCapture?.messageGroups?.size || 0}`);
-  console.log(`  - Scraper running: ${window.currentMessageScraper?.isRunning || false}`);
-  console.log(`  - Chat containers: ${document.querySelectorAll('.ChatMessageContainer[data-message-id]').length}`);
-  
-  console.log('\n🧪 Testing Database Connection...');
-  window.testDatabaseConnection().then(result => {
-    console.log(`Database test result: ${result ? '✅ PASSED' : '❌ FAILED'}`);
-  });
-  
-  console.log('\n💡 Available Commands:');
-  console.log('  - window.testDatabaseConnection() - Test database connection');
-  console.log('  - window.debugScrapingIssues() - Show this debug info');
-  console.log('===============================');
-};
-
 console.log('🚀 Lovable Assistant: Enhanced scraping with database saving ready!');
-console.log('💡 Debug commands: window.testDatabaseConnection(), window.debugScrapingIssues()');

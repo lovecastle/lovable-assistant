@@ -35,8 +35,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'saveMessageGroup':
+      handleSaveMessageGroup(request.data).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
     case 'bulkSaveConversations':
       handleBulkSaveConversations(request.data).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'getConversations':
+      handleGetConversations(request.filters || {}).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'deleteConversations':
+      handleDeleteConversations(request.filters || {}).then(result => {
         sendResponse(result);
       });
       break;
@@ -142,6 +160,85 @@ async function handleBulkSaveConversations(conversationsArray) {
     console.error('❌ Bulk save operation failed:', error);
     return { success: false, error: error.message };
   }
+}
+
+async function handleSaveMessageGroup(messageGroup) {
+  try {
+    console.log('🔍 Service Worker: Auto-capture saving message group:', messageGroup.id);
+    
+    // Convert message group format to conversation format
+    const conversationData = {
+      id: generateUUID(),
+      projectId: messageGroup.projectId,
+      userMessage: messageGroup.userContent || '',
+      lovableResponse: messageGroup.lovableContent || '',
+      timestamp: messageGroup.timestamp || new Date().toISOString(),
+      projectContext: {
+        messageGroupId: messageGroup.id,
+        userId: messageGroup.userId,
+        lovableId: messageGroup.lovableId,
+        autoCapture: true
+      },
+      categories: messageGroup.categories ? [
+        ...(messageGroup.categories.primary || []),
+        ...(messageGroup.categories.secondary || [])
+      ] : []
+    };
+
+    console.log('🔍 Service Worker: Auto-capture conversation data:', {
+      id: conversationData.id,
+      userMessageLength: conversationData.userMessage?.length || 0,
+      lovableResponseLength: conversationData.lovableResponse?.length || 0
+    });
+
+    const result = await supabase.saveConversation(conversationData);
+    console.log('✅ Service Worker: Auto-captured conversation saved:', result);
+    
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to save auto-captured conversation:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetConversations(filters = {}) {
+  try {
+    console.log('🔍 Service Worker: Getting conversations with filters:', filters);
+    
+    const conversations = await supabase.getConversations(
+      filters.projectId, 
+      filters.limit || 50
+    );
+    
+    console.log(`✅ Service Worker: Retrieved ${conversations.length} conversations`);
+    return { success: true, data: conversations };
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to get conversations:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleDeleteConversations(filters = {}) {
+  try {
+    console.log('🔍 Service Worker: Deleting conversations with filters:', filters);
+    
+    // If no specific filters, delete all conversations for current project
+    const result = await supabase.deleteConversations(filters);
+    
+    console.log('✅ Service Worker: Conversations deleted:', result);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to delete conversations:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 async function callClaudeAPI(apiKey, message, systemPrompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
