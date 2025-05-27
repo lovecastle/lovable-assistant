@@ -2193,6 +2193,9 @@ class ComprehensiveMessageScraper {
     this.activeRequests = new Set(); // Track active save requests
     this.maxConcurrentRequests = 5; // Limit concurrent requests
     this.requestQueue = []; // Queue for throttled requests
+    
+    // Add deduplication tracking
+    this.processedGroupIds = new Set(); // Track already processed group IDs
   }
 
   // Control verbose logging for debugging
@@ -2210,6 +2213,7 @@ class ComprehensiveMessageScraper {
     this.requestQueue = [];
     this.batchSavePromises = [];
     this.pendingSaves.clear();
+    this.processedGroupIds.clear(); // Reset deduplication tracking for fresh start
     
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
@@ -2532,21 +2536,40 @@ class ComprehensiveMessageScraper {
       return { success: false, saved: 0, errors: 0, skipped: 0, cancelled: true };
     }
     
+    // Filter out already processed groups to prevent duplicates
+    const unprocessedGroups = newGroups.filter(([groupId, group]) => {
+      if (this.processedGroupIds.has(groupId)) {
+        console.log(`⚠️ Skipping already processed group: ${groupId}`);
+        return false;
+      }
+      return true;
+    });
+    
+    const actualBatchSize = unprocessedGroups.length;
+    
+    if (actualBatchSize === 0) {
+      console.log('📝 All groups in batch already processed - skipping');
+      return { success: true, saved: 0, errors: 0, skipped: batchSize };
+    }
+    
+    console.log(`🔍 Processing batch of ${actualBatchSize} unprocessed message groups (${batchSize - actualBatchSize} already processed)...`);
+    
     let savedCount = 0;
     let errorCount = 0;
     let skippedCount = 0;
     
-    console.log(`🔍 Processing batch of ${batchSize} message groups...`);
-    
     // Process each message group in the batch
     const savePromises = [];
     
-    for (const [groupId, group] of newGroups) {
+    for (const [groupId, group] of unprocessedGroups) {
       // Check if scraping was stopped before each save
       if (!this.isRunning) {
         console.log('🛑 Stopping batch processing - scraper stopped');
         break;
       }
+      
+      // Mark as being processed
+      this.processedGroupIds.add(groupId);
       
       const savePromise = this.saveConversationGroup(groupId, group)
         .then(result => {
@@ -2554,6 +2577,9 @@ class ComprehensiveMessageScraper {
             savedCount++;
           } else if (result === 'skipped') {
             skippedCount++;
+          } else if (result === 'cancelled') {
+            // Don't count cancelled requests in error count
+            return result;
           } else {
             errorCount++;
           }
@@ -2580,115 +2606,12 @@ class ComprehensiveMessageScraper {
       success: errorCount === 0,
       saved: savedCount,
       errors: errorCount,
-      skipped: skippedCount,
+      skipped: skippedCount + (batchSize - actualBatchSize), // Include already processed groups
       total: batchSize
     };
     
-    console.log(`✅ Batch processing complete: ${savedCount} saved, ${skippedCount} skipped, ${errorCount} errors`);
+    console.log(`✅ Batch processing complete: ${savedCount} saved, ${skippedCount + (batchSize - actualBatchSize)} skipped, ${errorCount} errors`);
     return result;
-  }
-
-  async saveNewConversationsToDatabase(startIndex, endIndex) {
-    try {
-      if (!window.simpleConversationCapture?.messageGroups) {
-        console.warn('⚠️ No message groups found for incremental save');
-        return { success: true, saved: 0, errors: 0, skipped: 0 };
-      }
-
-      const messageGroups = window.simpleConversationCapture.messageGroups;
-      const messageGroupsArray = Array.from(messageGroups.entries());
-      
-      // Get only the new message groups (this is approximate since we're using Map)
-      const newGroups = messageGroupsArray.slice(startIndex);
-      
-      if (newGroups.length === 0) {
-        console.log('📝 No new conversations to save');
-        return { success: true, saved: 0, errors: 0, skipped: 0 };
-      }
-      
-      console.log(`💾 Starting batch save of ${newGroups.length} new conversations...`);
-      
-      let savedCount = 0;
-      let errorCount = 0;
-      let skippedCount = 0;
-      
-      // Create array to track all save promises for this batch
-      const savePromises = [];
-      
-      for (const [groupId, group] of newGroups) {
-        // Add to pending saves tracking
-        this.pendingSaves.add(groupId);
-        
-        // Create the save promise and track it
-        const savePromise = this.saveConversationGroup(groupId, group)
-          .then(success => {
-            // Remove from pending saves when complete
-            this.pendingSaves.delete(groupId);
-            
-            if (success === true) {
-              savedCount++;
-              console.log(`✅ Batch save: Saved conversation ${groupId} (${savedCount}/${newGroups.length})`);
-            } else if (success === 'skipped') {
-              skippedCount++;
-              console.log(`⚠️ Batch save: Skipped duplicate ${groupId} (${skippedCount} duplicates so far)`);
-            } else {
-              errorCount++;
-              console.error(`❌ Batch save: Failed to save ${groupId} (${errorCount} errors so far)`);
-            }
-            
-            return success;
-          })
-          .catch(error => {
-            // Remove from pending saves on error
-            this.pendingSaves.delete(groupId);
-            errorCount++;
-            console.error(`❌ Error saving conversation group ${groupId}:`, error);
-            return false;
-          });
-        
-        savePromises.push(savePromise);
-        
-        // Small delay between starting saves to prevent overwhelming
-        await this.wait(25);
-      }
-      
-      console.log(`⏳ Waiting for all ${savePromises.length} saves in this batch to complete...`);
-      
-      // Wait for ALL saves in this batch to complete
-      const results = await Promise.allSettled(savePromises);
-      
-      // Count actual results from Promise.allSettled
-      const finalCounts = results.reduce((acc, result) => {
-        if (result.status === 'fulfilled') {
-          if (result.value === true) acc.saved++;
-          else if (result.value === 'skipped') acc.skipped++;
-          else acc.errors++;
-        } else {
-          acc.errors++;
-        }
-        return acc;
-      }, { saved: 0, errors: 0, skipped: 0 });
-      
-      console.log(`✅ Batch save complete: ${finalCounts.saved} saved, ${finalCounts.skipped} skipped, ${finalCounts.errors} errors`);
-      
-      // Verify no pending saves remain for this batch
-      const remainingPendingCount = this.pendingSaves.size;
-      if (remainingPendingCount > 0) {
-        console.warn(`⚠️ Warning: ${remainingPendingCount} saves still pending after batch completion`);
-      }
-      
-      return {
-        success: finalCounts.errors === 0,
-        saved: finalCounts.saved,
-        errors: finalCounts.errors,
-        skipped: finalCounts.skipped,
-        total: newGroups.length
-      };
-      
-    } catch (error) {
-      console.error('❌ Batch save operation failed:', error);
-      return { success: false, saved: 0, errors: 1, skipped: 0, error: error.message };
-    }
   }
 
   async saveAllRemainingConversations() {
@@ -3233,6 +3156,7 @@ class ComprehensiveMessageScraper {
     this.pendingSaves.clear();
     this.activeRequests.clear();
     this.requestQueue = [];
+    this.processedGroupIds.clear(); // Reset deduplication tracking
     this.isCancelled = false; // Reset for next run
     
     // Update final status
