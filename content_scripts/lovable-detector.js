@@ -722,9 +722,9 @@ class LovableDetector {
       this.assistantDialog.remove();
     }
     
-    if (this.workingElementObserver) {
-      this.workingElementObserver.disconnect();
-      this.workingElementObserver = null;
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
     }
   }
 
@@ -2091,22 +2091,38 @@ class LovableDetector {
   }
 
   setupLovableResponseMonitoring() {
-    // Simple tracking: just monitor opacity changes from 1 to 0
-    this.lastWorkingOpacity = null;
-    this.workingElement = null;
+    // Track element existence state
+    this.workingElementExists = false;
+    this.monitoringInterval = null;
 
-    // Find and monitor the working element
-    this.findAndMonitorWorkingElement();
-    
-    // Set up periodic monitoring in case element appears later
-    setInterval(() => {
-      if (!this.workingElement) {
-        this.findAndMonitorWorkingElement();
-      }
-    }, 2000);
+    // Check for working element existence every 5 seconds
+    this.monitoringInterval = setInterval(() => {
+      this.checkWorkingElementExistence();
+    }, 5000);
+
+    // Initial check
+    this.checkWorkingElementExistence();
   }
 
-  findAndMonitorWorkingElement() {
+  checkWorkingElementExistence() {
+    const workingElement = this.findWorkingElement();
+    const currentlyExists = !!workingElement;
+    
+    // Check for state transitions
+    if (!this.workingElementExists && currentlyExists) {
+      // Element appeared - Lovable started working
+      this.workingElementExists = true;
+      console.log('🔄 Lovable started working...');
+    } else if (this.workingElementExists && !currentlyExists) {
+      // Element disappeared - Lovable finished working
+      this.workingElementExists = false;
+      console.log('✅ Working → Finished transition, showing notification');
+      this.onLovableResponseComplete();
+    }
+    // No console output for silent checks when state doesn't change
+  }
+
+  findWorkingElement() {
     // Strategy 1: Try XPath (most precise)
     try {
       const xpathResult = document.evaluate(
@@ -2116,82 +2132,31 @@ class LovableDetector {
         XPathResult.FIRST_ORDERED_NODE_TYPE,
         null
       );
-      if (xpathResult.singleNodeValue) {
-        this.setupElementMonitoring(xpathResult.singleNodeValue);
-        return;
+      if (xpathResult.singleNodeValue && xpathResult.singleNodeValue.textContent?.includes('Working...')) {
+        return xpathResult.singleNodeValue;
       }
     } catch (e) {
       // XPath failed, continue with other strategies
     }
 
-    // Strategy 2: Look for elements containing "Working..." text with opacity styles
-    const elementsWithOpacity = document.querySelectorAll('[style*="opacity"]');
-    for (const element of elementsWithOpacity) {
-      if (element.textContent?.includes('Working...')) {
-        this.setupElementMonitoring(element);
-        return;
-      }
-    }
-
-    // Strategy 3: CSS selector targeting the working text and find parent with opacity
+    // Strategy 2: Look for elements containing "Working..." text
     const workingElements = document.querySelectorAll('p.text-sm');
     for (const element of workingElements) {
       if (element.textContent?.trim() === 'Working...') {
-        let container = element.parentElement;
-        while (container && !container.style.opacity) {
-          container = container.parentElement;
-        }
-        if (container) {
-          this.setupElementMonitoring(container);
-          return;
-        }
+        return element.closest('[style*="opacity"]') || element;
       }
     }
-  }
 
-  setupElementMonitoring(element) {
-    if (this.workingElement === element) return; // Already monitoring this element
-    
-    this.workingElement = element;
-    this.lastWorkingOpacity = element.style.opacity;
-    
-    console.log('🎯 Found Working element, current opacity:', this.lastWorkingOpacity);
-
-    // Set up MutationObserver specifically for this element
-    if (this.workingElementObserver) {
-      this.workingElementObserver.disconnect();
+    // Strategy 3: Search more broadly for "Working..." text
+    const allElements = document.querySelectorAll('*');
+    for (const element of allElements) {
+      if (element.textContent?.includes('Working...') && 
+          element.textContent.trim().length < 50) { // Avoid large containers
+        return element;
+      }
     }
 
-    this.workingElementObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-          this.checkOpacityTransition(mutation.target);
-        }
-      });
-    });
-
-    this.workingElementObserver.observe(element, {
-      attributes: true,
-      attributeFilter: ['style']
-    });
-  }
-
-  checkOpacityTransition(element) {
-    const currentOpacity = element.style.opacity;
-    
-    // Only process if opacity actually changed
-    if (currentOpacity === this.lastWorkingOpacity) return;
-    
-    console.log(`🔍 Opacity transition: ${this.lastWorkingOpacity} → ${currentOpacity}`);
-    
-    // Check for 1 → 0 transition (working finished)
-    if (this.lastWorkingOpacity === '1' && currentOpacity === '0') {
-      console.log('✅ Detected Working → Finished transition, showing notification');
-      this.onLovableResponseComplete();
-    }
-    
-    // Update last known state
-    this.lastWorkingOpacity = currentOpacity;
+    return null;
   }
 
   onLovableResponseComplete() {
