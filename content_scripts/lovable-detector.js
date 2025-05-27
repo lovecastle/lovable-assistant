@@ -1794,6 +1794,10 @@ class LovableDetector {
       // Store globally so stop button can access it
       window.currentMessageScraper = scraper;
       
+      // Expose debugging methods
+      window.currentMessageScraper.debugStats = () => scraper.getScrapingStats();
+      window.currentMessageScraper.clearTracking = () => scraper.clearPersistentTracking();
+      
       await scraper.startScraping();
       
       // Clean up
@@ -2194,14 +2198,37 @@ class ComprehensiveMessageScraper {
     this.maxConcurrentRequests = 5; // Limit concurrent requests
     this.requestQueue = []; // Queue for throttled requests
     
-    // Add deduplication tracking
-    this.processedGroupIds = new Set(); // Track already processed group IDs
+    // Enhanced deduplication and persistence tracking
+    this.processedGroupIds = new Set(); // Track processed groups in current session
+    this.scrapedGroupIds = new Set(); // Persistent tracking of scraper-processed groups across sessions
+    this.sessionScrapedIds = new Set(); // Track what was scraped in current scraping session
   }
 
   // Control verbose logging for debugging
   setVerboseLogging(enabled) {
     this.verboseLogging = enabled;
     console.log(`🔧 Verbose logging ${enabled ? 'enabled' : 'disabled'} for scraper`);
+  }
+
+  // Get scraper statistics including persistent tracking
+  getScrapingStats() {
+    return {
+      isRunning: this.isRunning,
+      currentSessionProcessed: this.processedGroupIds.size,
+      currentSessionScraped: this.sessionScrapedIds.size,
+      totalScrapedAcrossSessions: this.scrapedGroupIds.size,
+      activeRequests: this.activeRequests.size,
+      queuedRequests: this.requestQueue.length,
+      batchSavePromises: this.batchSavePromises.length
+    };
+  }
+
+  // Clear persistent scraper tracking (use with caution - for debugging only)
+  clearPersistentTracking() {
+    const clearedCount = this.scrapedGroupIds.size;
+    this.scrapedGroupIds.clear();
+    console.log(`🧹 Cleared ${clearedCount} persistent scraped group IDs`);
+    return clearedCount;
   }
 
   async startScraping() {
@@ -2213,7 +2240,10 @@ class ComprehensiveMessageScraper {
     this.requestQueue = [];
     this.batchSavePromises = [];
     this.pendingSaves.clear();
-    this.processedGroupIds.clear(); // Reset deduplication tracking for fresh start
+    this.processedGroupIds.clear(); // Reset current session tracking
+    this.sessionScrapedIds.clear(); // Reset current session scraped tracking
+    
+    // Note: Keep this.scrapedGroupIds to remember what was scraped in previous sessions
     
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
@@ -2538,10 +2568,30 @@ class ComprehensiveMessageScraper {
     
     // Filter out already processed groups to prevent duplicates
     const unprocessedGroups = newGroups.filter(([groupId, group]) => {
+      // Skip if processed in current session
       if (this.processedGroupIds.has(groupId)) {
-        console.log(`⚠️ Skipping already processed group: ${groupId}`);
+        if (this.verboseLogging) {
+          console.log(`⚠️ Skipping already processed in session: ${groupId}`);
+        }
         return false;
       }
+      
+      // Skip if already scraped by manual scraper in previous sessions
+      if (this.scrapedGroupIds.has(groupId)) {
+        if (this.verboseLogging) {
+          console.log(`⚠️ Skipping previously scraped group: ${groupId}`);
+        }
+        return false;
+      }
+      
+      // Skip if it was auto-captured (check if lovableId exists in auto-capture tracking)
+      if (group.lovableId && this.wasAutoCaptured(group.lovableId)) {
+        if (this.verboseLogging) {
+          console.log(`⚠️ Skipping auto-captured group: ${groupId}`);
+        }
+        return false;
+      }
+      
       return true;
     });
     
@@ -2673,6 +2723,11 @@ class ComprehensiveMessageScraper {
     }
   }
 
+  wasAutoCaptured(lovableId) {
+    // Check if this lovableId was processed by auto-capture
+    return window.simpleConversationCapture?.processedLovableIds?.has(lovableId) || false;
+  }
+
   async saveConversationGroup(groupId, group, forceSave = false) {
     try {
       // Check if scraping was stopped (unless forced)
@@ -2722,7 +2777,9 @@ class ComprehensiveMessageScraper {
           // Duplicate detected - this is expected with unique constraints
           return 'skipped';
         } else {
-          // Successfully saved new conversation
+          // Successfully saved new conversation - track it
+          this.sessionScrapedIds.add(groupId);
+          this.processedGroupIds.add(groupId);
           return true;
         }
       } else {
@@ -3143,6 +3200,14 @@ class ComprehensiveMessageScraper {
   }
 
   cleanupAfterStop() {
+    // Store what was scraped in this session for persistence across scraper sessions
+    if (this.sessionScrapedIds.size > 0) {
+      for (const groupId of this.sessionScrapedIds) {
+        this.scrapedGroupIds.add(groupId);
+      }
+      console.log(`📝 Persisted ${this.sessionScrapedIds.size} scraped group IDs for future sessions`);
+    }
+    
     // Reset UI
     this.btn.disabled = false;
     this.btn.textContent = 'Scrape All Messages';
@@ -3151,13 +3216,16 @@ class ComprehensiveMessageScraper {
     const stopBtn = document.getElementById('stop-scraping-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     
-    // Clear all tracking and reset cancellation
+    // Clear session tracking but keep persistent tracking
     this.batchSavePromises = [];
     this.pendingSaves.clear();
     this.activeRequests.clear();
     this.requestQueue = [];
-    this.processedGroupIds.clear(); // Reset deduplication tracking
+    this.processedGroupIds.clear(); // Reset current session tracking
+    this.sessionScrapedIds.clear(); // Reset current session scraped tracking
     this.isCancelled = false; // Reset for next run
+    
+    // Note: Keep this.scrapedGroupIds to remember what was scraped across sessions
     
     // Update final status
     const finalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
