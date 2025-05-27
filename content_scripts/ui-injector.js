@@ -580,7 +580,49 @@ class UIInjector {
       dangerousAttrs.forEach(attr => el.removeAttribute(attr));
     });
     
+    // Enhance list styling for proper display
+    this.enhanceListStyling(temp);
+    
     return temp.innerHTML;
+  }
+
+  enhanceListStyling(container) {
+    // Add proper styling to unordered lists (bullet points)
+    const ulLists = container.querySelectorAll('ul');
+    ulLists.forEach(ul => {
+      ul.style.listStyleType = 'disc';
+      ul.style.paddingLeft = '20px';
+      ul.style.marginLeft = '0';
+      
+      // Ensure list items display properly
+      const listItems = ul.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Add proper styling to ordered lists (numbers)
+    const olLists = container.querySelectorAll('ol');
+    olLists.forEach(ol => {
+      ol.style.listStyleType = 'decimal';
+      ol.style.paddingLeft = '20px';
+      ol.style.marginLeft = '0';
+      
+      // Ensure list items display properly with numbers
+      const listItems = ol.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Handle nested lists
+    const nestedLists = container.querySelectorAll('ul ul, ol ol, ul ol, ol ul');
+    nestedLists.forEach(nestedList => {
+      nestedList.style.marginTop = '4px';
+      nestedList.style.marginBottom = '4px';
+    });
   }
 
   async getProjectContext() {

@@ -234,6 +234,40 @@ class LovableDetector {
           background: rgba(160, 174, 192, 0.8); 
         }
         
+        /* Enhanced list styling for HTML content */
+        #lovable-assistant-dialog ul {
+          list-style-type: disc !important;
+          padding-left: 20px !important;
+          margin: 8px 0 !important;
+        }
+        
+        #lovable-assistant-dialog ol {
+          list-style-type: decimal !important;
+          padding-left: 20px !important;
+          margin: 8px 0 !important;
+        }
+        
+        #lovable-assistant-dialog li {
+          display: list-item !important;
+          margin-bottom: 4px !important;
+        }
+        
+        #lovable-assistant-dialog ul ul,
+        #lovable-assistant-dialog ol ol,
+        #lovable-assistant-dialog ul ol,
+        #lovable-assistant-dialog ol ul {
+          margin: 4px 0 !important;
+        }
+        
+        /* Ensure nested lists have different styles */
+        #lovable-assistant-dialog ul ul {
+          list-style-type: circle !important;
+        }
+        
+        #lovable-assistant-dialog ul ul ul {
+          list-style-type: square !important;
+        }
+        
         @keyframes pulse { 0%, 60%, 100% { opacity: 0.4; transform: scale(1); } 30% { opacity: 1; transform: scale(1.2); } }
       `;
       document.head.appendChild(style);
@@ -559,7 +593,49 @@ class LovableDetector {
       dangerousAttrs.forEach(attr => el.removeAttribute(attr));
     });
     
+    // Enhance list styling for proper display
+    this.enhanceListStyling(temp);
+    
     return temp.innerHTML;
+  }
+
+  enhanceListStyling(container) {
+    // Add proper styling to unordered lists (bullet points)
+    const ulLists = container.querySelectorAll('ul');
+    ulLists.forEach(ul => {
+      ul.style.listStyleType = 'disc';
+      ul.style.paddingLeft = '20px';
+      ul.style.marginLeft = '0';
+      
+      // Ensure list items display properly
+      const listItems = ul.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Add proper styling to ordered lists (numbers)
+    const olLists = container.querySelectorAll('ol');
+    olLists.forEach(ol => {
+      ol.style.listStyleType = 'decimal';
+      ol.style.paddingLeft = '20px';
+      ol.style.marginLeft = '0';
+      
+      // Ensure list items display properly with numbers
+      const listItems = ol.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Handle nested lists
+    const nestedLists = container.querySelectorAll('ul ul, ol ol, ul ol, ol ul');
+    nestedLists.forEach(nestedList => {
+      nestedList.style.marginTop = '4px';
+      nestedList.style.marginBottom = '4px';
+    });
   }
 
   escapeRegex(string) {
