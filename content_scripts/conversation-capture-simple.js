@@ -240,7 +240,120 @@ class SimpleConversationCapture {
   }
 
   extractContent(element) {
-    // Enhanced content extraction with better filtering
+    // Enhanced content extraction with HTML formatting preservation
+    const messageId = element.getAttribute('data-message-id');
+    const isLovableMessage = messageId?.startsWith('aimsg_');
+    const isUserMessage = messageId?.startsWith('umsg_');
+    
+    if (isLovableMessage) {
+      return this.extractLovableContentAsHTML(element);
+    } else if (isUserMessage) {
+      return this.extractUserContentAsHTML(element);
+    }
+    
+    // Fallback to plain text extraction
+    return this.extractPlainTextContent(element);
+  }
+
+  extractLovableContentAsHTML(element) {
+    // For Lovable messages, preserve the rich HTML formatting
+    const proseElements = element.querySelectorAll('.prose, .prose-markdown, [class*="prose"]');
+    
+    if (proseElements.length > 0) {
+      let htmlContent = '';
+      
+      proseElements.forEach(prose => {
+        // Clone to avoid modifying original
+        const clone = prose.cloneNode(true);
+        
+        // Remove UI elements that shouldn't be part of content
+        const uiSelectors = [
+          'svg', 
+          'button[aria-haspopup]', 
+          '.opacity-0', 
+          '[class*="icon"]',
+          'button[data-state]',
+          '.shrink-0',
+          '[viewBox]'
+        ];
+        
+        uiSelectors.forEach(selector => {
+          const elements = clone.querySelectorAll(selector);
+          elements.forEach(el => el.remove());
+        });
+        
+        // Get the inner HTML, preserving formatting
+        const proseHTML = clone.innerHTML?.trim();
+        if (proseHTML && proseHTML.length > 10) {
+          htmlContent += proseHTML + ' ';
+        }
+      });
+      
+      if (htmlContent.trim()) {
+        if (this.verboseLogging) {
+          console.log(`✅ Extracted Lovable HTML content: "${htmlContent.substring(0, 100)}..."`);
+        }
+        return htmlContent.trim();
+      }
+    }
+    
+    // Fallback to plain text if no prose elements found
+    return this.extractPlainTextContent(element);
+  }
+
+  extractUserContentAsHTML(element) {
+    // For user messages, get the text content and convert line breaks to <br> tags
+    const contentDiv = element.querySelector('.overflow-wrap-anywhere, .whitespace-pre-wrap');
+    
+    if (contentDiv) {
+      // Get the text content preserving line breaks
+      let textContent = '';
+      const walker = document.createTreeWalker(
+        contentDiv,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: function(node) {
+            // Skip text inside buttons unless it's main content
+            const parent = node.parentElement;
+            if (parent?.tagName === 'BUTTON') {
+              return NodeFilter.FILTER_REJECT;
+            }
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        },
+        false
+      );
+      
+      let node;
+      while (node = walker.nextNode()) {
+        textContent += node.textContent;
+      }
+      
+      if (textContent.trim()) {
+        // Convert line breaks to <br> tags and escape HTML characters
+        const htmlContent = textContent
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/\r?\n/g, '<br>')  // Convert line breaks to <br> tags
+          .trim();
+        
+        if (this.verboseLogging) {
+          console.log(`✅ Extracted User HTML content: "${htmlContent.substring(0, 100)}..."`);
+        }
+        
+        return htmlContent;
+      }
+    }
+    
+    // Fallback to plain text extraction
+    return this.extractPlainTextContent(element);
+  }
+
+  extractPlainTextContent(element) {
+    // Legacy plain text extraction method (fallback)
     const clone = element.cloneNode(true);
     
     // Remove specific UI elements that shouldn't be part of content
@@ -249,9 +362,9 @@ class SimpleConversationCapture {
       'button[aria-haspopup]', 
       '.opacity-0', 
       '[class*="icon"]',
-      'button[data-state]', // Remove dropdown buttons
-      '.shrink-0', // Remove icon containers
-      '[viewBox]' // Remove SVG elements
+      'button[data-state]',
+      '.shrink-0',
+      '[viewBox]'
     ];
     
     uiSelectors.forEach(selector => {
@@ -259,35 +372,12 @@ class SimpleConversationCapture {
       elements.forEach(el => el.remove());
     });
     
-    // For Lovable messages, focus on prose content first
-    if (element.getAttribute('data-message-id')?.startsWith('aimsg_')) {
-      const proseElements = clone.querySelectorAll('.prose, .prose-markdown, [class*="prose"]');
-      if (proseElements.length > 0) {
-        let proseContent = '';
-        proseElements.forEach(prose => {
-          const text = prose.textContent?.trim();
-          if (text && text.length > 10) {
-            proseContent += text + ' ';
-          }
-        });
-        
-        if (proseContent.trim()) {
-          if (this.verboseLogging) {
-            console.log(`✅ Extracted Lovable prose content: "${proseContent.substring(0, 100)}..."`);
-          }
-          return proseContent.trim();
-        }
-      }
-    }
-    
-    // For user messages or fallback, get all text content
     let content = '';
     const walker = document.createTreeWalker(
       clone,
       NodeFilter.SHOW_TEXT,
       {
         acceptNode: function(node) {
-          // Skip text inside buttons unless it's main content
           const parent = node.parentElement;
           if (parent?.tagName === 'BUTTON' && 
               !parent.textContent?.includes('Enable Crop') &&
@@ -309,7 +399,7 @@ class SimpleConversationCapture {
     const finalContent = content.replace(/\s+/g, ' ').trim();
     
     if (this.verboseLogging) {
-      console.log(`📝 Extracted content (${finalContent.length} chars): "${finalContent.substring(0, 100)}..."`);
+      console.log(`📝 Extracted plain text content (${finalContent.length} chars): "${finalContent.substring(0, 100)}..."`);
     }
     
     return finalContent;
@@ -407,7 +497,7 @@ class SimpleConversationCapture {
         lovableContentLength: group.lovableContent?.length || 0
       });
 
-      // Convert group to conversation format with proper lovableId checking
+      // Convert group to conversation format with proper lovableId checking and HTML support
       const conversationData = {
         id: this.generateUUID(),
         projectId: group.projectId,
@@ -418,7 +508,8 @@ class SimpleConversationCapture {
           messageGroupId: group.id,
           userId: group.userId,
           lovableId: group.lovableId, // Store lovableId for duplicate detection
-          autoCapture: true
+          autoCapture: true,
+          contentFormat: 'html' // Indicate this is HTML formatted content
         },
         categories: group.categories ? [
           ...(group.categories.primary || []),

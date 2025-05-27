@@ -24,6 +24,7 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
+    this.setupLovableResponseMonitoring();
   }
 
   detectLovablePage() {
@@ -233,6 +234,40 @@ class LovableDetector {
         #dialog-content::-webkit-scrollbar-thumb:hover,
         #chat-messages::-webkit-scrollbar-thumb:hover { 
           background: rgba(160, 174, 192, 0.8); 
+        }
+        
+        /* Enhanced list styling for HTML content */
+        #lovable-assistant-dialog ul {
+          list-style-type: disc !important;
+          padding-left: 20px !important;
+          margin: 8px 0 !important;
+        }
+        
+        #lovable-assistant-dialog ol {
+          list-style-type: decimal !important;
+          padding-left: 20px !important;
+          margin: 8px 0 !important;
+        }
+        
+        #lovable-assistant-dialog li {
+          display: list-item !important;
+          margin-bottom: 4px !important;
+        }
+        
+        #lovable-assistant-dialog ul ul,
+        #lovable-assistant-dialog ol ol,
+        #lovable-assistant-dialog ul ol,
+        #lovable-assistant-dialog ol ul {
+          margin: 4px 0 !important;
+        }
+        
+        /* Ensure nested lists have different styles */
+        #lovable-assistant-dialog ul ul {
+          list-style-type: circle !important;
+        }
+        
+        #lovable-assistant-dialog ul ul ul {
+          list-style-type: square !important;
         }
         
         @keyframes pulse { 0%, 60%, 100% { opacity: 0.4; transform: scale(1); } 30% { opacity: 1; transform: scale(1.2); } }
@@ -515,7 +550,11 @@ class LovableDetector {
       line-height: 1.4; word-wrap: break-word; font-size: 14px;
     `;
 
-    messageBubble.innerHTML = this.formatMessage(content);
+    // For chat messages, detect if content is HTML and format accordingly
+    const isHTMLContent = this.isHTMLContent(content);
+    const formattedContent = this.formatMessage(content, isHTMLContent);
+    
+    messageBubble.innerHTML = formattedContent;
     messageDiv.appendChild(messageBubble);
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -524,9 +563,81 @@ class LovableDetector {
   // --- UI Helper Methods ---
   // Message formatting, styling, and UI manipulation functions
 
-  formatMessage(content) {
-    // Use the advanced MarkdownFormatter for consistent Claude-like formatting
-    return MarkdownFormatter.format(content);
+  formatMessage(content, isHTML = false) {
+    // Check if content is HTML formatted (from newer captures)
+    if (isHTML || this.isHTMLContent(content)) {
+      // For HTML content, return as-is but sanitize dangerous elements
+      return this.sanitizeHTML(content);
+    } else {
+      // For plain text content, use the advanced MarkdownFormatter
+      return MarkdownFormatter.format(content);
+    }
+  }
+
+  isHTMLContent(content) {
+    // Detect if content contains HTML tags (simple heuristic)
+    return /<\/?(p|br|h[1-6]|ol|ul|li|blockquote|pre|code|strong|em|span|div)[^>]*>/i.test(content);
+  }
+
+  sanitizeHTML(htmlContent) {
+    // Create a temporary element to sanitize HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    
+    // Remove potentially dangerous elements and attributes
+    const dangerousElements = temp.querySelectorAll('script, iframe, object, embed, form, input, button');
+    dangerousElements.forEach(el => el.remove());
+    
+    // Remove dangerous attributes
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      const dangerousAttrs = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur'];
+      dangerousAttrs.forEach(attr => el.removeAttribute(attr));
+    });
+    
+    // Enhance list styling for proper display
+    this.enhanceListStyling(temp);
+    
+    return temp.innerHTML;
+  }
+
+  enhanceListStyling(container) {
+    // Add proper styling to unordered lists (bullet points)
+    const ulLists = container.querySelectorAll('ul');
+    ulLists.forEach(ul => {
+      ul.style.listStyleType = 'disc';
+      ul.style.paddingLeft = '20px';
+      ul.style.marginLeft = '0';
+      
+      // Ensure list items display properly
+      const listItems = ul.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Add proper styling to ordered lists (numbers)
+    const olLists = container.querySelectorAll('ol');
+    olLists.forEach(ol => {
+      ol.style.listStyleType = 'decimal';
+      ol.style.paddingLeft = '20px';
+      ol.style.marginLeft = '0';
+      
+      // Ensure list items display properly with numbers
+      const listItems = ol.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Handle nested lists
+    const nestedLists = container.querySelectorAll('ul ul, ol ol, ul ol, ol ul');
+    nestedLists.forEach(nestedList => {
+      nestedList.style.marginTop = '4px';
+      nestedList.style.marginBottom = '4px';
+    });
   }
 
   escapeRegex(string) {
@@ -615,6 +726,11 @@ class LovableDetector {
     
     if (this.assistantDialog) {
       this.assistantDialog.remove();
+    }
+    
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
     }
   }
 
@@ -1437,9 +1553,9 @@ class LovableDetector {
     }
 
     try {
-      console.log(`🗑️ Starting cleanup of ${messageCount} messages...`);
+      console.log(`🗑️ Starting bulk cleanup of ${messageCount} messages...`);
       
-      // Get conversation IDs to delete from database
+      // Collect all unique conversation IDs for bulk delete
       const conversationIds = new Set();
       this.filteredHistoryMessages.forEach(msg => {
         if (msg.conversationId) {
@@ -1447,26 +1563,22 @@ class LovableDetector {
         }
       });
 
-      // Delete from Supabase database
+      // Perform efficient bulk delete in a single request
       if (conversationIds.size > 0) {
-        console.log(`🗑️ Deleting ${conversationIds.size} conversations from database...`);
+        console.log(`🗑️ Bulk deleting ${conversationIds.size} conversations from database...`);
         
-        for (const conversationId of conversationIds) {
-          try {
-            const response = await this.safeSendMessage({
-              action: 'deleteConversations',
-              filters: { id: conversationId }
-            });
-            
-            if (!response?.success) {
-              console.warn(`⚠️ Failed to delete conversation ${conversationId}:`, response?.error);
-            }
-          } catch (error) {
-            console.error(`❌ Error deleting conversation ${conversationId}:`, error);
-          }
+        const response = await this.safeSendMessage({
+          action: 'deleteConversations',
+          filters: { ids: Array.from(conversationIds) } // Send all IDs in single request
+        });
+        
+        if (response?.success) {
+          const deletedCount = response.data?.deletedCount || conversationIds.size;
+          console.log(`✅ Bulk delete successful: ${deletedCount} conversations deleted`);
+        } else {
+          console.warn(`⚠️ Bulk delete failed:`, response?.error);
+          throw new Error(response?.error || 'Bulk delete failed');
         }
-        
-        console.log(`✅ Database cleanup completed`);
       }
       
       // Get the IDs of messages to remove from local memory
@@ -1493,16 +1605,16 @@ class LovableDetector {
       this.filteredHistoryMessages = [...this.allHistoryMessages];
       this.applyHistoryFilters();
       
-      console.log(`🗑️ Successfully cleaned ${idsToRemove.size} messages from history and database`);
+      console.log(`🗑️ Successfully cleaned ${idsToRemove.size} messages from history and database using bulk delete`);
       
       // Refresh the display
       this.renderHistoryMessages();
       
       // Show success message
-      alert(`Successfully deleted ${messageCount} messages from the database.`);
+      alert(`Successfully deleted ${messageCount} messages from the database using efficient bulk delete.`);
       
     } catch (error) {
-      console.error('❌ Error cleaning filtered messages:', error);
+      console.error('❌ Error during bulk cleanup:', error);
       alert('An error occurred while cleaning messages. Please check the console and try again.');
     }
   }
@@ -1607,7 +1719,15 @@ class LovableDetector {
       </div>
     `;
 
-    messageBubble.innerHTML = headerHtml + this.highlightSearchTerms(this.formatMessage(content));
+    // Check if this is HTML content from newer captures
+    const isHTMLContent = messageData.contentFormat === 'html' || 
+                         messageData.projectContext?.contentFormat === 'html' ||
+                         this.isHTMLContent(content);
+
+    const formattedContent = this.formatMessage(content, isHTMLContent);
+    const highlightedContent = this.highlightSearchTerms(formattedContent);
+
+    messageBubble.innerHTML = headerHtml + highlightedContent;
     messageDiv.appendChild(messageBubble);
     messagesContainer.appendChild(messageDiv);
   }
@@ -1710,8 +1830,8 @@ class LovableDetector {
     // Setup input auto-expansion
     this.setupInputAutoExpansion();
     
-    // Setup Lovable response monitoring
-    this.setupLovableResponseMonitoring();
+    // Setup input auto-expansion
+    this.setupInputAutoExpansion();
   }
 
   setupToggleSwitch(toggleId, settingKey) {
@@ -1981,48 +2101,72 @@ class LovableDetector {
   }
 
   setupLovableResponseMonitoring() {
-    // Monitor for Lovable response completion
-    if (!window.lovableResponseMonitor) {
-      window.lovableResponseMonitor = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'childList') {
-            // Check if a Lovable response just completed
-            this.checkForLovableResponseCompletion(mutation);
-          }
-        });
-      });
-      
-      // Start observing
-      window.lovableResponseMonitor.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-    }
+    // Track element existence state
+    this.workingElementExists = false;
+    this.monitoringInterval = null;
+
+    // Check for working element existence every 5 seconds
+    this.monitoringInterval = setInterval(() => {
+      this.checkWorkingElementExistence();
+    }, 5000);
+
+    // Initial check
+    this.checkWorkingElementExistence();
   }
 
-  checkForLovableResponseCompletion(mutation) {
-    // Look for signs that Lovable finished responding
-    const addedNodes = Array.from(mutation.addedNodes);
+  checkWorkingElementExistence() {
+    const workingElement = this.findWorkingElement();
+    const currentlyExists = !!workingElement;
     
-    addedNodes.forEach(node => {
-      if (node.nodeType === 1 && node.textContent) {
-        // Check for completion indicators
-        const completionIndicators = [
-          'I\'ve made some changes',
-          'The updates have been',
-          'I\'ve updated the',
-          'Changes have been applied'
-        ];
-        
-        const hasCompletionIndicator = completionIndicators.some(indicator => 
-          node.textContent.includes(indicator)
-        );
-        
-        if (hasCompletionIndicator) {
-          this.onLovableResponseComplete();
-        }
+    // Check for state transitions
+    if (!this.workingElementExists && currentlyExists) {
+      // Element appeared - Lovable started working
+      this.workingElementExists = true;
+      console.log('🔄 Lovable started working...');
+    } else if (this.workingElementExists && !currentlyExists) {
+      // Element disappeared - Lovable finished working
+      this.workingElementExists = false;
+      console.log('✅ Working → Finished transition, showing notification');
+      this.onLovableResponseComplete();
+    }
+    // No console output for silent checks when state doesn't change
+  }
+
+  findWorkingElement() {
+    // Strategy 1: Try XPath (most precise)
+    try {
+      const xpathResult = document.evaluate(
+        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]/div[3]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      if (xpathResult.singleNodeValue && xpathResult.singleNodeValue.textContent?.includes('Working...')) {
+        return xpathResult.singleNodeValue;
       }
-    });
+    } catch (e) {
+      // XPath failed, continue with other strategies
+    }
+
+    // Strategy 2: Look for elements containing "Working..." text
+    const workingElements = document.querySelectorAll('p.text-sm');
+    for (const element of workingElements) {
+      if (element.textContent?.trim() === 'Working...') {
+        return element.closest('[style*="opacity"]') || element;
+      }
+    }
+
+    // Strategy 3: Search more broadly for "Working..." text
+    const allElements = document.querySelectorAll('*');
+    for (const element of allElements) {
+      if (element.textContent?.includes('Working...') && 
+          element.textContent.trim().length < 50) { // Avoid large containers
+        return element;
+      }
+    }
+
+    return null;
   }
 
   onLovableResponseComplete() {
@@ -2192,15 +2336,15 @@ class ComprehensiveMessageScraper {
     this.batchSavePromises = []; // Track active save promises
     this.saveCompletionCallbacks = new Map(); // Track completion callbacks for saves
     
-    // Add cancellation token and request throttling
+    // Add cancellation token and request throttling - INITIALIZE ALL SETS
     this.isCancelled = false;
     this.activeRequests = new Set(); // Track active save requests
     this.maxConcurrentRequests = 5; // Limit concurrent requests
     this.requestQueue = []; // Queue for throttled requests
     
-    // Enhanced deduplication and persistence tracking
+    // Enhanced deduplication and persistence tracking - INITIALIZE ALL SETS
     this.processedGroupIds = new Set(); // Track processed groups in current session
-    this.scrapedGroupIds = new Set(); // Persistent tracking of scraper-processed groups across sessions
+    this.scrapedGroupIds = new Set(); // Persistent tracking across sessions
     this.sessionScrapedIds = new Set(); // Track what was scraped in current scraping session
   }
 
@@ -2210,40 +2354,51 @@ class ComprehensiveMessageScraper {
     console.log(`🔧 Verbose logging ${enabled ? 'enabled' : 'disabled'} for scraper`);
   }
 
-  // Get scraper statistics including persistent tracking
-  getScrapingStats() {
-    return {
-      isRunning: this.isRunning,
-      currentSessionProcessed: this.processedGroupIds.size,
-      currentSessionScraped: this.sessionScrapedIds.size,
-      totalScrapedAcrossSessions: this.scrapedGroupIds.size,
-      activeRequests: this.activeRequests.size,
-      queuedRequests: this.requestQueue.length,
-      batchSavePromises: this.batchSavePromises.length
-    };
+  // Clear all scraper internal state for fresh session
+  clearScrapingState() {
+    // Clear any leftover state from previous runs
+    this.activeRequests.clear();
+    this.requestQueue = [];
+    this.batchSavePromises = [];
+    this.pendingSaves.clear();
+    this.processedGroupIds.clear();
+    this.sessionScrapedIds.clear();
+    this.scrapedGroupIds.clear(); // Clear persistent tracking for fresh start
+    
+    // Reset scraping state
+    this.lastMessageGroupCount = 0;
+    this.scrollAttempts = 0;
+    this.noNewDataCounter = 0;
+    this.hasReachedTop = false;
+    
+    console.log('🧹 Cleared all scraper internal state for fresh session');
   }
 
-  // Clear persistent scraper tracking (use with caution - for debugging only)
-  clearPersistentTracking() {
-    const clearedCount = this.scrapedGroupIds.size;
-    this.scrapedGroupIds.clear();
-    console.log(`🧹 Cleared ${clearedCount} persistent scraped group IDs`);
-    return clearedCount;
+  // Reset simpleConversationCapture to prevent reprocessing old groups
+  resetSimpleConversationCapture() {
+    if (window.simpleConversationCapture) {
+      const oldSize = window.simpleConversationCapture.messageGroups?.size || 0;
+      
+      // Clear message groups to prevent reprocessing
+      window.simpleConversationCapture.messageGroups?.clear();
+      window.simpleConversationCapture.processedLovableIds?.clear();
+      
+      // Reset pending group
+      window.simpleConversationCapture.pendingGroup = null;
+      
+      console.log(`🧹 Reset simpleConversationCapture: cleared ${oldSize} message groups`);
+    } else {
+      console.log('⚠️ simpleConversationCapture not found - skipping reset');
+    }
   }
 
   async startScraping() {
     this.isRunning = true;
     this.isCancelled = false; // Reset cancellation flag for new scraping session
     
-    // Clear any leftover state from previous runs
-    this.activeRequests.clear();
-    this.requestQueue = [];
-    this.batchSavePromises = [];
-    this.pendingSaves.clear();
-    this.processedGroupIds.clear(); // Reset current session tracking
-    this.sessionScrapedIds.clear(); // Reset current session scraped tracking
-    
-    // Note: Keep this.scrapedGroupIds to remember what was scraped in previous sessions
+    // CRITICAL: Reset all state for clean scraping session
+    this.clearScrapingState();
+    this.resetSimpleConversationCapture(); // Clear previous session data to prevent reprocessing
     
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
@@ -2741,7 +2896,7 @@ class ComprehensiveMessageScraper {
         console.log(`🔍 Processing ${groupId}: userContent=${group.userContent?.length || 0}chars, lovableContent=${group.lovableContent?.length || 0}chars`);
       }
 
-      // Prepare conversation data for database with proper UUID - same structure as auto-capture
+      // Prepare conversation data for database with proper UUID - same structure as auto-capture with HTML support
       const conversationData = {
         id: this.generateUUID(), // Always generate a proper UUID for database
         projectId: this.extractProjectId(),
@@ -2753,7 +2908,8 @@ class ComprehensiveMessageScraper {
           messageGroupId: groupId, // Keep original groupId in context
           userId: group.userId,
           lovableId: group.lovableId,
-          autoCapture: false // This is from scraping, not auto-capture
+          autoCapture: false, // This is from scraping, not auto-capture
+          contentFormat: 'html' // Indicate this is HTML formatted content
         },
         categories: this.extractCategoriesFromGroup(group)
       };
@@ -3179,7 +3335,7 @@ class ComprehensiveMessageScraper {
     this.isCancelled = true; // Set cancellation flag
     
     // Update status
-    this.updateStatus('🛑 Scraping stopped by user. Cancelling all pending operations...', '#f59e0b');
+    this.updateStatus('🛑 Scraping stopped by user. Cleaning up state...', '#f59e0b');
     
     // Cancel all pending requests in queue
     while (this.requestQueue.length > 0) {
@@ -3187,26 +3343,21 @@ class ComprehensiveMessageScraper {
       resolve({ success: false, error: 'Request cancelled', cancelled: true });
     }
     
-    // Clear all tracking
-    this.pendingSaves.clear();
-    this.batchSavePromises = [];
-    this.activeRequests.clear();
+    // Clear all state immediately for clean restart
+    this.clearScrapingState(); // Clear scraper state
+    this.resetSimpleConversationCapture(); // Clear capture storage to prevent reprocessing
     
-    const cancelledCount = this.requestQueue.length + this.activeRequests.size;
-    console.log(`🛑 Cancelled ${cancelledCount} pending operations immediately`);
+    const cancelledCount = this.pendingSaves.size + this.batchSavePromises.length;
+    console.log(`🛑 Cancelled ${cancelledCount} pending operations and cleared all state`);
     
     // Immediate cleanup
     this.cleanupAfterStop();
   }
 
   cleanupAfterStop() {
-    // Store what was scraped in this session for persistence across scraper sessions
-    if (this.sessionScrapedIds.size > 0) {
-      for (const groupId of this.sessionScrapedIds) {
-        this.scrapedGroupIds.add(groupId);
-      }
-      console.log(`📝 Persisted ${this.sessionScrapedIds.size} scraped group IDs for future sessions`);
-    }
+    // Ensure all state is cleared for immediate clean restart capability
+    this.clearScrapingState();
+    this.resetSimpleConversationCapture();
     
     // Reset UI
     this.btn.disabled = false;
@@ -3216,21 +3367,9 @@ class ComprehensiveMessageScraper {
     const stopBtn = document.getElementById('stop-scraping-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     
-    // Clear session tracking but keep persistent tracking
-    this.batchSavePromises = [];
-    this.pendingSaves.clear();
-    this.activeRequests.clear();
-    this.requestQueue = [];
-    this.processedGroupIds.clear(); // Reset current session tracking
-    this.sessionScrapedIds.clear(); // Reset current session scraped tracking
-    this.isCancelled = false; // Reset for next run
-    
-    // Note: Keep this.scrapedGroupIds to remember what was scraped across sessions
-    
     // Update final status
-    const finalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
     this.updateStatus(
-      `🛑 Scraping stopped. Captured ${finalCount} message groups before stopping.`,
+      `🛑 Scraping stopped. All state cleared for clean restart.`,
       '#f59e0b'
     );
     

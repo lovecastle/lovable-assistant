@@ -274,7 +274,11 @@ async function handleDeleteConversations(filters = {}) {
   try {
     console.log('🔍 Service Worker: Deleting conversations with filters:', filters);
     
-    // If no specific filters, delete all conversations for current project
+    // Special handling for bulk delete operations
+    if (filters.ids && Array.isArray(filters.ids)) {
+      console.log(`🔍 Service Worker: Bulk deleting ${filters.ids.length} conversations`);
+    }
+    
     const result = await supabase.deleteConversations(filters);
     
     console.log('✅ Service Worker: Conversations deleted:', result);

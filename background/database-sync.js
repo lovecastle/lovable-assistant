@@ -259,6 +259,18 @@ export class SupabaseClient {
     if (filters.id) {
       // Delete specific conversation by ID
       conditions.push(`id=eq.${filters.id}`);
+    } else if (filters.ids && Array.isArray(filters.ids)) {
+      // Bulk delete by multiple IDs - much more efficient!
+      if (filters.ids.length === 0) {
+        console.log('🔍 Database-sync: No conversation IDs provided for bulk delete');
+        return { success: true, deletedCount: 0 };
+      }
+      
+      // Use PostgreSQL's "in" operator for bulk delete
+      const idsString = filters.ids.map(id => `"${id}"`).join(',');
+      conditions.push(`id=in.(${idsString})`);
+      
+      console.log(`🔍 Database-sync: Bulk deleting ${filters.ids.length} conversations`);
     } else {
       // Delete by other filters
       if (filters.projectId) {
@@ -283,8 +295,16 @@ export class SupabaseClient {
         method: 'DELETE'
       });
       
-      console.log('✅ Database-sync: Conversations deleted successfully:', result);
-      return result;
+      // Calculate deleted count for bulk operations
+      let deletedCount = 0;
+      if (filters.ids && Array.isArray(filters.ids)) {
+        deletedCount = Array.isArray(result) ? result.length : filters.ids.length;
+      } else {
+        deletedCount = Array.isArray(result) ? result.length : 1;
+      }
+      
+      console.log(`✅ Database-sync: Successfully deleted ${deletedCount} conversations`);
+      return { success: true, deletedCount, data: result };
     } catch (error) {
       console.error('❌ Database-sync: Failed to delete conversations:', error);
       throw error;

@@ -547,8 +547,82 @@ class UIInjector {
   }
 
   formatMessageContent(content) {
-    // Use the advanced MarkdownFormatter for consistent Claude-like formatting
-    return MarkdownFormatter.format(content);
+    // Check if content is HTML formatted (from newer captures)
+    const isHTMLContent = this.isHTMLContent(content);
+    
+    if (isHTMLContent) {
+      // For HTML content, return as-is but sanitize dangerous elements
+      return this.sanitizeHTML(content);
+    } else {
+      // For plain text content, use the advanced MarkdownFormatter
+      return MarkdownFormatter.format(content);
+    }
+  }
+
+  isHTMLContent(content) {
+    // Detect if content contains HTML tags (simple heuristic)
+    return /<\/?(p|br|h[1-6]|ol|ul|li|blockquote|pre|code|strong|em|span|div)[^>]*>/i.test(content);
+  }
+
+  sanitizeHTML(htmlContent) {
+    // Create a temporary element to sanitize HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    
+    // Remove potentially dangerous elements and attributes
+    const dangerousElements = temp.querySelectorAll('script, iframe, object, embed, form, input, button');
+    dangerousElements.forEach(el => el.remove());
+    
+    // Remove dangerous attributes
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      const dangerousAttrs = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur'];
+      dangerousAttrs.forEach(attr => el.removeAttribute(attr));
+    });
+    
+    // Enhance list styling for proper display
+    this.enhanceListStyling(temp);
+    
+    return temp.innerHTML;
+  }
+
+  enhanceListStyling(container) {
+    // Add proper styling to unordered lists (bullet points)
+    const ulLists = container.querySelectorAll('ul');
+    ulLists.forEach(ul => {
+      ul.style.listStyleType = 'disc';
+      ul.style.paddingLeft = '20px';
+      ul.style.marginLeft = '0';
+      
+      // Ensure list items display properly
+      const listItems = ul.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Add proper styling to ordered lists (numbers)
+    const olLists = container.querySelectorAll('ol');
+    olLists.forEach(ol => {
+      ol.style.listStyleType = 'decimal';
+      ol.style.paddingLeft = '20px';
+      ol.style.marginLeft = '0';
+      
+      // Ensure list items display properly with numbers
+      const listItems = ol.querySelectorAll('li');
+      listItems.forEach(li => {
+        li.style.display = 'list-item';
+        li.style.marginBottom = '4px';
+      });
+    });
+    
+    // Handle nested lists
+    const nestedLists = container.querySelectorAll('ul ul, ol ol, ul ol, ol ul');
+    nestedLists.forEach(nestedList => {
+      nestedList.style.marginTop = '4px';
+      nestedList.style.marginBottom = '4px';
+    });
   }
 
   async getProjectContext() {
