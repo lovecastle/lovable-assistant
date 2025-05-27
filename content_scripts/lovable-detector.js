@@ -1465,9 +1465,9 @@ class LovableDetector {
     }
 
     try {
-      console.log(`🗑️ Starting cleanup of ${messageCount} messages...`);
+      console.log(`🗑️ Starting bulk cleanup of ${messageCount} messages...`);
       
-      // Get conversation IDs to delete from database
+      // Collect all unique conversation IDs for bulk delete
       const conversationIds = new Set();
       this.filteredHistoryMessages.forEach(msg => {
         if (msg.conversationId) {
@@ -1475,26 +1475,22 @@ class LovableDetector {
         }
       });
 
-      // Delete from Supabase database
+      // Perform efficient bulk delete in a single request
       if (conversationIds.size > 0) {
-        console.log(`🗑️ Deleting ${conversationIds.size} conversations from database...`);
+        console.log(`🗑️ Bulk deleting ${conversationIds.size} conversations from database...`);
         
-        for (const conversationId of conversationIds) {
-          try {
-            const response = await this.safeSendMessage({
-              action: 'deleteConversations',
-              filters: { id: conversationId }
-            });
-            
-            if (!response?.success) {
-              console.warn(`⚠️ Failed to delete conversation ${conversationId}:`, response?.error);
-            }
-          } catch (error) {
-            console.error(`❌ Error deleting conversation ${conversationId}:`, error);
-          }
+        const response = await this.safeSendMessage({
+          action: 'deleteConversations',
+          filters: { ids: Array.from(conversationIds) } // Send all IDs in single request
+        });
+        
+        if (response?.success) {
+          const deletedCount = response.data?.deletedCount || conversationIds.size;
+          console.log(`✅ Bulk delete successful: ${deletedCount} conversations deleted`);
+        } else {
+          console.warn(`⚠️ Bulk delete failed:`, response?.error);
+          throw new Error(response?.error || 'Bulk delete failed');
         }
-        
-        console.log(`✅ Database cleanup completed`);
       }
       
       // Get the IDs of messages to remove from local memory
@@ -1521,16 +1517,16 @@ class LovableDetector {
       this.filteredHistoryMessages = [...this.allHistoryMessages];
       this.applyHistoryFilters();
       
-      console.log(`🗑️ Successfully cleaned ${idsToRemove.size} messages from history and database`);
+      console.log(`🗑️ Successfully cleaned ${idsToRemove.size} messages from history and database using bulk delete`);
       
       // Refresh the display
       this.renderHistoryMessages();
       
       // Show success message
-      alert(`Successfully deleted ${messageCount} messages from the database.`);
+      alert(`Successfully deleted ${messageCount} messages from the database using efficient bulk delete.`);
       
     } catch (error) {
-      console.error('❌ Error cleaning filtered messages:', error);
+      console.error('❌ Error during bulk cleanup:', error);
       alert('An error occurred while cleaning messages. Please check the console and try again.');
     }
   }
