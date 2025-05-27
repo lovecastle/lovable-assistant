@@ -2175,6 +2175,17 @@ class ComprehensiveMessageScraper {
     this.pendingSaves = new Set(); // Track IDs of conversations being saved
     this.batchSavePromises = []; // Track active save promises
     this.saveCompletionCallbacks = new Map(); // Track completion callbacks for saves
+    
+    // Add cancellation token and request throttling - INITIALIZE ALL SETS
+    this.isCancelled = false;
+    this.activeRequests = new Set(); // Track active save requests
+    this.maxConcurrentRequests = 5; // Limit concurrent requests
+    this.requestQueue = []; // Queue for throttled requests
+    
+    // Enhanced deduplication and persistence tracking - INITIALIZE ALL SETS
+    this.processedGroupIds = new Set(); // Track processed groups in current session
+    this.scrapedGroupIds = new Set(); // Persistent tracking across sessions
+    this.sessionScrapedIds = new Set(); // Track what was scraped in current scraping session
   }
 
   // Control verbose logging for debugging
