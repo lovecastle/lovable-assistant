@@ -23,6 +23,7 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
+    this.setupLovableResponseMonitoring();
   }
 
   detectLovablePage() {
@@ -2085,48 +2086,141 @@ class LovableDetector {
   }
 
   setupLovableResponseMonitoring() {
-    // Monitor for Lovable response completion
+    // Initialize working state tracking
+    this.workingState = {
+      isWorking: false,
+      wasWorkingBeforeFinish: false,
+      lastStateChange: null,
+      debounceTimeout: null
+    };
+
+    // Monitor for Lovable "Working..." element state changes
     if (!window.lovableResponseMonitor) {
       window.lovableResponseMonitor = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
-          if (mutation.type === 'childList') {
-            // Check if a Lovable response just completed
-            this.checkForLovableResponseCompletion(mutation);
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            this.checkWorkingElementState(mutation.target);
+          } else if (mutation.type === 'childList') {
+            // Check for working element in added nodes
+            mutation.addedNodes.forEach(node => {
+              if (node.nodeType === 1) {
+                this.findAndMonitorWorkingElement(node);
+              }
+            });
           }
         });
       });
       
-      // Start observing
+      // Start observing with focus on style changes
       window.lovableResponseMonitor.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style']
       });
+    }
+
+    // Initial scan for existing working element
+    this.findAndMonitorWorkingElement(document.body);
+  }
+
+  findAndMonitorWorkingElement(rootElement) {
+    // Look for the "Working..." element using multiple strategies
+    const workingElement = this.locateWorkingElement(rootElement);
+    if (workingElement) {
+      this.checkWorkingElementState(workingElement);
     }
   }
 
-  checkForLovableResponseCompletion(mutation) {
-    // Look for signs that Lovable finished responding
-    const addedNodes = Array.from(mutation.addedNodes);
-    
-    addedNodes.forEach(node => {
-      if (node.nodeType === 1 && node.textContent) {
-        // Check for completion indicators
-        const completionIndicators = [
-          'I\'ve made some changes',
-          'The updates have been',
-          'I\'ve updated the',
-          'Changes have been applied'
-        ];
-        
-        const hasCompletionIndicator = completionIndicators.some(indicator => 
-          node.textContent.includes(indicator)
-        );
-        
-        if (hasCompletionIndicator) {
-          this.onLovableResponseComplete();
-        }
+  locateWorkingElement(rootElement) {
+    // Strategy 1: Try XPath (most precise)
+    try {
+      const xpathResult = document.evaluate(
+        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]/div[3]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      if (xpathResult.singleNodeValue) {
+        return xpathResult.singleNodeValue;
       }
-    });
+    } catch (e) {
+      // XPath failed, continue with other strategies
+    }
+
+    // Strategy 2: CSS selector targeting the working text
+    const workingElements = rootElement.querySelectorAll('p.text-sm');
+    for (const element of workingElements) {
+      if (element.textContent?.trim() === 'Working...') {
+        // Return the parent container that has the opacity style
+        let container = element.parentElement;
+        while (container && !container.style.opacity) {
+          container = container.parentElement;
+        }
+        return container;
+      }
+    }
+
+    // Strategy 3: Look for elements with opacity styles that contain "Working..." text
+    const elementsWithOpacity = rootElement.querySelectorAll('[style*="opacity"]');
+    for (const element of elementsWithOpacity) {
+      if (element.textContent?.includes('Working...')) {
+        return element;
+      }
+    }
+
+    return null;
+  }
+
+  checkWorkingElementState(element) {
+    if (!element || !element.style) return;
+
+    // Extract opacity value from style attribute
+    const opacityMatch = element.style.opacity;
+    const isCurrentlyWorking = opacityMatch === '1' || opacityMatch === '1.0';
+    const isCurrentlyFinished = opacityMatch === '0' || opacityMatch === '0.0';
+
+    // Only process if we have a clear state
+    if (!isCurrentlyWorking && !isCurrentlyFinished) return;
+
+    // Debounce rapid state changes
+    if (this.workingState.debounceTimeout) {
+      clearTimeout(this.workingState.debounceTimeout);
+    }
+
+    this.workingState.debounceTimeout = setTimeout(() => {
+      this.processWorkingStateChange(isCurrentlyWorking, isCurrentlyFinished);
+    }, 100);
+  }
+
+  processWorkingStateChange(isWorking, isFinished) {
+    const previousState = this.workingState.isWorking;
+    const now = Date.now();
+
+    if (isWorking && !previousState) {
+      // Lovable started working
+      this.workingState.isWorking = true;
+      this.workingState.wasWorkingBeforeFinish = true;
+      this.workingState.lastStateChange = now;
+      
+      if (this.verboseLogging) {
+        console.log('🔄 Lovable started working...');
+      }
+    } else if (isFinished && previousState && this.workingState.wasWorkingBeforeFinish) {
+      // Lovable finished working (proper sequence: working → finished)
+      this.workingState.isWorking = false;
+      this.workingState.lastStateChange = now;
+      
+      if (this.verboseLogging) {
+        console.log('✅ Lovable finished working - triggering notification');
+      }
+      
+      this.onLovableResponseComplete();
+      
+      // Reset state for next cycle
+      this.workingState.wasWorkingBeforeFinish = false;
+    }
   }
 
   onLovableResponseComplete() {
