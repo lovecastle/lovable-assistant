@@ -2175,6 +2175,12 @@ class ComprehensiveMessageScraper {
     this.pendingSaves = new Set(); // Track IDs of conversations being saved
     this.batchSavePromises = []; // Track active save promises
     this.saveCompletionCallbacks = new Map(); // Track completion callbacks for saves
+    
+    // Add cancellation token and request throttling
+    this.isCancelled = false;
+    this.activeRequests = new Set(); // Track active save requests
+    this.maxConcurrentRequests = 5; // Limit concurrent requests
+    this.requestQueue = []; // Queue for throttled requests
   }
 
   // Control verbose logging for debugging
@@ -2185,6 +2191,14 @@ class ComprehensiveMessageScraper {
 
   async startScraping() {
     this.isRunning = true;
+    this.isCancelled = false; // Reset cancellation flag for new scraping session
+    
+    // Clear any leftover state from previous runs
+    this.activeRequests.clear();
+    this.requestQueue = [];
+    this.batchSavePromises = [];
+    this.pendingSaves.clear();
+    
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
     // Find the chat container
@@ -2951,7 +2965,54 @@ class ComprehensiveMessageScraper {
   }
 
   async safeSendMessage(message) {
+    // Check if scraper was cancelled before sending
+    if (this.isCancelled || !this.isRunning) {
+      console.log('🛑 Request cancelled before sending:', message.action);
+      return { success: false, error: 'Request cancelled', cancelled: true };
+    }
+
+    // Check concurrent request limit
+    if (this.activeRequests.size >= this.maxConcurrentRequests) {
+      console.log(`⏳ Request queued (${this.activeRequests.size}/${this.maxConcurrentRequests} active):`, message.action);
+      return this.queueRequest(message);
+    }
+
+    return this.executeRequest(message);
+  }
+
+  async queueRequest(message) {
+    return new Promise((resolve) => {
+      this.requestQueue.push({ message, resolve });
+      this.processQueue();
+    });
+  }
+
+  async processQueue() {
+    if (this.requestQueue.length === 0 || this.activeRequests.size >= this.maxConcurrentRequests) {
+      return;
+    }
+
+    const { message, resolve } = this.requestQueue.shift();
+    
+    // Check cancellation again before processing queued request
+    if (this.isCancelled || !this.isRunning) {
+      resolve({ success: false, error: 'Request cancelled', cancelled: true });
+      return;
+    }
+
+    this.executeRequest(message).then(resolve);
+  }
+
+  async executeRequest(message) {
+    const requestId = `${message.action}_${Date.now()}_${Math.random()}`;
+    this.activeRequests.add(requestId);
+
     try {
+      // Final cancellation check before sending
+      if (this.isCancelled || !this.isRunning) {
+        return { success: false, error: 'Request cancelled', cancelled: true };
+      }
+
       console.log('🔍 Content Script: Sending message to background:', {
         action: message.action,
         dataId: message.data?.id,
@@ -2980,6 +3041,11 @@ class ComprehensiveMessageScraper {
       
       console.error('❌ Chrome runtime message error:', error);
       return { success: false, error: error.message };
+    } finally {
+      this.activeRequests.delete(requestId);
+      
+      // Process next item in queue
+      setTimeout(() => this.processQueue(), 10);
     }
   }
 
@@ -3112,19 +3178,24 @@ class ComprehensiveMessageScraper {
   stop() {
     console.log('🛑 Manually stopping scraper...');
     this.isRunning = false;
+    this.isCancelled = true; // Set cancellation flag
     
     // Update status
-    this.updateStatus('🛑 Scraping stopped by user. Cancelling pending operations...', '#f59e0b');
+    this.updateStatus('🛑 Scraping stopped by user. Cancelling all pending operations...', '#f59e0b');
     
-    // Clear all pending saves immediately
+    // Cancel all pending requests in queue
+    while (this.requestQueue.length > 0) {
+      const { resolve } = this.requestQueue.shift();
+      resolve({ success: false, error: 'Request cancelled', cancelled: true });
+    }
+    
+    // Clear all tracking
     this.pendingSaves.clear();
-    
-    // Cancel batch save promises by clearing the array
-    // Note: Individual promises may still complete, but we won't wait for them
-    const pendingCount = this.batchSavePromises.length;
     this.batchSavePromises = [];
+    this.activeRequests.clear();
     
-    console.log(`🛑 Cancelled ${pendingCount} pending batch operations`);
+    const cancelledCount = this.requestQueue.length + this.activeRequests.size;
+    console.log(`🛑 Cancelled ${cancelledCount} pending operations immediately`);
     
     // Immediate cleanup
     this.cleanupAfterStop();
@@ -3139,9 +3210,12 @@ class ComprehensiveMessageScraper {
     const stopBtn = document.getElementById('stop-scraping-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     
-    // Clear tracking
+    // Clear all tracking and reset cancellation
     this.batchSavePromises = [];
     this.pendingSaves.clear();
+    this.activeRequests.clear();
+    this.requestQueue = [];
+    this.isCancelled = false; // Reset for next run
     
     // Update final status
     const finalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
