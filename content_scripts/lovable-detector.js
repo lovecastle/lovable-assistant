@@ -2258,19 +2258,25 @@ class LovableDetector {
 
   async safeSendMessage(message) {
     try {
-      console.log('🔍 LovableDetector: Sending message to background:', {
-        action: message.action,
-        dataId: message.data?.id,
-        dataKeys: message.data ? Object.keys(message.data) : []
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 LovableDetector: Sending message to background:', {
+          action: message.action,
+          dataId: message.data?.id,
+          dataKeys: message.data ? Object.keys(message.data) : []
+        });
+      }
       
       const response = await chrome.runtime.sendMessage(message);
       
-      console.log('🔍 LovableDetector: Received response from background:', {
-        success: response?.success,
-        error: response?.error,
-        hasData: !!response?.data
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 LovableDetector: Received response from background:', {
+          success: response?.success,
+          error: response?.error,
+          hasData: !!response?.data
+        });
+      }
       
       return response;
     } catch (error) {
