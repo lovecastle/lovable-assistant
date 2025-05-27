@@ -2183,8 +2183,52 @@ class ComprehensiveMessageScraper {
     console.log(`🔧 Verbose logging ${enabled ? 'enabled' : 'disabled'} for scraper`);
   }
 
+  // Clear all scraper internal state for fresh session
+  clearScrapingState() {
+    // Clear any leftover state from previous runs
+    this.activeRequests.clear();
+    this.requestQueue = [];
+    this.batchSavePromises = [];
+    this.pendingSaves.clear();
+    this.processedGroupIds.clear();
+    this.sessionScrapedIds.clear();
+    this.scrapedGroupIds.clear(); // Clear persistent tracking for fresh start
+    
+    // Reset scraping state
+    this.lastMessageGroupCount = 0;
+    this.scrollAttempts = 0;
+    this.noNewDataCounter = 0;
+    this.hasReachedTop = false;
+    
+    console.log('🧹 Cleared all scraper internal state for fresh session');
+  }
+
+  // Reset simpleConversationCapture to prevent reprocessing old groups
+  resetSimpleConversationCapture() {
+    if (window.simpleConversationCapture) {
+      const oldSize = window.simpleConversationCapture.messageGroups?.size || 0;
+      
+      // Clear message groups to prevent reprocessing
+      window.simpleConversationCapture.messageGroups?.clear();
+      window.simpleConversationCapture.processedLovableIds?.clear();
+      
+      // Reset pending group
+      window.simpleConversationCapture.pendingGroup = null;
+      
+      console.log(`🧹 Reset simpleConversationCapture: cleared ${oldSize} message groups`);
+    } else {
+      console.log('⚠️ simpleConversationCapture not found - skipping reset');
+    }
+  }
+
   async startScraping() {
     this.isRunning = true;
+    this.isCancelled = false; // Reset cancellation flag for new scraping session
+    
+    // CRITICAL: Reset all state for clean scraping session
+    this.clearScrapingState();
+    this.resetSimpleConversationCapture(); // Clear previous session data to prevent reprocessing
+    
     this.updateStatus('🔍 Finding chat container...', '#667eea');
     
     // Find the chat container
@@ -3112,25 +3156,33 @@ class ComprehensiveMessageScraper {
   stop() {
     console.log('🛑 Manually stopping scraper...');
     this.isRunning = false;
+    this.isCancelled = true; // Set cancellation flag
     
     // Update status
-    this.updateStatus('🛑 Scraping stopped by user. Cancelling pending operations...', '#f59e0b');
+    this.updateStatus('🛑 Scraping stopped by user. Cleaning up state...', '#f59e0b');
     
-    // Clear all pending saves immediately
-    this.pendingSaves.clear();
+    // Cancel all pending requests in queue
+    while (this.requestQueue.length > 0) {
+      const { resolve } = this.requestQueue.shift();
+      resolve({ success: false, error: 'Request cancelled', cancelled: true });
+    }
     
-    // Cancel batch save promises by clearing the array
-    // Note: Individual promises may still complete, but we won't wait for them
-    const pendingCount = this.batchSavePromises.length;
-    this.batchSavePromises = [];
+    // Clear all state immediately for clean restart
+    this.clearScrapingState(); // Clear scraper state
+    this.resetSimpleConversationCapture(); // Clear capture storage to prevent reprocessing
     
-    console.log(`🛑 Cancelled ${pendingCount} pending batch operations`);
+    const cancelledCount = this.pendingSaves.size + this.batchSavePromises.length;
+    console.log(`🛑 Cancelled ${cancelledCount} pending operations and cleared all state`);
     
     // Immediate cleanup
     this.cleanupAfterStop();
   }
 
   cleanupAfterStop() {
+    // Ensure all state is cleared for immediate clean restart capability
+    this.clearScrapingState();
+    this.resetSimpleConversationCapture();
+    
     // Reset UI
     this.btn.disabled = false;
     this.btn.textContent = 'Scrape All Messages';
@@ -3139,14 +3191,9 @@ class ComprehensiveMessageScraper {
     const stopBtn = document.getElementById('stop-scraping-btn');
     if (stopBtn) stopBtn.style.display = 'none';
     
-    // Clear tracking
-    this.batchSavePromises = [];
-    this.pendingSaves.clear();
-    
     // Update final status
-    const finalCount = window.simpleConversationCapture?.messageGroups?.size || 0;
     this.updateStatus(
-      `🛑 Scraping stopped. Captured ${finalCount} message groups before stopping.`,
+      `🛑 Scraping stopped. All state cleared for clean restart.`,
       '#f59e0b'
     );
     
