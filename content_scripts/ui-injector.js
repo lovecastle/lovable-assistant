@@ -547,8 +547,40 @@ class UIInjector {
   }
 
   formatMessageContent(content) {
-    // Use the advanced MarkdownFormatter for consistent Claude-like formatting
-    return MarkdownFormatter.format(content);
+    // Check if content is HTML formatted (from newer captures)
+    const isHTMLContent = this.isHTMLContent(content);
+    
+    if (isHTMLContent) {
+      // For HTML content, return as-is but sanitize dangerous elements
+      return this.sanitizeHTML(content);
+    } else {
+      // For plain text content, use the advanced MarkdownFormatter
+      return MarkdownFormatter.format(content);
+    }
+  }
+
+  isHTMLContent(content) {
+    // Detect if content contains HTML tags (simple heuristic)
+    return /<\/?(p|br|h[1-6]|ol|ul|li|blockquote|pre|code|strong|em|span|div)[^>]*>/i.test(content);
+  }
+
+  sanitizeHTML(htmlContent) {
+    // Create a temporary element to sanitize HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    
+    // Remove potentially dangerous elements and attributes
+    const dangerousElements = temp.querySelectorAll('script, iframe, object, embed, form, input, button');
+    dangerousElements.forEach(el => el.remove());
+    
+    // Remove dangerous attributes
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      const dangerousAttrs = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur'];
+      dangerousAttrs.forEach(attr => el.removeAttribute(attr));
+    });
+    
+    return temp.innerHTML;
   }
 
   async getProjectContext() {

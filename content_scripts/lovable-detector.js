@@ -514,7 +514,11 @@ class LovableDetector {
       line-height: 1.4; word-wrap: break-word; font-size: 14px;
     `;
 
-    messageBubble.innerHTML = this.formatMessage(content);
+    // For chat messages, detect if content is HTML and format accordingly
+    const isHTMLContent = this.isHTMLContent(content);
+    const formattedContent = this.formatMessage(content, isHTMLContent);
+    
+    messageBubble.innerHTML = formattedContent;
     messageDiv.appendChild(messageBubble);
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -523,9 +527,39 @@ class LovableDetector {
   // --- UI Helper Methods ---
   // Message formatting, styling, and UI manipulation functions
 
-  formatMessage(content) {
-    // Use the advanced MarkdownFormatter for consistent Claude-like formatting
-    return MarkdownFormatter.format(content);
+  formatMessage(content, isHTML = false) {
+    // Check if content is HTML formatted (from newer captures)
+    if (isHTML || this.isHTMLContent(content)) {
+      // For HTML content, return as-is but sanitize dangerous elements
+      return this.sanitizeHTML(content);
+    } else {
+      // For plain text content, use the advanced MarkdownFormatter
+      return MarkdownFormatter.format(content);
+    }
+  }
+
+  isHTMLContent(content) {
+    // Detect if content contains HTML tags (simple heuristic)
+    return /<\/?(p|br|h[1-6]|ol|ul|li|blockquote|pre|code|strong|em|span|div)[^>]*>/i.test(content);
+  }
+
+  sanitizeHTML(htmlContent) {
+    // Create a temporary element to sanitize HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    
+    // Remove potentially dangerous elements and attributes
+    const dangerousElements = temp.querySelectorAll('script, iframe, object, embed, form, input, button');
+    dangerousElements.forEach(el => el.remove());
+    
+    // Remove dangerous attributes
+    const allElements = temp.querySelectorAll('*');
+    allElements.forEach(el => {
+      const dangerousAttrs = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur'];
+      dangerousAttrs.forEach(attr => el.removeAttribute(attr));
+    });
+    
+    return temp.innerHTML;
   }
 
   escapeRegex(string) {
@@ -1601,7 +1635,15 @@ class LovableDetector {
       </div>
     `;
 
-    messageBubble.innerHTML = headerHtml + this.highlightSearchTerms(this.formatMessage(content));
+    // Check if this is HTML content from newer captures
+    const isHTMLContent = messageData.contentFormat === 'html' || 
+                         messageData.projectContext?.contentFormat === 'html' ||
+                         this.isHTMLContent(content);
+
+    const formattedContent = this.formatMessage(content, isHTMLContent);
+    const highlightedContent = this.highlightSearchTerms(formattedContent);
+
+    messageBubble.innerHTML = headerHtml + highlightedContent;
     messageDiv.appendChild(messageBubble);
     messagesContainer.appendChild(messageDiv);
   }
@@ -2792,7 +2834,7 @@ class ComprehensiveMessageScraper {
         console.log(`🔍 Processing ${groupId}: userContent=${group.userContent?.length || 0}chars, lovableContent=${group.lovableContent?.length || 0}chars`);
       }
 
-      // Prepare conversation data for database with proper UUID - same structure as auto-capture
+      // Prepare conversation data for database with proper UUID - same structure as auto-capture with HTML support
       const conversationData = {
         id: this.generateUUID(), // Always generate a proper UUID for database
         projectId: this.extractProjectId(),
@@ -2804,7 +2846,8 @@ class ComprehensiveMessageScraper {
           messageGroupId: groupId, // Keep original groupId in context
           userId: group.userId,
           lovableId: group.lovableId,
-          autoCapture: false // This is from scraping, not auto-capture
+          autoCapture: false, // This is from scraping, not auto-capture
+          contentFormat: 'html' // Indicate this is HTML formatted content
         },
         categories: this.extractCategoriesFromGroup(group)
       };
