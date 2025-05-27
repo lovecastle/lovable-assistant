@@ -17,6 +17,7 @@ class LovableDetector {
     this.isLovablePage = false;
     this.projectId = null;
     this.assistantDialog = null;
+    this.verboseLogging = false; // Control verbose console logging
     this.init();
   }
 
@@ -531,6 +532,11 @@ class LovableDetector {
   escapeRegex(string) {
     // Escape special regex characters to treat them as literal characters
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  setVerboseLogging(enabled) {
+    this.verboseLogging = enabled;
+    console.log(`🔧 LovableDetector verbose logging ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   showTypingIndicator() {
@@ -2114,19 +2120,25 @@ class LovableDetector {
 
   async safeSendMessage(message) {
     try {
-      console.log('🔍 LovableDetector: Sending message to background:', {
-        action: message.action,
-        dataId: message.data?.id,
-        dataKeys: message.data ? Object.keys(message.data) : []
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 LovableDetector: Sending message to background:', {
+          action: message.action,
+          dataId: message.data?.id,
+          dataKeys: message.data ? Object.keys(message.data) : []
+        });
+      }
       
       const response = await chrome.runtime.sendMessage(message);
       
-      console.log('🔍 LovableDetector: Received response from background:', {
-        success: response?.success,
-        error: response?.error,
-        hasData: !!response?.data
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 LovableDetector: Received response from background:', {
+          success: response?.success,
+          error: response?.error,
+          hasData: !!response?.data
+        });
+      }
       
       return response;
     } catch (error) {
@@ -3013,19 +3025,25 @@ class ComprehensiveMessageScraper {
         return { success: false, error: 'Request cancelled', cancelled: true };
       }
 
-      console.log('🔍 Content Script: Sending message to background:', {
-        action: message.action,
-        dataId: message.data?.id,
-        dataKeys: message.data ? Object.keys(message.data) : []
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 Content Script: Sending message to background:', {
+          action: message.action,
+          dataId: message.data?.id,
+          dataKeys: message.data ? Object.keys(message.data) : []
+        });
+      }
       
       const response = await chrome.runtime.sendMessage(message);
       
-      console.log('🔍 Content Script: Received response from background:', {
-        success: response?.success,
-        error: response?.error,
-        hasData: !!response?.data
-      });
+      // Only log if verbose mode is enabled
+      if (this.verboseLogging) {
+        console.log('🔍 Content Script: Received response from background:', {
+          success: response?.success,
+          error: response?.error,
+          hasData: !!response?.data
+        });
+      }
       
       return response;
     } catch (error) {
