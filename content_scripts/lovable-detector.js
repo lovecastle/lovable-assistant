@@ -721,6 +721,11 @@ class LovableDetector {
     if (this.assistantDialog) {
       this.assistantDialog.remove();
     }
+    
+    if (this.workingElementObserver) {
+      this.workingElementObserver.disconnect();
+      this.workingElementObserver = null;
+    }
   }
 
   setupWelcomePageEvents() {
@@ -1819,8 +1824,8 @@ class LovableDetector {
     // Setup input auto-expansion
     this.setupInputAutoExpansion();
     
-    // Setup Lovable response monitoring
-    this.setupLovableResponseMonitoring();
+    // Setup input auto-expansion
+    this.setupInputAutoExpansion();
   }
 
   setupToggleSwitch(toggleId, settingKey) {
@@ -2086,53 +2091,22 @@ class LovableDetector {
   }
 
   setupLovableResponseMonitoring() {
-    // Initialize working state tracking
-    this.workingState = {
-      isWorking: false,
-      wasWorkingBeforeFinish: false,
-      lastStateChange: null,
-      debounceTimeout: null
-    };
+    // Simple tracking: just monitor opacity changes from 1 to 0
+    this.lastWorkingOpacity = null;
+    this.workingElement = null;
 
-    // Monitor for Lovable "Working..." element state changes
-    if (!window.lovableResponseMonitor) {
-      window.lovableResponseMonitor = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-            this.checkWorkingElementState(mutation.target);
-          } else if (mutation.type === 'childList') {
-            // Check for working element in added nodes
-            mutation.addedNodes.forEach(node => {
-              if (node.nodeType === 1) {
-                this.findAndMonitorWorkingElement(node);
-              }
-            });
-          }
-        });
-      });
-      
-      // Start observing with focus on style changes
-      window.lovableResponseMonitor.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style']
-      });
-    }
-
-    // Initial scan for existing working element
-    this.findAndMonitorWorkingElement(document.body);
+    // Find and monitor the working element
+    this.findAndMonitorWorkingElement();
+    
+    // Set up periodic monitoring in case element appears later
+    setInterval(() => {
+      if (!this.workingElement) {
+        this.findAndMonitorWorkingElement();
+      }
+    }, 2000);
   }
 
-  findAndMonitorWorkingElement(rootElement) {
-    // Look for the "Working..." element using multiple strategies
-    const workingElement = this.locateWorkingElement(rootElement);
-    if (workingElement) {
-      this.checkWorkingElementState(workingElement);
-    }
-  }
-
-  locateWorkingElement(rootElement) {
+  findAndMonitorWorkingElement() {
     // Strategy 1: Try XPath (most precise)
     try {
       const xpathResult = document.evaluate(
@@ -2143,84 +2117,81 @@ class LovableDetector {
         null
       );
       if (xpathResult.singleNodeValue) {
-        return xpathResult.singleNodeValue;
+        this.setupElementMonitoring(xpathResult.singleNodeValue);
+        return;
       }
     } catch (e) {
       // XPath failed, continue with other strategies
     }
 
-    // Strategy 2: CSS selector targeting the working text
-    const workingElements = rootElement.querySelectorAll('p.text-sm');
+    // Strategy 2: Look for elements containing "Working..." text with opacity styles
+    const elementsWithOpacity = document.querySelectorAll('[style*="opacity"]');
+    for (const element of elementsWithOpacity) {
+      if (element.textContent?.includes('Working...')) {
+        this.setupElementMonitoring(element);
+        return;
+      }
+    }
+
+    // Strategy 3: CSS selector targeting the working text and find parent with opacity
+    const workingElements = document.querySelectorAll('p.text-sm');
     for (const element of workingElements) {
       if (element.textContent?.trim() === 'Working...') {
-        // Return the parent container that has the opacity style
         let container = element.parentElement;
         while (container && !container.style.opacity) {
           container = container.parentElement;
         }
-        return container;
+        if (container) {
+          this.setupElementMonitoring(container);
+          return;
+        }
       }
     }
-
-    // Strategy 3: Look for elements with opacity styles that contain "Working..." text
-    const elementsWithOpacity = rootElement.querySelectorAll('[style*="opacity"]');
-    for (const element of elementsWithOpacity) {
-      if (element.textContent?.includes('Working...')) {
-        return element;
-      }
-    }
-
-    return null;
   }
 
-  checkWorkingElementState(element) {
-    if (!element || !element.style) return;
+  setupElementMonitoring(element) {
+    if (this.workingElement === element) return; // Already monitoring this element
+    
+    this.workingElement = element;
+    this.lastWorkingOpacity = element.style.opacity;
+    
+    console.log('🎯 Found Working element, current opacity:', this.lastWorkingOpacity);
 
-    // Extract opacity value from style attribute
-    const opacityMatch = element.style.opacity;
-    const isCurrentlyWorking = opacityMatch === '1' || opacityMatch === '1.0';
-    const isCurrentlyFinished = opacityMatch === '0' || opacityMatch === '0.0';
-
-    // Only process if we have a clear state
-    if (!isCurrentlyWorking && !isCurrentlyFinished) return;
-
-    // Debounce rapid state changes
-    if (this.workingState.debounceTimeout) {
-      clearTimeout(this.workingState.debounceTimeout);
+    // Set up MutationObserver specifically for this element
+    if (this.workingElementObserver) {
+      this.workingElementObserver.disconnect();
     }
 
-    this.workingState.debounceTimeout = setTimeout(() => {
-      this.processWorkingStateChange(isCurrentlyWorking, isCurrentlyFinished);
-    }, 100);
+    this.workingElementObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+          this.checkOpacityTransition(mutation.target);
+        }
+      });
+    });
+
+    this.workingElementObserver.observe(element, {
+      attributes: true,
+      attributeFilter: ['style']
+    });
   }
 
-  processWorkingStateChange(isWorking, isFinished) {
-    const previousState = this.workingState.isWorking;
-    const now = Date.now();
-
-    if (isWorking && !previousState) {
-      // Lovable started working
-      this.workingState.isWorking = true;
-      this.workingState.wasWorkingBeforeFinish = true;
-      this.workingState.lastStateChange = now;
-      
-      if (this.verboseLogging) {
-        console.log('🔄 Lovable started working...');
-      }
-    } else if (isFinished && previousState && this.workingState.wasWorkingBeforeFinish) {
-      // Lovable finished working (proper sequence: working → finished)
-      this.workingState.isWorking = false;
-      this.workingState.lastStateChange = now;
-      
-      if (this.verboseLogging) {
-        console.log('✅ Lovable finished working - triggering notification');
-      }
-      
+  checkOpacityTransition(element) {
+    const currentOpacity = element.style.opacity;
+    
+    // Only process if opacity actually changed
+    if (currentOpacity === this.lastWorkingOpacity) return;
+    
+    console.log(`🔍 Opacity transition: ${this.lastWorkingOpacity} → ${currentOpacity}`);
+    
+    // Check for 1 → 0 transition (working finished)
+    if (this.lastWorkingOpacity === '1' && currentOpacity === '0') {
+      console.log('✅ Detected Working → Finished transition, showing notification');
       this.onLovableResponseComplete();
-      
-      // Reset state for next cycle
-      this.workingState.wasWorkingBeforeFinish = false;
     }
+    
+    // Update last known state
+    this.lastWorkingOpacity = currentOpacity;
   }
 
   onLovableResponseComplete() {
