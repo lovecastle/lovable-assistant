@@ -54,35 +54,159 @@ class SimpleConversationCapture {
   }
 
   findChatContainer() {
-    const selectors = [
-      'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
-      'div[class*="overflow-y-auto"][class*="h-full"]',
-      'main div div div div.overflow-y-auto'
-    ];
+    // Try the specific XPath first for exact matching
+    try {
+      const xpathResult = document.evaluate(
+        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]/div[1]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      
+      if (xpathResult.singleNodeValue) {
+        if (this.verboseLogging) {
+          console.log('✅ Found chat container using XPath');
+        }
+        return xpathResult.singleNodeValue;
+      }
+    } catch (e) {
+      if (this.verboseLogging) {
+        console.log('⚠️ XPath evaluation failed:', e);
+      }
+    }
 
-    for (const selector of selectors) {
-      const containers = document.querySelectorAll(selector);
-      for (const container of containers) {
-        if (container.querySelector('.ChatMessageContainer[data-message-id]')) {
+    // Try to find by message containers (more resilient to structure changes)
+    const messageContainers = document.querySelectorAll('[data-message-id^="umsg_"], [data-message-id^="aimsg_"], .ChatMessageContainer[data-message-id]');
+    if (messageContainers.length > 0) {
+      // Find common scrollable parent
+      let container = messageContainers[0];
+      let scrollableParent = null;
+      
+      // Traverse up to find scrollable container
+      while (container && container.parentElement) {
+        const style = window.getComputedStyle(container.parentElement);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          scrollableParent = container.parentElement;
+          break;
+        }
+        container = container.parentElement;
+      }
+      
+      if (scrollableParent) {
+        if (this.verboseLogging) {
+          console.log('✅ Found chat container via message containers');
+        }
+        return scrollableParent;
+      }
+      
+      // Find closest common parent for all message containers
+      if (messageContainers.length > 1) {
+        const parent = this.findCommonAncestor(Array.from(messageContainers));
+        if (parent) {
           if (this.verboseLogging) {
-            console.log('✅ Found chat container');
+            console.log('✅ Found chat container via common ancestor');
           }
-          return container;
+          return parent;
         }
       }
     }
 
-    // Fallback: find any container with ChatMessageContainer children
-    const messageContainers = document.querySelectorAll('.ChatMessageContainer[data-message-id]');
-    if (messageContainers.length > 0) {
-      let container = messageContainers[0].parentElement;
-      while (container && !container.matches('div[class*="overflow-y-auto"]')) {
-        container = container.parentElement;
+    // Legacy and extended selectors as fallback
+    const selectors = [
+      'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
+      'div[class*="overflow-y-auto"][class*="h-full"]',
+      'main div div div div.overflow-y-auto',
+      // New selectors based on observed structure
+      'div[style*="overflow-anchor"]',
+      'div[style*="visibility: visible"]',
+      'main div[class*="flex"] div[class*="overflow"]',
+      'div[style*="overflow"]',
+      '.group-container > div'
+    ];
+
+    for (const selector of selectors) {
+      try {
+        const containers = document.querySelectorAll(selector);
+        for (const container of containers) {
+          const hasMessages = container.querySelector('[data-message-id^="umsg_"]') || 
+                              container.querySelector('[data-message-id^="aimsg_"]') ||
+                              container.querySelector('.ChatMessageContainer[data-message-id]');
+          
+          if (hasMessages) {
+            if (this.verboseLogging) {
+              console.log(`✅ Found chat container using selector: ${selector}`);
+            }
+            return container;
+          }
+        }
+      } catch (e) {
+        if (this.verboseLogging) {
+          console.log(`⚠️ Error with selector ${selector}:`, e);
+        }
       }
-      return container || document.body;
     }
 
-    return null;
+    // Deep DOM scan as last resort
+    if (this.verboseLogging) {
+      console.log('⚠️ Using deep DOM scan to find chat container');
+    }
+    return this.findContainerDeepScan();
+  }
+  
+  // Helper method for deep scanning
+  findContainerDeepScan() {
+    // Find any element containing message IDs
+    const allElements = document.querySelectorAll('*');
+    const potentialContainers = [];
+    
+    for (const el of allElements) {
+      if (el.querySelectorAll('[data-message-id]').length > 1) {
+        potentialContainers.push({
+          element: el,
+          messageCount: el.querySelectorAll('[data-message-id]').length,
+          isScrollable: this.isScrollable(el)
+        });
+      }
+    }
+    
+    // Sort by most likely (scrollable with most messages)
+    potentialContainers.sort((a, b) => {
+      // Prioritize scrollable elements
+      if (a.isScrollable && !b.isScrollable) return -1;
+      if (!a.isScrollable && b.isScrollable) return 1;
+      // Then by message count
+      return b.messageCount - a.messageCount;
+    });
+    
+    return potentialContainers.length > 0 ? potentialContainers[0].element : document.body;
+  }
+  
+  isScrollable(element) {
+    const style = window.getComputedStyle(element);
+    return style.overflowY === 'scroll' || 
+           style.overflowY === 'auto' || 
+           element.scrollHeight > element.clientHeight;
+  }
+  
+  findCommonAncestor(elements) {
+    if (!elements.length) return null;
+    if (elements.length === 1) return elements[0].parentElement;
+    
+    let ancestor = elements[0].parentElement;
+    while (ancestor) {
+      let isCommon = true;
+      for (let i = 1; i < elements.length; i++) {
+        if (!ancestor.contains(elements[i])) {
+          isCommon = false;
+          break;
+        }
+      }
+      if (isCommon) return ancestor;
+      ancestor = ancestor.parentElement;
+    }
+    
+    return document.body;
   }
 
   setupObserver(container) {
@@ -115,13 +239,23 @@ class SimpleConversationCapture {
       console.log('🔍 Scanning for new message groups...');
     }
 
-    // Find all Lovable messages (aimsg_*) in DOM order
-    const lovableMessages = Array.from(document.querySelectorAll('[data-message-id^="aimsg_"]'))
+    // Find all message elements in DOM order
+    // Include both prefix style IDs (aimsg_*) and UUID style IDs
+    const allMessages = Array.from(document.querySelectorAll('[data-message-id]'))
       .sort((a, b) => {
         const rectA = a.getBoundingClientRect();
         const rectB = b.getBoundingClientRect();
         return rectA.top - rectB.top;
       });
+      
+    // Separate user and lovable messages
+    const lovableMessages = allMessages.filter(el => {
+      const messageId = el.getAttribute('data-message-id');
+      // Lovable message can be identified by aimsg_ prefix or by checking for prose content
+      return messageId.startsWith('aimsg_') || 
+             (el.querySelector('.prose, .prose-markdown, [class*="prose"]') !== null && 
+              !isUuidUserMessage(el));
+    });
 
     if (this.verboseLogging) {
       console.log(`📊 Found ${lovableMessages.length} Lovable messages in DOM`);
@@ -158,7 +292,7 @@ class SimpleConversationCapture {
       }
 
       // Find the user message that comes before this Lovable response
-      const userElement = this.findPrecedingUserMessage(lovableElement);
+      const userElement = this.findPrecedingUserMessage(lovableElement, allMessages);
       if (!userElement) {
         if (this.verboseLogging) {
           console.log(`⚠️ No user message found before Lovable: ${lovableId}`);
@@ -219,24 +353,65 @@ class SimpleConversationCapture {
       console.log(`📊 Found ${newGroupsFound} new message groups`);
     }
   }
+  
+  // Helper function to determine if an element with UUID-style message ID is a user message
+  isUuidUserMessage(element) {
+    // Check if it has the user message styling
+    const hasUserStyling = element.querySelector('.bg-secondary') !== null;
+    
+    // Check if it's positioned on the right side of the chat (user messages typically are)
+    const hasRightAlignment = element.querySelector('.items-end') !== null;
+    
+    // Ensure it doesn't have AI-specific elements
+    const hasAiElements = element.querySelector('.lovable-logo_svg__b, .lovable-logo, svg[fill="currentColor"][viewBox="0 0 23 24"]') !== null;
+    
+    return hasUserStyling && hasRightAlignment && !hasAiElements;
+  }
 
-  findPrecedingUserMessage(lovableElement) {
-    // Get all message containers in DOM order
-    const allMessages = Array.from(document.querySelectorAll('.ChatMessageContainer[data-message-id]'))
-      .sort((a, b) => {
+  findPrecedingUserMessage(lovableElement, allMessages = null) {
+    // If allMessages is not provided, get all message containers in DOM order
+    if (!allMessages) {
+      allMessages = Array.from(document.querySelectorAll(
+        '.ChatMessageContainer[data-message-id], [data-message-id^="umsg_"], [data-message-id^="aimsg_"], [data-message-id]'
+      )).sort((a, b) => {
         const rectA = a.getBoundingClientRect();
         const rectB = b.getBoundingClientRect();
         return rectA.top - rectB.top;
       });
+    }
 
     // Find the index of the Lovable message
     const lovableIndex = allMessages.indexOf(lovableElement);
     if (lovableIndex <= 0) {
       return null;
     }
+    
+    // Look for a suitable user message before the lovable message
+    for (let i = lovableIndex - 1; i >= 0; i--) {
+      const candidateElement = allMessages[i];
+      const messageId = candidateElement.getAttribute('data-message-id');
+      
+      // Check if it's a user message based on ID prefix or visual characteristics
+      if (messageId.startsWith('umsg_') || this.isUuidUserMessage(candidateElement)) {
+        return candidateElement;
+      }
+    }
 
-    // Return the message immediately before it (should be user message)
+    // If we can't find a clear user message, return the message immediately before (fallback)
     return allMessages[lovableIndex - 1];
+  }
+  
+  isUuidUserMessage(element) {
+    // Check if it has the user message styling
+    const hasUserStyling = element.querySelector('.bg-secondary') !== null;
+    
+    // Check if it's positioned on the right side of the chat (user messages typically are)
+    const hasRightAlignment = element.querySelector('.items-end') !== null;
+    
+    // Ensure it doesn't have AI-specific elements
+    const hasAiElements = element.querySelector('.lovable-logo_svg__b, .lovable-logo, svg[fill="currentColor"][viewBox="0 0 23 24"]') !== null;
+    
+    return hasUserStyling && hasRightAlignment && !hasAiElements;
   }
 
   extractContent(element) {
@@ -303,7 +478,34 @@ class SimpleConversationCapture {
 
   extractUserContentAsHTML(element) {
     // For user messages, get the text content and convert line breaks to <br> tags
-    const contentDiv = element.querySelector('.overflow-wrap-anywhere, .whitespace-pre-wrap');
+    // Support both classic and UUID-style user messages
+    
+    // First try to find the message content div with common selectors
+    const contentSelectors = [
+      '.overflow-wrap-anywhere', 
+      '.whitespace-pre-wrap',
+      '.overflow-wrap-anywhere.overflow-auto.whitespace-pre-wrap'
+    ];
+    
+    let contentDiv = null;
+    for (const selector of contentSelectors) {
+      const found = element.querySelector(selector);
+      if (found) {
+        contentDiv = found;
+        break;
+      }
+    }
+    
+    if (!contentDiv) {
+      // Fallback: look for div elements containing text
+      const divs = element.querySelectorAll('div');
+      for (const div of divs) {
+        if (div.textContent.trim().length > 0 && !div.querySelector('div, button, svg')) {
+          contentDiv = div;
+          break;
+        }
+      }
+    }
     
     if (contentDiv) {
       // Get the text content preserving line breaks
@@ -424,22 +626,21 @@ class SimpleConversationCapture {
   }
 
   shouldIgnoreGroup(userContent, lovableContent) {
-    // Rule 1: Ignore if user prompt starts with error report
-    if (userContent.trim().startsWith('For the code present, I get the error below')) {
-      if (this.verboseLogging) {
-        console.log('🚫 Ignoring: User message starts with error report');
+    // Rule 1: Ignore if user prompt starts with specific patterns
+    const ignorePrefixes = [
+      'For the code present, I get the error below',
+      'Refactor',
+      'Implement the plan'
+    ];
+    
+    const userContentTrimmed = userContent.trim();
+    for (const prefix of ignorePrefixes) {
+      if (userContentTrimmed.startsWith(prefix)) {
+        if (this.verboseLogging) {
+          console.log(`🚫 Ignoring: User message starts with "${prefix}"`);
+        }
+        return true;
       }
-      return true;
-    }
-
-    // Rule 2: Ignore if Lovable response starts with refactoring
-    // Be more specific - only check the actual response text, not button text
-    const lovableMainContent = lovableContent.trim();
-    if (userContent.trim().startsWith('Refactor')) {
-      if (this.verboseLogging) {
-        console.log('🚫 Ignoring: User message starts with refactoring');
-      }
-      return true;
     }
 
     return false;

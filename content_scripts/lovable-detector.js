@@ -2424,42 +2424,161 @@ class ComprehensiveMessageScraper {
   }
 
   findChatContainer() {
-    // Look for Lovable's chat scroll container
-    const possibleSelectors = [
-      // Main chat container with scrolling
-      'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
-      // Alternative containers that might contain messages
-      'div[class*="overflow-y-auto"][class*="h-full"]',
-      // Fallback: any scrollable container with ChatMessageContainer children
-      'div[class*="overflow-y-auto"]'
-    ];
-    
-    for (const selector of possibleSelectors) {
-      const containers = document.querySelectorAll(selector);
-      for (const container of containers) {
-        // Check if this container has ChatMessageContainer children
-        const messages = container.querySelectorAll('.ChatMessageContainer[data-message-id]');
-        if (messages.length > 0) {
-          return container;
+    // Try the specific XPath first for exact matching
+    try {
+      const xpathResult = document.evaluate(
+        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]/div[1]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      
+      if (xpathResult.singleNodeValue) {
+        if (this.verboseLogging) {
+          console.log('✅ Found chat container using XPath');
         }
+        return xpathResult.singleNodeValue;
+      }
+    } catch (e) {
+      if (this.verboseLogging) {
+        console.log('⚠️ XPath evaluation failed:', e);
       }
     }
-    
-    // Final fallback: find any container that has ChatMessageContainer descendants
-    const messageContainers = document.querySelectorAll('.ChatMessageContainer[data-message-id]');
+
+    // Try to find by message containers (more resilient to structure changes)
+    const messageContainers = document.querySelectorAll('[data-message-id^="umsg_"], [data-message-id^="aimsg_"], .ChatMessageContainer[data-message-id]');
     if (messageContainers.length > 0) {
-      // Find the common scrollable ancestor
+      // Find common scrollable parent
       let container = messageContainers[0];
+      let scrollableParent = null;
+      
+      // Traverse up to find scrollable container
       while (container && container.parentElement) {
-        const style = window.getComputedStyle(container);
+        const style = window.getComputedStyle(container.parentElement);
         if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-          return container;
+          scrollableParent = container.parentElement;
+          break;
         }
         container = container.parentElement;
       }
+      
+      if (scrollableParent) {
+        if (this.verboseLogging) {
+          console.log('✅ Found chat container via message containers');
+        }
+        return scrollableParent;
+      }
+      
+      // Find closest common parent for all message containers
+      if (messageContainers.length > 1) {
+        const parent = this.findCommonAncestor(Array.from(messageContainers));
+        if (parent) {
+          if (this.verboseLogging) {
+            console.log('✅ Found chat container via common ancestor');
+          }
+          return parent;
+        }
+      }
     }
     
-    return null;
+    // Look for Lovable's chat scroll container (legacy and extended selectors)
+    const possibleSelectors = [
+      // Legacy selectors
+      'div.h-full.w-full.overflow-y-auto.scrollbar-thin.scrollbar-track-transparent.scrollbar-thumb-muted-foreground',
+      'div[class*="overflow-y-auto"][class*="h-full"]',
+      'div[class*="overflow-y-auto"]',
+      // New selectors based on observed structure
+      'div[style*="overflow-anchor"]',
+      'div[style*="visibility: visible"]',
+      'main div[class*="flex"] div[class*="overflow"]',
+      'div[style*="overflow"]',
+      '.group-container > div'
+    ];
+    
+    for (const selector of possibleSelectors) {
+      try {
+        const containers = document.querySelectorAll(selector);
+        for (const container of containers) {
+          const hasMessages = container.querySelector('[data-message-id^="umsg_"]') || 
+                              container.querySelector('[data-message-id^="aimsg_"]') ||
+                              container.querySelector('.ChatMessageContainer[data-message-id]');
+          
+          if (hasMessages) {
+            if (this.verboseLogging) {
+              console.log(`✅ Found chat container using selector: ${selector}`);
+            }
+            return container;
+          }
+        }
+      } catch (e) {
+        if (this.verboseLogging) {
+          console.log(`⚠️ Error with selector ${selector}:`, e);
+        }
+      }
+    }
+
+    // Deep DOM scan as last resort
+    return this.findContainerDeepScan();
+  }
+  
+  // Helper method for deep scanning
+  findContainerDeepScan() {
+    if (this.verboseLogging) {
+      console.log('⚠️ Using deep DOM scan to find chat container');
+    }
+    
+    // Find any element containing message IDs
+    const allElements = document.querySelectorAll('*');
+    const potentialContainers = [];
+    
+    for (const el of allElements) {
+      if (el.querySelectorAll('[data-message-id]').length > 1) {
+        potentialContainers.push({
+          element: el,
+          messageCount: el.querySelectorAll('[data-message-id]').length,
+          isScrollable: this.isScrollable(el)
+        });
+      }
+    }
+    
+    // Sort by most likely (scrollable with most messages)
+    potentialContainers.sort((a, b) => {
+      // Prioritize scrollable elements
+      if (a.isScrollable && !b.isScrollable) return -1;
+      if (!a.isScrollable && b.isScrollable) return 1;
+      // Then by message count
+      return b.messageCount - a.messageCount;
+    });
+    
+    return potentialContainers.length > 0 ? potentialContainers[0].element : document.body;
+  }
+  
+  isScrollable(element) {
+    const style = window.getComputedStyle(element);
+    return style.overflowY === 'scroll' || 
+           style.overflowY === 'auto' || 
+           element.scrollHeight > element.clientHeight;
+  }
+  
+  findCommonAncestor(elements) {
+    if (!elements.length) return null;
+    if (elements.length === 1) return elements[0].parentElement;
+    
+    let ancestor = elements[0].parentElement;
+    while (ancestor) {
+      let isCommon = true;
+      for (let i = 1; i < elements.length; i++) {
+        if (!ancestor.contains(elements[i])) {
+          isCommon = false;
+          break;
+        }
+      }
+      if (isCommon) return ancestor;
+      ancestor = ancestor.parentElement;
+    }
+    
+    return document.body;
   }
 
   async recordInitialState() {
