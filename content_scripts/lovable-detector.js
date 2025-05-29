@@ -24,7 +24,7 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
-    this.setupLovableResponseMonitoring();
+    // The notification monitoring system has been removed
   }
 
   detectLovablePage() {
@@ -728,10 +728,7 @@ class LovableDetector {
       this.assistantDialog.remove();
     }
     
-    if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
-      this.monitoringInterval = null;
-    }
+    // The notification monitoring system has been removed
   }
 
   setupWelcomePageEvents() {
@@ -991,33 +988,6 @@ class LovableDetector {
             <strong>💡 How it works:</strong> This feature automatically scrolls up through your chat history, 
             capturing messages as they load. It handles Lovable's lazy loading and will continue running 
             even if you switch browser tabs. The process may take a few minutes for long conversations.
-          </div>
-        </div>
-        
-        <!-- Notifications -->
-        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-            🔔 Notifications
-          </h3>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <label style="color: #4a5568; font-size: 14px;">Show notification when Lovable finishes response</label>
-            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
-              <input type="checkbox" id="notification-toggle" style="opacity: 0; width: 0; height: 0;">
-              <span class="toggle-slider" style="
-                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-                background-color: #ccc; transition: .4s; border-radius: 24px;
-              "></span>
-            </label>
-          </div>
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <label style="color: #4a5568; font-size: 14px;">Auto switch to Lovable tab after response</label>
-            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
-              <input type="checkbox" id="auto-switch-toggle" style="opacity: 0; width: 0; height: 0;">
-              <span class="toggle-slider" style="
-                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-                background-color: #ccc; transition: .4s; border-radius: 24px;
-              "></span>
-            </label>
           </div>
         </div>
         
@@ -1806,8 +1776,6 @@ class LovableDetector {
     }
 
     // Toggle switches
-    this.setupToggleSwitch('notification-toggle', 'lovable-notifications');
-    this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
     this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
 
     // Settings buttons
@@ -1877,8 +1845,6 @@ class LovableDetector {
   loadUtilitiesSettings() {
     // Load saved settings from localStorage
     const settings = [
-      { id: 'notification-toggle', key: 'lovable-notifications' },
-      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
       { id: 'auto-expand-toggle', key: 'lovable-auto-expand' }
     ];
 
@@ -2100,134 +2066,14 @@ class LovableDetector {
     textarea.style.height = newHeight + 'px';
   }
 
-  setupLovableResponseMonitoring() {
-    // Track element existence state
-    this.workingElementExists = false;
-    this.monitoringInterval = null;
+  // The notification system has been removed as it's no longer needed
+  // Any functionality that previously depended on notifications has been removed
 
-    // Check for working element existence every 5 seconds
-    this.monitoringInterval = setInterval(() => {
-      this.checkWorkingElementExistence();
-    }, 5000);
-
-    // Initial check
-    this.checkWorkingElementExistence();
-  }
-
-  checkWorkingElementExistence() {
-    const workingElement = this.findWorkingElement();
-    const currentlyExists = !!workingElement;
-    
-    // Check for state transitions
-    if (!this.workingElementExists && currentlyExists) {
-      // Element appeared - Lovable started working
-      this.workingElementExists = true;
-      console.log('🔄 Lovable started working...');
-    } else if (this.workingElementExists && !currentlyExists) {
-      // Element disappeared - Lovable finished working
-      this.workingElementExists = false;
-      console.log('✅ Working → Finished transition, showing notification');
-      this.onLovableResponseComplete();
-    }
-    // No console output for silent checks when state doesn't change
-  }
-
-  findWorkingElement() {
-    // Strategy 1: Try XPath (most precise)
-    try {
-      const xpathResult = document.evaluate(
-        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]/div[3]',
-        document,
-        null,
-        XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null
-      );
-      if (xpathResult.singleNodeValue && xpathResult.singleNodeValue.textContent?.includes('Working...')) {
-        return xpathResult.singleNodeValue;
-      }
-    } catch (e) {
-      // XPath failed, continue with other strategies
-    }
-
-    // Strategy 2: Look for elements containing "Working..." text
-    const workingElements = document.querySelectorAll('p.text-sm');
-    for (const element of workingElements) {
-      if (element.textContent?.trim() === 'Working...') {
-        return element.closest('[style*="opacity"]') || element;
-      }
-    }
-
-    // Strategy 3: Search more broadly for "Working..." text
-    const allElements = document.querySelectorAll('*');
-    for (const element of allElements) {
-      if (element.textContent?.includes('Working...') && 
-          element.textContent.trim().length < 50) { // Avoid large containers
-        return element;
-      }
-    }
-
-    return null;
-  }
-
-  onLovableResponseComplete() {
-    // Show notification if enabled
-    if (localStorage.getItem('lovable-notifications') === 'true') {
-      this.showLovableCompletionNotification();
-    }
-    
-    // Auto-switch to tab if enabled
-    if (localStorage.getItem('lovable-auto-switch') === 'true') {
-      this.switchToLovableTab();
-    }
-  }
-
-  showLovableCompletionNotification() {
-    // Check if browser supports notifications
-    if (!('Notification' in window)) return;
-    
-    // Request permission if needed
-    if (Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          this.createNotification();
-        }
-      });
-    } else if (Notification.permission === 'granted') {
-      this.createNotification();
-    }
-  }
-
-  createNotification() {
-    const notification = new Notification('Lovable Response Complete', {
-      body: 'Your Lovable.dev assistant has finished responding',
-      icon: '/favicon.ico',
-      badge: '/favicon.ico'
-    });
-    
-    // Auto-close after 5 seconds
-    setTimeout(() => notification.close(), 5000);
-    
-    // Click to focus tab
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
-  }
-
-  switchToLovableTab() {
-    // Focus the current window/tab
-    window.focus();
-    
-    // Scroll to top to ensure visibility
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
 
   resetUtilitiesSettings() {
     if (!confirm('Are you sure you want to reset all utility settings? This will disable all features.')) return;
     
     const settings = [
-      'lovable-notifications',
-      'lovable-auto-switch', 
       'lovable-auto-expand'
     ];
     
@@ -2241,8 +2087,6 @@ class LovableDetector {
 
   exportUtilitiesSettings() {
     const settings = {
-      notifications: localStorage.getItem('lovable-notifications') === 'true',
-      autoSwitch: localStorage.getItem('lovable-auto-switch') === 'true',
       autoExpand: localStorage.getItem('lovable-auto-expand') === 'true',
       exportDate: new Date().toISOString(),
       projectId: this.projectId
