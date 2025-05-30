@@ -18,13 +18,17 @@ class LovableDetector {
     this.projectId = null;
     this.assistantDialog = null;
     this.verboseLogging = false; // Control verbose console logging
-    this.init();
+    
+    try {
+      this.init();
+    } catch (error) {
+      console.error('Error during LovableDetector initialization:', error);
+    }
   }
 
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
-    // The notification monitoring system has been removed
   }
 
   detectLovablePage() {
@@ -41,16 +45,26 @@ class LovableDetector {
         this.showReadyNotification();
       }, 100);
       
-      chrome.runtime.sendMessage({
-        action: 'lovablePageDetected',
-        data: {
-          projectId: this.projectId,
-          url: url,
-          timestamp: new Date().toISOString()
-        }
-      }).catch(error => {
-        console.log('Could not send message to background:', error);
-      });
+      // Safely send message to background
+      if (chrome.runtime?.id) {
+        chrome.runtime.sendMessage({
+          action: 'lovablePageDetected',
+          data: {
+            projectId: this.projectId,
+            url: url,
+            timestamp: new Date().toISOString()
+          }
+        }).catch(error => {
+          if (!error.message?.includes('Extension context invalidated')) {
+            console.log('Could not send message to background:', error);
+          }
+        });
+      }
+      
+      // Initialize working status monitor after page detection
+      setTimeout(() => {
+        this.initializeWorkingStatusMonitor();
+      }, 1000);
     }
   }
 
@@ -991,6 +1005,34 @@ class LovableDetector {
           </div>
         </div>
         
+        <!-- Notification Settings -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            🔔 Notification Settings
+          </h3>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="color: #4a5568; font-size: 14px;">Enable desktop notifications when Lovable completes tasks</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="notifications-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+          <div style="
+            background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
+            padding: 10px; font-size: 13px; color: #0369a1;
+          ">
+            <strong>📌 How it works:</strong> When you're working on another tab, you'll receive a desktop notification 
+            when Lovable finishes a task that took 3 seconds or more. The notification will show: 
+            "Lovable has done the task. Return to the tab!"
+          </div>
+          <div id="notification-status" style="
+            margin-top: 10px; font-size: 12px; color: #4a5568; display: none;
+          "></div>
+        </div>
+        
         <!-- Input Enhancement -->
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
@@ -1777,6 +1819,7 @@ class LovableDetector {
 
     // Toggle switches
     this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
+    this.setupNotificationToggle();
 
     // Settings buttons
     const resetBtn = document.getElementById('reset-utilities-btn');
@@ -1853,6 +1896,92 @@ class LovableDetector {
       if (toggle) {
         const saved = localStorage.getItem(key);
         toggle.checked = saved === 'true';
+      }
+    });
+    
+    // Load notification settings
+    this.loadNotificationSettings();
+  }
+  
+  async loadNotificationSettings() {
+    try {
+      // Check if extension context is still valid
+      if (!chrome.runtime?.id) {
+        console.warn('Extension context lost - page needs refresh');
+        return;
+      }
+      
+      const response = await chrome.runtime.sendMessage({
+        action: 'getNotificationSettings'
+      });
+      
+      if (response?.success) {
+        const toggle = document.getElementById('notifications-toggle');
+        if (toggle) {
+          toggle.checked = response.settings.enabled;
+        }
+      }
+    } catch (error) {
+      if (error.message?.includes('Extension context invalidated')) {
+        console.warn('Extension was reloaded - notification settings unavailable until page refresh');
+      } else {
+        console.error('Failed to load notification settings:', error);
+      }
+    }
+  }
+  
+  setupNotificationToggle() {
+    const toggle = document.getElementById('notifications-toggle');
+    const statusDiv = document.getElementById('notification-status');
+    
+    if (!toggle) return;
+    
+    toggle.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+      
+      try {
+        // Check if extension context is still valid
+        if (!chrome.runtime?.id) {
+          throw new Error('Extension context lost - please refresh the page');
+        }
+        
+        // Update settings in background
+        const response = await chrome.runtime.sendMessage({
+          action: 'updateNotificationSettings',
+          settings: { enabled }
+        });
+        
+        if (response?.success) {
+          // Show status message
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.color = '#48bb78';
+            statusDiv.textContent = enabled ? 
+              '✅ Notifications enabled! You\'ll be notified when Lovable completes tasks.' : 
+              '🔕 Notifications disabled.';
+            
+            setTimeout(() => {
+              statusDiv.style.display = 'none';
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update notification settings:', error);
+        
+        // Revert toggle on error
+        toggle.checked = !enabled;
+        
+        if (statusDiv) {
+          statusDiv.style.display = 'block';
+          statusDiv.style.color = '#f56565';
+          statusDiv.textContent = error.message?.includes('Extension context') ?
+            '❌ Extension was reloaded. Please refresh the page.' :
+            '❌ Failed to update notification settings.';
+          
+          setTimeout(() => {
+            statusDiv.style.display = 'none';
+          }, 3000);
+        }
       }
     });
   }
@@ -2147,6 +2276,112 @@ class LovableDetector {
       console.error('❌ Chrome runtime message error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // ===========================
+  // WORKING STATUS MONITORING SYSTEM
+  // ===========================
+  // Monitors Lovable's working status and shows notifications
+  
+  initializeWorkingStatusMonitor() {
+    // Check if extension context is valid
+    if (!chrome.runtime?.id) {
+      console.warn('Extension context not available - skipping working status monitor');
+      return;
+    }
+    
+    // Set up message listener for status requests from service worker
+    try {
+      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === 'getWorkingStatus') {
+          const isWorking = this.detectWorkingStatus();
+          console.log(`🔍 [Content] Working status check: ${isWorking ? '✅ WORKING' : '⏸️ IDLE'}`);
+          sendResponse({ success: true, isWorking });
+          return true;
+        }
+      });
+      
+      // Notify service worker to start monitoring this tab
+      chrome.runtime.sendMessage({
+        action: 'startWorkingStatusMonitor'
+      }).then(response => {
+        if (response?.success) {
+          console.log('🔍 Working status monitor initialized (service worker mode)');
+        }
+      }).catch(error => {
+        if (error.message?.includes('Extension context invalidated')) {
+          console.warn('Extension was reloaded - working status monitor unavailable until page refresh');
+        } else {
+          console.error('Failed to initialize working status monitor:', error);
+        }
+      });
+    } catch (error) {
+      console.warn('Could not set up working status monitor:', error);
+    }
+  }
+  
+  detectWorkingStatus() {
+    const detectionLog = [];
+    
+    // Check for stop button using multiple strategies
+    // Strategy 1: Look for buttons with the specific stop icon SVG path
+    const stopButtonPath = 'M360-330h240q12.75 0 21.38-8.63Q630-347.25 630-360v-240q0-12.75-8.62-21.38Q612.75-630 600-630H360q-12.75 0-21.37 8.62Q330-612.75 330-600v240q0 12.75 8.63 21.37Q347.25-330 360-330';
+    const pathElements = document.querySelectorAll(`path[d*="${stopButtonPath.substring(0, 50)}"]`);
+    
+    for (const path of pathElements) {
+      // Find the parent button
+      const button = path.closest('button');
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          detectionLog.push(`✅ Found visible stop button (by SVG path)`);
+          console.log(`🎯 [Content] Detection details:`, detectionLog);
+          return true;
+        }
+      }
+    }
+    
+    // Strategy 2: Look for buttons in the chat form area with square icon
+    const formButtons = document.querySelectorAll('form button svg[viewBox*="-960 960 960"]');
+    for (const svg of formButtons) {
+      const button = svg.closest('button');
+      if (button) {
+        // Check if it's a small square button (typical stop button size)
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 && rect.width <= 30 && rect.height <= 30) {
+          // Check if the path contains the stop icon pattern
+          const path = svg.querySelector('path');
+          if (path && path.getAttribute('d')?.includes('M360-330')) {
+            detectionLog.push(`✅ Found visible stop button (by form location)`);
+            console.log(`🎯 [Content] Detection details:`, detectionLog);
+            return true;
+          }
+        }
+      }
+    }
+    
+    // Strategy 3: XPath-based detection for the specific location
+    const xpathResult = document.evaluate(
+      '//form//button[contains(@class, "h-6 w-6") and .//svg[contains(@viewBox, "-960 960 960")]]',
+      document,
+      null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+      null
+    );
+    
+    for (let i = 0; i < xpathResult.snapshotLength; i++) {
+      const button = xpathResult.snapshotItem(i);
+      const rect = button.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        detectionLog.push(`✅ Found visible stop button (by XPath)`);
+        console.log(`🎯 [Content] Detection details:`, detectionLog);
+        return true;
+      }
+    }
+    
+    detectionLog.push('❌ No stop buttons found');
+    console.log(`🎯 [Content] Detection details:`, detectionLog);
+    return false;
   }
 }
 

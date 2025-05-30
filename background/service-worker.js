@@ -59,6 +59,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'showNotification':
+      handleShowNotification(request.data).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'updateNotificationSettings':
+      handleUpdateNotificationSettings(request.settings).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'getNotificationSettings':
+      handleGetNotificationSettings().then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'startWorkingStatusMonitor':
+      handleStartWorkingStatusMonitor(sender.tab.id).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
+    case 'checkWorkingStatus':
+      // Content script will send current status
+      handleWorkingStatusUpdate(sender.tab.id, request.data).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -326,5 +357,224 @@ async function callClaudeAPI(apiKey, message, systemPrompt) {
   const data = await response.json();
   return data.content[0].text;
 }
+
+// Notification system functions
+async function handleShowNotification(data) {
+  try {
+    const settings = await chrome.storage.sync.get(['notificationsEnabled']);
+    
+    // Check if notifications are enabled
+    if (settings.notificationsEnabled === false) {
+      return { success: false, reason: 'Notifications disabled' };
+    }
+    
+    // Create notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('assets/icons/icon128.png'),
+      title: 'Lovable.dev Assistant',
+      message: data.message || 'Lovable has done the task. Return to the tab!',
+      priority: 2,
+      requireInteraction: false
+    }, (notificationId) => {
+      if (chrome.runtime.lastError) {
+        console.error('Notification error:', chrome.runtime.lastError);
+      } else {
+        console.log('Notification shown:', notificationId);
+      }
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to show notification:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleUpdateNotificationSettings(settings) {
+  try {
+    await chrome.storage.sync.set({
+      notificationsEnabled: settings.enabled !== false,
+      notificationThreshold: settings.threshold || 3000
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update notification settings:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetNotificationSettings() {
+  try {
+    const settings = await chrome.storage.sync.get([
+      'notificationsEnabled',
+      'notificationThreshold'
+    ]);
+    return {
+      success: true,
+      settings: {
+        enabled: settings.notificationsEnabled !== false,
+        threshold: settings.notificationThreshold || 3000
+      }
+    };
+  } catch (error) {
+    console.error('Failed to get notification settings:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Working status monitoring system
+const tabWorkingStatus = new Map(); // Track working status per tab
+
+async function handleStartWorkingStatusMonitor(tabId) {
+  try {
+    console.log(`🎬 [Tab ${tabId}] Initializing working status monitor...`);
+    
+    // Initialize monitoring for this tab
+    if (!tabWorkingStatus.has(tabId)) {
+      tabWorkingStatus.set(tabId, {
+        isWorking: false,
+        startTime: null,
+        hasNotified: false,
+        checkInterval: null
+      });
+      console.log(`📝 [Tab ${tabId}] Created new monitoring state`);
+    } else {
+      console.log(`♻️ [Tab ${tabId}] Reusing existing monitoring state`);
+    }
+    
+    // Start periodic status checks
+    startStatusChecking(tabId);
+    
+    console.log(`✅ [Tab ${tabId}] Working status monitor started successfully!`);
+    return { success: true };
+  } catch (error) {
+    console.error(`❌ [Tab ${tabId}] Failed to start working status monitor:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+function startStatusChecking(tabId) {
+  const status = tabWorkingStatus.get(tabId);
+  if (!status) return;
+  
+  // Clear any existing interval
+  if (status.checkInterval) {
+    clearInterval(status.checkInterval);
+  }
+  
+  // Set polling rate based on working status
+  const pollRate = status.isWorking ? 1000 : 3000;
+  
+  console.log(`📊 [Tab ${tabId}] Starting status checks every ${pollRate}ms (${status.isWorking ? 'WORKING' : 'IDLE'} mode)`);
+  
+  status.checkInterval = setInterval(async () => {
+    try {
+      console.log(`🔍 [Tab ${tabId}] Checking working status...`);
+      
+      // Request status from content script
+      const response = await chrome.tabs.sendMessage(tabId, {
+        action: 'getWorkingStatus'
+      });
+      
+      if (response && response.success) {
+        console.log(`📡 [Tab ${tabId}] Status response: ${response.isWorking ? '✅ WORKING' : '⏸️ IDLE'}`);
+        await handleWorkingStatusUpdate(tabId, { isWorking: response.isWorking });
+      }
+    } catch (error) {
+      // Tab might be closed or content script not ready
+      console.log(`❌ [Tab ${tabId}] Status check failed:`, error.message);
+      // Clean up if tab is gone
+      if (error.message.includes('No tab with id') || error.message.includes('Receiving end does not exist')) {
+        cleanupTab(tabId);
+      }
+    }
+  }, pollRate);
+}
+
+async function handleWorkingStatusUpdate(tabId, data) {
+  try {
+    const status = tabWorkingStatus.get(tabId);
+    if (!status) {
+      // Initialize if not exists
+      tabWorkingStatus.set(tabId, {
+        isWorking: false,
+        startTime: null,
+        hasNotified: false,
+        checkInterval: null
+      });
+      startStatusChecking(tabId);
+      return { success: true };
+    }
+    
+    const wasWorking = status.isWorking;
+    const isWorking = data.isWorking;
+    
+    if (isWorking && !wasWorking) {
+      // Just started working
+      status.isWorking = true;
+      status.startTime = Date.now();
+      status.hasNotified = false;
+      
+      console.log(`🚀 [Tab ${tabId}] STATE CHANGE: IDLE → WORKING`);
+      console.log(`⏱️ [Tab ${tabId}] Started at: ${new Date(status.startTime).toLocaleTimeString()}`);
+      
+      // Switch to faster polling
+      startStatusChecking(tabId);
+      
+    } else if (!isWorking && wasWorking) {
+      // Just finished working
+      const duration = Date.now() - status.startTime;
+      status.isWorking = false;
+      
+      console.log(`✅ [Tab ${tabId}] STATE CHANGE: WORKING → IDLE`);
+      console.log(`⏱️ [Tab ${tabId}] Duration: ${Math.round(duration / 1000)} seconds`);
+      console.log(`🔔 [Tab ${tabId}] Notification eligible: ${duration >= 3000 ? 'YES' : 'NO (too short)'}`);
+      
+      // Switch back to slower polling
+      startStatusChecking(tabId);
+      
+      // Check if we should notify
+      if (duration >= 3000 && !status.hasNotified) {
+        const settings = await chrome.storage.sync.get(['notificationsEnabled']);
+        console.log(`⚙️ [Tab ${tabId}] Notifications enabled: ${settings.notificationsEnabled !== false}`);
+        
+        if (settings.notificationsEnabled !== false) {
+          console.log(`📬 [Tab ${tabId}] Sending notification...`);
+          await handleShowNotification({
+            message: `Lovable has done the task. Return to the tab! (Completed in ${Math.round(duration / 1000)}s)`
+          });
+          status.hasNotified = true;
+          console.log(`✅ [Tab ${tabId}] Notification sent!`);
+        } else {
+          console.log(`🔕 [Tab ${tabId}] Notifications disabled - skipping`);
+        }
+      } else if (status.hasNotified) {
+        console.log(`ℹ️ [Tab ${tabId}] Already notified for this task`);
+      }
+    } else {
+      console.log(`🔄 [Tab ${tabId}] No state change (still ${isWorking ? 'WORKING' : 'IDLE'})`);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update working status:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function cleanupTab(tabId) {
+  const status = tabWorkingStatus.get(tabId);
+  if (status && status.checkInterval) {
+    clearInterval(status.checkInterval);
+  }
+  tabWorkingStatus.delete(tabId);
+  console.log(`Cleaned up monitoring for tab ${tabId}`);
+}
+
+// Clean up when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  cleanupTab(tabId);
+});
 
 console.log('Service worker initialized');
