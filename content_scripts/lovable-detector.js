@@ -2304,10 +2304,6 @@ class LovableDetector {
       // Notify service worker to start monitoring this tab
       chrome.runtime.sendMessage({
         action: 'startWorkingStatusMonitor'
-      }).then(response => {
-        if (response?.success) {
-          console.log('🔍 Working status monitor initialized (service worker mode)');
-        }
       }).catch(error => {
         if (error.message?.includes('Extension context invalidated')) {
           console.warn('Extension was reloaded - working status monitor unavailable until page refresh');
@@ -2321,8 +2317,6 @@ class LovableDetector {
   }
   
   detectWorkingStatus() {
-    const detectionLog = [];
-    
     // Check for stop button using multiple strategies
     // Strategy 1: Look for buttons with the specific stop icon SVG path
     const stopButtonPath = 'M360-330h240q12.75 0 21.38-8.63Q630-347.25 630-360v-240q0-12.75-8.62-21.38Q612.75-630 600-630H360q-12.75 0-21.37 8.62Q330-612.75 330-600v240q0 12.75 8.63 21.37Q347.25-330 360-330';
@@ -2334,8 +2328,6 @@ class LovableDetector {
       if (button) {
         const rect = button.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
-          detectionLog.push(`✅ Found visible stop button (by SVG path)`);
-          console.log(`🎯 [Content] Detection details:`, detectionLog);
           return true;
         }
       }
@@ -2352,8 +2344,6 @@ class LovableDetector {
           // Check if the path contains the stop icon pattern
           const path = svg.querySelector('path');
           if (path && path.getAttribute('d')?.includes('M360-330')) {
-            detectionLog.push(`✅ Found visible stop button (by form location)`);
-            console.log(`🎯 [Content] Detection details:`, detectionLog);
             return true;
           }
         }
@@ -2373,14 +2363,10 @@ class LovableDetector {
       const button = xpathResult.snapshotItem(i);
       const rect = button.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        detectionLog.push(`✅ Found visible stop button (by XPath)`);
-        console.log(`🎯 [Content] Detection details:`, detectionLog);
         return true;
       }
     }
     
-    detectionLog.push('❌ No stop buttons found');
-    console.log(`🎯 [Content] Detection details:`, detectionLog);
     return false;
   }
 }

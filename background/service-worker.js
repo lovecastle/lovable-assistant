@@ -428,8 +428,6 @@ const tabWorkingStatus = new Map(); // Track working status per tab
 
 async function handleStartWorkingStatusMonitor(tabId) {
   try {
-    console.log(`🎬 [Tab ${tabId}] Initializing working status monitor...`);
-    
     // Initialize monitoring for this tab
     if (!tabWorkingStatus.has(tabId)) {
       tabWorkingStatus.set(tabId, {
@@ -438,15 +436,11 @@ async function handleStartWorkingStatusMonitor(tabId) {
         hasNotified: false,
         checkInterval: null
       });
-      console.log(`📝 [Tab ${tabId}] Created new monitoring state`);
-    } else {
-      console.log(`♻️ [Tab ${tabId}] Reusing existing monitoring state`);
     }
     
     // Start periodic status checks
     startStatusChecking(tabId);
     
-    console.log(`✅ [Tab ${tabId}] Working status monitor started successfully!`);
     return { success: true };
   } catch (error) {
     console.error(`❌ [Tab ${tabId}] Failed to start working status monitor:`, error);
@@ -466,24 +460,18 @@ function startStatusChecking(tabId) {
   // Set polling rate based on working status
   const pollRate = status.isWorking ? 1000 : 3000;
   
-  console.log(`📊 [Tab ${tabId}] Starting status checks every ${pollRate}ms (${status.isWorking ? 'WORKING' : 'IDLE'} mode)`);
-  
   status.checkInterval = setInterval(async () => {
     try {
-      console.log(`🔍 [Tab ${tabId}] Checking working status...`);
-      
       // Request status from content script
       const response = await chrome.tabs.sendMessage(tabId, {
         action: 'getWorkingStatus'
       });
       
       if (response && response.success) {
-        console.log(`📡 [Tab ${tabId}] Status response: ${response.isWorking ? '✅ WORKING' : '⏸️ IDLE'}`);
         await handleWorkingStatusUpdate(tabId, { isWorking: response.isWorking });
       }
     } catch (error) {
       // Tab might be closed or content script not ready
-      console.log(`❌ [Tab ${tabId}] Status check failed:`, error.message);
       // Clean up if tab is gone
       if (error.message.includes('No tab with id') || error.message.includes('Receiving end does not exist')) {
         cleanupTab(tabId);
