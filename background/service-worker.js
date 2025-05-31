@@ -537,11 +537,7 @@ async function handleWorkingStatusUpdate(tabId, data) {
         } else {
           console.log(`🔕 [Tab ${tabId}] Notifications disabled - skipping`);
         }
-      } else if (status.hasNotified) {
-        console.log(`ℹ️ [Tab ${tabId}] Already notified for this task`);
       }
-    } else {
-      console.log(`🔄 [Tab ${tabId}] No state change (still ${isWorking ? 'WORKING' : 'IDLE'})`);
     }
     
     return { success: true };

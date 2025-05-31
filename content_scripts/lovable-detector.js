@@ -2295,7 +2295,6 @@ class LovableDetector {
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'getWorkingStatus') {
           const isWorking = this.detectWorkingStatus();
-          console.log(`🔍 [Content] Working status check: ${isWorking ? '✅ WORKING' : '⏸️ IDLE'}`);
           sendResponse({ success: true, isWorking });
           return true;
         }
