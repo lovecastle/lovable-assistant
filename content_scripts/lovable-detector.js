@@ -1020,13 +1020,39 @@ class LovableDetector {
               "></span>
             </label>
           </div>
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="color: #4a5568; font-size: 14px;">Rename browser tab to "Working..." when Lovable is working</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="tab-rename-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="color: #4a5568; font-size: 14px;">Auto-switch back to Lovable tab when task completes</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="auto-switch-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
+          </div>
+          
           <div style="
             background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
             padding: 10px; font-size: 13px; color: #0369a1;
           ">
-            <strong>📌 How it works:</strong> When you're working on another tab, you'll receive a desktop notification 
-            when Lovable finishes a task that took 3 seconds or more. The notification will show: 
-            "Lovable has done the task. Return to the tab!"
+            <strong>📌 How it works:</strong> 
+            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+              <li>Desktop notifications alert you when Lovable finishes tasks that took 3+ seconds</li>
+              <li>Tab renaming shows "Working..." with animated dots in the browser tab title</li>
+              <li>Auto-switch brings you back to the Lovable tab when work is complete</li>
+            </ul>
           </div>
           <div id="notification-status" style="
             margin-top: 10px; font-size: 12px; color: #4a5568; display: none;
@@ -1819,6 +1845,8 @@ class LovableDetector {
 
     // Toggle switches
     this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
+    this.setupToggleSwitch('tab-rename-toggle', 'lovable-tab-rename');
+    this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
     this.setupNotificationToggle();
 
     // Settings buttons
@@ -1888,7 +1916,9 @@ class LovableDetector {
   loadUtilitiesSettings() {
     // Load saved settings from localStorage
     const settings = [
-      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' }
+      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' },
+      { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
+      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' }
     ];
 
     settings.forEach(({ id, key }) => {
@@ -2290,11 +2320,22 @@ class LovableDetector {
       return;
     }
     
+    // Initialize tab renaming state
+    this.originalTitle = document.title;
+    this.tabRenameInterval = null;
+    this.currentDots = '';
+    
     // Set up message listener for status requests from service worker
     try {
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'getWorkingStatus') {
           const isWorking = this.detectWorkingStatus();
+          
+          // Handle tab renaming if enabled
+          if (localStorage.getItem('lovable-tab-rename') === 'true') {
+            this.handleTabRename(isWorking);
+          }
+          
           sendResponse({ success: true, isWorking });
           return true;
         }
@@ -2367,6 +2408,42 @@ class LovableDetector {
     }
     
     return false;
+  }
+  
+  handleTabRename(isWorking) {
+    if (isWorking && !this.tabRenameInterval) {
+      // Start animated dots
+      this.tabRenameInterval = setInterval(() => {
+        if (this.currentDots.length >= 3) {
+          this.currentDots = '';
+        } else {
+          this.currentDots += '.';
+        }
+        document.title = `Working${this.currentDots}`;
+      }, 500); // Update every 500ms
+      
+      // Set initial title
+      document.title = 'Working';
+    } else if (!isWorking && this.tabRenameInterval) {
+      // Stop animation and restore original title
+      clearInterval(this.tabRenameInterval);
+      this.tabRenameInterval = null;
+      this.currentDots = '';
+      document.title = this.originalTitle || 'Lovable';
+      
+      // Handle auto-switch back if enabled
+      if (localStorage.getItem('lovable-auto-switch') === 'true') {
+        // Focus the window/tab
+        window.focus();
+        
+        // Send message to service worker to activate this tab
+        chrome.runtime.sendMessage({
+          action: 'activateTab'
+        }).catch(error => {
+          console.warn('Could not activate tab:', error);
+        });
+      }
+    }
   }
 }
 

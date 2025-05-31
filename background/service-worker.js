@@ -90,6 +90,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'activateTab':
+      handleActivateTab(sender.tab.id).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -560,5 +566,24 @@ function cleanupTab(tabId) {
 chrome.tabs.onRemoved.addListener((tabId) => {
   cleanupTab(tabId);
 });
+
+async function handleActivateTab(tabId) {
+  try {
+    // Get the tab info
+    const tab = await chrome.tabs.get(tabId);
+    
+    // Focus the window containing the tab
+    await chrome.windows.update(tab.windowId, { focused: true });
+    
+    // Activate the tab
+    await chrome.tabs.update(tabId, { active: true });
+    
+    console.log(`✅ [Tab ${tabId}] Tab activated and window focused`);
+    return { success: true };
+  } catch (error) {
+    console.error(`❌ [Tab ${tabId}] Failed to activate tab:`, error);
+    return { success: false, error: error.message };
+  }
+}
 
 console.log('Service worker initialized');
