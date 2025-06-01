@@ -1,107 +1,79 @@
 // Popup Script for Lovable Assistant Chrome Extension
-class PopupManager {
-  constructor() {
-    this.init();
-  }
-
-  async init() {
-    this.setupEventListeners();
-    await this.loadSettings();
-  }
-
-  setupEventListeners() {
-    const saveBtn = document.getElementById('save-config');
-    const testBtn = document.getElementById('test-connection');
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check connection status on load
+  checkConnectionStatus();
+  
+  // Open settings button
+  document.getElementById('open-settings').addEventListener('click', async () => {
+    // Get the active tab
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => {
-        this.saveConfiguration();
+    // Check if we're on a Lovable.dev project page
+    if (activeTab.url && activeTab.url.includes('lovable.dev/projects/')) {
+      // Send message to content script to open settings
+      chrome.tabs.sendMessage(activeTab.id, { 
+        action: 'openAssistantSettings' 
       });
+      window.close();
+    } else {
+      // Show message that user needs to be on Lovable.dev
+      updateStatus('Please navigate to a Lovable.dev project page first', true);
+    }
+  });
+  
+  // Check connection button
+  document.getElementById('check-connection').addEventListener('click', async () => {
+    updateStatus('Checking connection...', false);
+    await checkConnectionStatus();
+  });
+});
+
+async function checkConnectionStatus() {
+  try {
+    // Check if API keys are configured
+    const config = await chrome.storage.sync.get([
+      'aiProvider', 'claudeApiKey', 'openaiApiKey', 'geminiApiKey', 
+      'supabaseProjectId', 'supabaseKey'
+    ]);
+    
+    const provider = config.aiProvider || 'claude';
+    let hasApiKey = false;
+    
+    switch (provider) {
+      case 'claude':
+        hasApiKey = !!config.claudeApiKey;
+        break;
+      case 'openai':
+        hasApiKey = !!config.openaiApiKey;
+        break;
+      case 'gemini':
+        hasApiKey = !!config.geminiApiKey;
+        break;
     }
     
-    if (testBtn) {
-      testBtn.addEventListener('click', () => {
-        this.testConnection();
-      });
-    }
-  }
-
-  async saveConfiguration() {
-    const claudeKey = document.getElementById('claude-api-key')?.value.trim();
-    const supabaseUrl = document.getElementById('supabase-url')?.value.trim();
-    const supabaseKey = document.getElementById('supabase-key')?.value.trim();
-
-    if (!claudeKey || !supabaseUrl || !supabaseKey) {
-      this.showStatus('All fields are required', 'error');
+    if (!hasApiKey || !config.supabaseProjectId || !config.supabaseKey) {
+      updateStatus('API keys not configured', true);
       return;
     }
-
-    try {
-      await chrome.storage.sync.set({
-        claudeApiKey: claudeKey,
-        supabaseUrl: supabaseUrl,
-        supabaseKey: supabaseKey
-      });
-
-      this.showStatus('Configuration saved successfully!', 'success');
-    } catch (error) {
-      console.error('Failed to save configuration:', error);
-      this.showStatus('Failed to save configuration', 'error');
-    }
-  }
-
-  async testConnection() {
-    this.showStatus('Testing connection...', 'success');
     
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'testConnection'
-      });
-
-      if (response?.success) {
-        this.showStatus('✅ Connection successful!', 'success');
-      } else {
-        this.showStatus('❌ Connection failed - check your credentials', 'error');
-      }
-    } catch (error) {
-      console.error('Test connection failed:', error);
-      this.showStatus('❌ Test failed - extension error', 'error');
+    // Test the connection
+    const response = await chrome.runtime.sendMessage({ action: 'testConnection' });
+    
+    if (response && response.success) {
+      const providerName = provider === 'claude' ? 'Claude' : provider === 'openai' ? 'OpenAI' : 'Gemini';
+      updateStatus(`Connected with ${providerName}`, false);
+    } else {
+      updateStatus('Connection failed', true);
     }
-  }
-  async loadSettings() {
-    try {
-      const settings = await chrome.storage.sync.get(['claudeApiKey', 'supabaseUrl', 'supabaseKey']);
-      
-      if (settings.claudeApiKey) {
-        document.getElementById('claude-api-key').value = settings.claudeApiKey;
-      }
-      if (settings.supabaseUrl) {
-        document.getElementById('supabase-url').value = settings.supabaseUrl;
-      }
-      if (settings.supabaseKey) {
-        document.getElementById('supabase-key').value = settings.supabaseKey;
-      }
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-    }
-  }
-
-  showStatus(message, type) {
-    const statusEl = document.getElementById('status');
-    if (statusEl) {
-      statusEl.textContent = message;
-      statusEl.className = `status ${type}`;
-      statusEl.style.display = 'block';
-      
-      // Auto-hide after 3 seconds
-      setTimeout(() => {
-        statusEl.style.display = 'none';
-      }, 3000);
-    }
+  } catch (error) {
+    updateStatus('Error checking connection', true);
   }
 }
 
-// Initialize popup when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new PopupManager();
-});
+function updateStatus(text, isError) {
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  
+  statusDot.className = 'status-dot' + (isError ? ' error' : '');
+  statusText.textContent = text;
+}

@@ -4,44 +4,133 @@
   <meta charset="UTF-8">
   <title>Lovable Assistant</title>
   <style>
-    body { width: 350px; padding: 20px; font-family: system-ui, sans-serif; margin: 0; }
-    .header { text-align: center; margin-bottom: 20px; }
-    .header h1 { color: #667eea; margin: 0; font-size: 18px; }
-    .config-group { margin-bottom: 15px; }
-    .config-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-    .config-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-    .btn { background: #667eea; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
-    .btn-test { background: #38a169; }
-    .status { padding: 10px; margin-top: 10px; border-radius: 4px; text-align: center; font-size: 14px; }
-    .status.success { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
-    .status.error { background: #fed7d7; color: #742a2a; border: 1px solid #feb2b2; }
+    body { 
+      width: 300px; 
+      padding: 20px; 
+      font-family: system-ui, sans-serif; 
+      margin: 0;
+      background: #f7fafc;
+    }
+    .header { 
+      text-align: center; 
+      margin-bottom: 20px; 
+    }
+    .header h1 { 
+      color: #667eea; 
+      margin: 0 0 8px 0; 
+      font-size: 20px; 
+    }
+    .header p {
+      color: #4a5568;
+      font-size: 14px;
+      margin: 0;
+    }
+    .info-box {
+      background: white;
+      border: 1px solid #c9cfd7;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .info-box h3 {
+      margin: 0 0 8px 0;
+      color: #1a202c;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .info-box p {
+      margin: 0;
+      color: #4a5568;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: white;
+      border: 1px solid #c9cfd7;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #48bb78;
+    }
+    .status-dot.error {
+      background: #f56565;
+    }
+    .status-text {
+      flex: 1;
+      font-size: 13px;
+      color: #4a5568;
+    }
+    .quick-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+    .btn:hover {
+      background: #5a67d8;
+    }
+    .btn-secondary {
+      background: white;
+      color: #4a5568;
+      border: 1px solid #c9cfd7;
+    }
+    .btn-secondary:hover {
+      background: #f7fafc;
+    }
+    .footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #718096;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Lovable Assistant</h1>
-    <p>Configure your API credentials</p>
+    <h1>🎯 Lovable Assistant</h1>
+    <p>Enhance your Lovable.dev experience</p>
   </div>
 
-  <div class="config-group">
-    <label for="claude-api-key">Claude API Key</label>
-    <input type="password" id="claude-api-key" placeholder="sk-ant-...">
+  <div class="status-indicator">
+    <div class="status-dot" id="status-dot"></div>
+    <div class="status-text" id="status-text">Checking connection...</div>
   </div>
 
-  <div class="config-group">
-    <label for="supabase-url">Supabase URL</label>
-    <input type="url" id="supabase-url" placeholder="https://your-project.supabase.co">
+  <div class="info-box">
+    <h3>📍 Quick Access</h3>
+    <p>Open Lovable Assistant on any Lovable.dev project page by clicking the floating button in the bottom-right corner.</p>
   </div>
 
-  <div class="config-group">
-    <label for="supabase-key">Supabase Key</label>
-    <input type="password" id="supabase-key" placeholder="eyJ...">
+  <div class="quick-actions">
+    <button class="btn" id="open-settings">⚙️ Open Settings</button>
+    <button class="btn btn-secondary" id="check-connection">🔄 Check Connection</button>
   </div>
 
-  <button class="btn" id="save-config">Save Configuration</button>
-  <button class="btn btn-test" id="test-connection">Test Connection</button>
-  
-  <div id="status" class="status" style="display: none;"></div>
+  <div class="footer">
+    Version 1.0.0
+  </div>
   
   <script src="popup.js"></script>
 </body>

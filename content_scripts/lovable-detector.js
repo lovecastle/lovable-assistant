@@ -910,17 +910,132 @@ class LovableDetector {
           ">← Back to Welcome</button>
         </div>
         
+        <!-- AI Provider Configuration -->
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-            🔑 API Configuration
+            🤖 AI Assistant Configuration
           </h3>
-          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
-            Click the extension icon in your toolbar to configure your Claude API key and Supabase settings.
-          </p>
-          <button onclick="chrome.action.openPopup()" style="
-            background: #667eea; color: white; border: none; padding: 8px 16px;
-            border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">Open Settings</button>
+          
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; color: #4a5568; font-size: 14px; font-weight: 500;">
+              Select AI Provider
+            </label>
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <label style="
+                display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+                border: 2px solid #c9cfd7; border-radius: 8px; cursor: pointer;
+                transition: all 0.2s; flex: 1;
+              " class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="claude" id="provider-claude" style="width: 16px; height: 16px;">
+                <div>
+                  <div style="font-weight: 600; color: #1a202c;">Claude</div>
+                  <div style="font-size: 12px; color: #718096;">Anthropic</div>
+                </div>
+              </label>
+              
+              <label style="
+                display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+                border: 2px solid #c9cfd7; border-radius: 8px; cursor: pointer;
+                transition: all 0.2s; flex: 1;
+              " class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="openai" id="provider-openai" style="width: 16px; height: 16px;">
+                <div>
+                  <div style="font-weight: 600; color: #1a202c;">GPT-4</div>
+                  <div style="font-size: 12px; color: #718096;">OpenAI</div>
+                </div>
+              </label>
+              
+              <label style="
+                display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+                border: 2px solid #c9cfd7; border-radius: 8px; cursor: pointer;
+                transition: all 0.2s; flex: 1;
+              " class="ai-provider-option">
+                <input type="radio" name="ai-provider" value="gemini" id="provider-gemini" style="width: 16px; height: 16px;">
+                <div>
+                  <div style="font-weight: 600; color: #1a202c;">Gemini</div>
+                  <div style="font-size: 12px; color: #718096;">Google</div>
+                </div>
+              </label>
+            </div>
+            
+            <!-- Claude API Key -->
+            <div id="claude-config" style="display: none;">
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Claude API Key</label>
+              <input type="password" id="claude-api-key" placeholder="sk-ant-..." style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+              ">
+              <div style="font-size: 12px; color: #718096;">
+                Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: #667eea;">console.anthropic.com</a>
+              </div>
+            </div>
+            
+            <!-- OpenAI API Key -->
+            <div id="openai-config" style="display: none;">
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">OpenAI API Key</label>
+              <input type="password" id="openai-api-key" placeholder="sk-..." style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+              ">
+              <div style="font-size: 12px; color: #718096;">
+                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea;">platform.openai.com</a>
+              </div>
+            </div>
+            
+            <!-- Gemini API Key -->
+            <div id="gemini-config" style="display: none;">
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Gemini API Key</label>
+              <input type="password" id="gemini-api-key" placeholder="AIza..." style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+              ">
+              <div style="font-size: 12px; color: #718096;">
+                Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #667eea;">Google AI Studio</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Database Configuration -->
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            💾 Database Configuration (Supabase)
+          </h3>
+          
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Project ID</label>
+            <input type="text" id="supabase-project-id" placeholder="your-project-id" style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; font-family: inherit;
+            ">
+            <div style="margin-top: 4px; font-size: 12px; color: #718096;">
+              Find this in your Supabase dashboard URL: https://[project-id].supabase.co
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Anon/Public Key</label>
+            <input type="password" id="supabase-key" placeholder="eyJ..." style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; font-family: inherit;
+            ">
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <button id="save-api-config" style="
+              background: #667eea; color: white; border: none; padding: 10px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+            ">Save Configuration</button>
+            <button id="test-api-connection" style="
+              background: #48bb78; color: white; border: none; padding: 10px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+            ">Test Connection</button>
+          </div>
+          
+          <div id="api-status" style="
+            margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 13px;
+            display: none;
+          "></div>
         </div>
         
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
@@ -944,6 +1059,9 @@ class LovableDetector {
     `;
     
     this.setupBackButton();
+    this.setupAPIProviderSelection();
+    this.setupAPIConfiguration();
+    this.loadAPISettings();
   }
 
   // ===========================
@@ -1869,8 +1987,8 @@ class LovableDetector {
     // Setup input auto-expansion
     this.setupInputAutoExpansion();
     
-    // Setup input auto-expansion
-    this.setupInputAutoExpansion();
+    // Setup API configuration
+    this.setupAPIConfiguration();
   }
 
   setupToggleSwitch(toggleId, settingKey) {
@@ -1931,6 +2049,9 @@ class LovableDetector {
     
     // Load notification settings
     this.loadNotificationSettings();
+    
+    // Load API settings
+    this.loadAPISettings();
   }
   
   async loadNotificationSettings() {
@@ -2014,6 +2135,193 @@ class LovableDetector {
         }
       }
     });
+  }
+  
+  setupAPIProviderSelection() {
+    const providerOptions = document.querySelectorAll('input[name="ai-provider"]');
+    const claudeConfig = document.getElementById('claude-config');
+    const openaiConfig = document.getElementById('openai-config');
+    const geminiConfig = document.getElementById('gemini-config');
+    
+    // Add CSS for selected state
+    const style = document.createElement('style');
+    style.textContent = `
+      .ai-provider-option:has(input:checked) {
+        border-color: #667eea !important;
+        background: #f0f4ff !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    providerOptions.forEach(option => {
+      option.addEventListener('change', (e) => {
+        // Hide all configs
+        claudeConfig.style.display = 'none';
+        openaiConfig.style.display = 'none';
+        geminiConfig.style.display = 'none';
+        
+        // Show selected config
+        switch (e.target.value) {
+          case 'claude':
+            claudeConfig.style.display = 'block';
+            break;
+          case 'openai':
+            openaiConfig.style.display = 'block';
+            break;
+          case 'gemini':
+            geminiConfig.style.display = 'block';
+            break;
+        }
+        
+        // Save selected provider
+        chrome.storage.sync.set({ aiProvider: e.target.value });
+      });
+    });
+  }
+  
+  setupAPIConfiguration() {
+    const saveBtn = document.getElementById('save-api-config');
+    const testBtn = document.getElementById('test-api-connection');
+    const statusDiv = document.getElementById('api-status');
+    
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
+        const projectId = document.getElementById('supabase-project-id').value;
+        const supabaseKey = document.getElementById('supabase-key').value;
+        
+        const configData = {
+          aiProvider: provider,
+          supabaseProjectId: projectId,
+          supabaseUrl: `https://${projectId}.supabase.co`,
+          supabaseKey: supabaseKey
+        };
+        
+        // Add provider-specific API key
+        switch (provider) {
+          case 'claude':
+            configData.claudeApiKey = document.getElementById('claude-api-key').value;
+            break;
+          case 'openai':
+            configData.openaiApiKey = document.getElementById('openai-api-key').value;
+            break;
+          case 'gemini':
+            configData.geminiApiKey = document.getElementById('gemini-api-key').value;
+            break;
+        }
+        
+        try {
+          // Save to Chrome storage
+          await chrome.storage.sync.set(configData);
+          
+          // Show success message
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#f0fff4';
+            statusDiv.style.color = '#22543d';
+            statusDiv.style.border = '1px solid #9ae6b4';
+            statusDiv.textContent = '✅ Configuration saved successfully!';
+            
+            setTimeout(() => {
+              statusDiv.style.display = 'none';
+            }, 3000);
+          }
+        } catch (error) {
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#fed7d7';
+            statusDiv.style.color = '#742a2a';
+            statusDiv.style.border = '1px solid #feb2b2';
+            statusDiv.textContent = '❌ Failed to save configuration: ' + error.message;
+          }
+        }
+      });
+    }
+    
+    if (testBtn) {
+      testBtn.addEventListener('click', async () => {
+        if (statusDiv) {
+          statusDiv.style.display = 'block';
+          statusDiv.style.background = '#e6f7ff';
+          statusDiv.style.color = '#0369a1';
+          statusDiv.style.border = '1px solid #bae6fd';
+          statusDiv.textContent = '🔄 Testing connection...';
+        }
+        
+        try {
+          const response = await chrome.runtime.sendMessage({ action: 'testConnection' });
+          
+          if (statusDiv) {
+            if (response.success) {
+              statusDiv.style.background = '#f0fff4';
+              statusDiv.style.color = '#22543d';
+              statusDiv.style.border = '1px solid #9ae6b4';
+              const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
+              const providerName = provider === 'claude' ? 'Claude' : provider === 'openai' ? 'OpenAI' : 'Gemini';
+              statusDiv.textContent = `✅ Connection successful! ${providerName} API and Supabase are configured correctly.`;
+            } else {
+              statusDiv.style.background = '#fed7d7';
+              statusDiv.style.color = '#742a2a';
+              statusDiv.style.border = '1px solid #feb2b2';
+              statusDiv.textContent = '❌ Connection failed. Please check your API credentials.';
+            }
+          }
+        } catch (error) {
+          if (statusDiv) {
+            statusDiv.style.background = '#fed7d7';
+            statusDiv.style.color = '#742a2a';
+            statusDiv.style.border = '1px solid #feb2b2';
+            statusDiv.textContent = '❌ Test failed: ' + error.message;
+          }
+        }
+      });
+    }
+  }
+  
+  async loadAPISettings() {
+    try {
+      const settings = await chrome.storage.sync.get([
+        'aiProvider', 'claudeApiKey', 'openaiApiKey', 'geminiApiKey',
+        'supabaseProjectId', 'supabaseKey'
+      ]);
+      
+      // Set selected provider
+      const provider = settings.aiProvider || 'claude';
+      const providerRadio = document.getElementById(`provider-${provider}`);
+      if (providerRadio) {
+        providerRadio.checked = true;
+        providerRadio.dispatchEvent(new Event('change'));
+      }
+      
+      // Load API keys
+      const claudeInput = document.getElementById('claude-api-key');
+      const openaiInput = document.getElementById('openai-api-key');
+      const geminiInput = document.getElementById('gemini-api-key');
+      const projectIdInput = document.getElementById('supabase-project-id');
+      const supabaseKeyInput = document.getElementById('supabase-key');
+      
+      if (claudeInput && settings.claudeApiKey) {
+        claudeInput.value = settings.claudeApiKey;
+      }
+      
+      if (openaiInput && settings.openaiApiKey) {
+        openaiInput.value = settings.openaiApiKey;
+      }
+      
+      if (geminiInput && settings.geminiApiKey) {
+        geminiInput.value = settings.geminiApiKey;
+      }
+      
+      if (projectIdInput && settings.supabaseProjectId) {
+        projectIdInput.value = settings.supabaseProjectId;
+      }
+      
+      if (supabaseKeyInput && settings.supabaseKey) {
+        supabaseKeyInput.value = settings.supabaseKey;
+      }
+    } catch (error) {
+      console.error('Failed to load API settings:', error);
+    }
   }
 
   async scrapeAllMessages() {
@@ -3651,5 +3959,19 @@ class ComprehensiveMessageScraper {
 // Initialize the detector
 const lovableDetector = new LovableDetector();
 window.lovableDetector = lovableDetector;
+
+// Set up message listener for popup communication
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'openAssistantSettings') {
+    // Open the assistant and navigate to utilities page
+    lovableDetector.toggleAssistant();
+    // Give it a moment to open, then navigate to utilities
+    setTimeout(() => {
+      lovableDetector.showUtilitiesPage();
+    }, 100);
+    sendResponse({ success: true });
+    return true;
+  }
+});
 
 console.log('🚀 Lovable Assistant: Enhanced scraping with database saving ready!');

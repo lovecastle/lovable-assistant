@@ -1,10 +1,14 @@
 // Service Worker for Chrome Extension Background Tasks
 import { SupabaseClient } from './database-sync.js';
+import { AIAPI } from './ai-api.js';
 
 console.log('Service worker starting...');
 
 // Initialize database client
 const supabase = new SupabaseClient();
+
+// Initialize AI API client
+const aiAPI = new AIAPI();
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
@@ -105,27 +109,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function testConnection() {
   try {
-    const settings = await chrome.storage.sync.get(['claudeApiKey', 'supabaseUrl']);
-    return !!(settings.claudeApiKey && settings.supabaseUrl);
+    // Test AI API connection
+    const aiConnected = await aiAPI.testConnection();
+    
+    // Test Supabase connection
+    const settings = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
+    const supabaseConnected = !!(settings.supabaseUrl && settings.supabaseKey);
+    
+    return aiConnected && supabaseConnected;
   } catch (error) {
+    console.error('Connection test failed:', error);
     return false;
   }
 }
 
 async function handleChatMessage(message, context) {
   try {
-    const settings = await chrome.storage.sync.get(['claudeApiKey']);
-    
-    if (!settings.claudeApiKey) {
-      return { success: false, error: 'Claude API key not configured' };
-    }
-
     const systemPrompt = `You are a helpful development assistant for Lovable.dev projects. 
     Help with coding, debugging, and best practices. Be concise but helpful.
     
     Project: ${context?.projectId || 'Unknown'}`;
 
-    const response = await callClaudeAPI(settings.claudeApiKey, message, systemPrompt);
+    const response = await aiAPI.generateResponse(message, systemPrompt);
     return { success: true, data: response };
     
   } catch (error) {
@@ -333,37 +338,6 @@ function generateUUID() {
     return v.toString(16);
   });
 }
-async function callClaudeAPI(apiKey, message, systemPrompt) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: message
-        }
-      ],
-      system: systemPrompt
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Claude API error: ${error.error?.message || response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.content[0].text;
-}
-
 // Notification system functions
 async function handleShowNotification(data) {
   try {
