@@ -4,17 +4,33 @@ export class AIAPI {
     this.providers = {
       claude: {
         baseURL: 'https://api.anthropic.com/v1',
-        model: 'claude-3-5-sonnet-20241022',
+        models: [
+          { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', default: true },
+          { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
+          { id: 'claude-3-7-sonnet-latest', name: 'Claude 3.7 Sonnet' },
+          { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
+          { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' }
+        ],
         maxTokens: 4000
       },
       openai: {
         baseURL: 'https://api.openai.com/v1',
-        model: 'gpt-4-turbo-preview',
+        models: [
+          { id: 'o4-mini-2025-04-16', name: 'O4 Mini', default: true },
+          { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1' },
+          { id: 'gpt-4.1-mini-2025-04-14', name: 'GPT-4.1 Mini' },
+          { id: 'gpt-4o-2024-08-06', name: 'GPT-4o' },
+          { id: 'gpt-4o-mini-2024-07-18', name: 'GPT-4o Mini' }
+        ],
         maxTokens: 4000
       },
       gemini: {
         baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-        model: 'gemini-pro',
+        models: [
+          { id: 'gemini-2.5-flash-preview-05-20', name: 'Gemini 2.5 Flash', default: true },
+          { id: 'gemini-2.5-pro-preview-05-06', name: 'Gemini 2.5 Pro' },
+          { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }
+        ],
         maxTokens: 4000
       }
     };
@@ -22,21 +38,25 @@ export class AIAPI {
 
   async getConfig() {
     const config = await chrome.storage.sync.get([
-      'aiProvider', 'claudeApiKey', 'openaiApiKey', 'geminiApiKey'
+      'aiProvider', 'claudeApiKey', 'openaiApiKey', 'geminiApiKey',
+      'claudeModel', 'openaiModel', 'geminiModel'
     ]);
     
     const provider = config.aiProvider || 'claude';
-    let apiKey;
+    let apiKey, model;
     
     switch (provider) {
       case 'claude':
         apiKey = config.claudeApiKey;
+        model = config.claudeModel || this.providers.claude.models.find(m => m.default).id;
         break;
       case 'openai':
         apiKey = config.openaiApiKey;
+        model = config.openaiModel || this.providers.openai.models.find(m => m.default).id;
         break;
       case 'gemini':
         apiKey = config.geminiApiKey;
+        model = config.geminiModel || this.providers.gemini.models.find(m => m.default).id;
         break;
     }
     
@@ -44,25 +64,29 @@ export class AIAPI {
       throw new Error(`${provider} API key not configured. Please set it in the extension settings.`);
     }
     
-    return { provider, apiKey };
+    return { provider, apiKey, model };
+  }
+  
+  getAvailableModels(provider) {
+    return this.providers[provider]?.models || [];
   }
 
   async generateResponse(prompt, systemPrompt = '') {
-    const { provider, apiKey } = await this.getConfig();
+    const { provider, apiKey, model } = await this.getConfig();
     
     switch (provider) {
       case 'claude':
-        return this.generateClaudeResponse(prompt, systemPrompt, apiKey);
+        return this.generateClaudeResponse(prompt, systemPrompt, apiKey, model);
       case 'openai':
-        return this.generateOpenAIResponse(prompt, systemPrompt, apiKey);
+        return this.generateOpenAIResponse(prompt, systemPrompt, apiKey, model);
       case 'gemini':
-        return this.generateGeminiResponse(prompt, systemPrompt, apiKey);
+        return this.generateGeminiResponse(prompt, systemPrompt, apiKey, model);
       default:
         throw new Error(`Unknown AI provider: ${provider}`);
     }
   }
 
-  async generateClaudeResponse(prompt, systemPrompt, apiKey) {
+  async generateClaudeResponse(prompt, systemPrompt, apiKey, model) {
     try {
       const response = await fetch(`${this.providers.claude.baseURL}/messages`, {
         method: 'POST',
@@ -73,7 +97,7 @@ export class AIAPI {
           'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify({
-          model: this.providers.claude.model,
+          model: model,
           max_tokens: this.providers.claude.maxTokens,
           messages: [
             {
@@ -98,21 +122,36 @@ export class AIAPI {
     }
   }
 
-  async generateOpenAIResponse(prompt, systemPrompt, apiKey) {
+  async generateOpenAIResponse(prompt, systemPrompt, apiKey, model) {
     try {
       const messages = [];
       
-      if (systemPrompt) {
+      // O1 and O4 models don't support system messages, so combine with user prompt
+      const isO1O4Model = model.startsWith('o1') || model.startsWith('o4');
+      
+      // O1 and O4 models also don't support custom temperature (only default 1.0)
+      const supportsTemperature = !isO1O4Model;
+      
+      if (isO1O4Model && systemPrompt) {
+        // Combine system prompt with user prompt for O1/O4 models
         messages.push({
-          role: 'system',
-          content: systemPrompt || 'You are a helpful development assistant for web development projects.'
+          role: 'user',
+          content: `${systemPrompt}\n\n${prompt}`
+        });
+      } else {
+        // Standard approach for other models
+        if (systemPrompt) {
+          messages.push({
+            role: 'system',
+            content: systemPrompt || 'You are a helpful development assistant for web development projects.'
+          });
+        }
+        
+        messages.push({
+          role: 'user',
+          content: prompt
         });
       }
-      
-      messages.push({
-        role: 'user',
-        content: prompt
-      });
       
       const response = await fetch(`${this.providers.openai.baseURL}/chat/completions`, {
         method: 'POST',
@@ -121,10 +160,10 @@ export class AIAPI {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: this.providers.openai.model,
+          model: model,
           messages: messages,
-          max_tokens: this.providers.openai.maxTokens,
-          temperature: 0.7
+          max_completion_tokens: this.providers.openai.maxTokens,
+          ...(supportsTemperature && { temperature: 0.7 })
         })
       });
 
@@ -141,13 +180,13 @@ export class AIAPI {
     }
   }
 
-  async generateGeminiResponse(prompt, systemPrompt, apiKey) {
+  async generateGeminiResponse(prompt, systemPrompt, apiKey, model) {
     try {
       // Combine system prompt and user prompt for Gemini
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
       
       const response = await fetch(
-        `${this.providers.gemini.baseURL}/models/${this.providers.gemini.model}:generateContent?key=${apiKey}`,
+        `${this.providers.gemini.baseURL}/models/${model}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {

@@ -142,7 +142,7 @@ lovable-assistant/
 ├── manifest.json              # Extension configuration
 ├── background/
 │   ├── service-worker.js      # Main background script
-│   ├── claude-api.js         # Claude API integration
+│   ├── ai-api.js             # Multi-provider AI API integration
 │   └── database-sync.js      # Supabase integration
 ├── content_scripts/
 │   ├── lovable-detector.js   # Page detection

@@ -940,7 +940,7 @@ class LovableDetector {
               " class="ai-provider-option">
                 <input type="radio" name="ai-provider" value="openai" id="provider-openai" style="width: 16px; height: 16px;">
                 <div>
-                  <div style="font-weight: 600; color: #1a202c;">GPT-4</div>
+                  <div style="font-weight: 600; color: #1a202c;">GPT</div>
                   <div style="font-size: 12px; color: #718096;">OpenAI</div>
                 </div>
               </label>
@@ -963,8 +963,21 @@ class LovableDetector {
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Claude API Key</label>
               <input type="password" id="claude-api-key" placeholder="sk-ant-..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+                font-size: 14px; font-family: inherit; margin-bottom: 12px;
               ">
+              
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
+              <select id="claude-model" style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+              ">
+                <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                <option value="claude-3-7-sonnet-latest">Claude 3.7 Sonnet</option>
+                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
+              </select>
+              
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: #667eea;">console.anthropic.com</a>
               </div>
@@ -975,8 +988,21 @@ class LovableDetector {
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">OpenAI API Key</label>
               <input type="password" id="openai-api-key" placeholder="sk-..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+                font-size: 14px; font-family: inherit; margin-bottom: 12px;
               ">
+              
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
+              <select id="openai-model" style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+              ">
+                <option value="o4-mini-2025-04-16">O4 Mini</option>
+                <option value="gpt-4.1-2025-04-14">GPT-4.1</option>
+                <option value="gpt-4.1-mini-2025-04-14">GPT-4.1 Mini</option>
+                <option value="gpt-4o-2024-08-06">GPT-4o</option>
+                <option value="gpt-4o-mini">GPT-4o Mini</option>
+              </select>
+              
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea;">platform.openai.com</a>
               </div>
@@ -987,8 +1013,19 @@ class LovableDetector {
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Gemini API Key</label>
               <input type="password" id="gemini-api-key" placeholder="AIza..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-                font-size: 14px; font-family: inherit; margin-bottom: 8px;
+                font-size: 14px; font-family: inherit; margin-bottom: 12px;
               ">
+              
+              <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
+              <select id="gemini-model" style="
+                width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+                font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+              ">
+                <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              </select>
+              
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #667eea;">Google AI Studio</a>
               </div>
@@ -2197,16 +2234,19 @@ class LovableDetector {
           supabaseKey: supabaseKey
         };
         
-        // Add provider-specific API key
+        // Add provider-specific API key and model
         switch (provider) {
           case 'claude':
             configData.claudeApiKey = document.getElementById('claude-api-key').value;
+            configData.claudeModel = document.getElementById('claude-model').value;
             break;
           case 'openai':
             configData.openaiApiKey = document.getElementById('openai-api-key').value;
+            configData.openaiModel = document.getElementById('openai-model').value;
             break;
           case 'gemini':
             configData.geminiApiKey = document.getElementById('gemini-api-key').value;
+            configData.geminiModel = document.getElementById('gemini-model').value;
             break;
         }
         
@@ -2282,6 +2322,7 @@ class LovableDetector {
     try {
       const settings = await chrome.storage.sync.get([
         'aiProvider', 'claudeApiKey', 'openaiApiKey', 'geminiApiKey',
+        'claudeModel', 'openaiModel', 'geminiModel',
         'supabaseProjectId', 'supabaseKey'
       ]);
       
@@ -2297,6 +2338,9 @@ class LovableDetector {
       const claudeInput = document.getElementById('claude-api-key');
       const openaiInput = document.getElementById('openai-api-key');
       const geminiInput = document.getElementById('gemini-api-key');
+      const claudeModelSelect = document.getElementById('claude-model');
+      const openaiModelSelect = document.getElementById('openai-model');
+      const geminiModelSelect = document.getElementById('gemini-model');
       const projectIdInput = document.getElementById('supabase-project-id');
       const supabaseKeyInput = document.getElementById('supabase-key');
       
@@ -2312,6 +2356,36 @@ class LovableDetector {
         geminiInput.value = settings.geminiApiKey;
       }
       
+      // Load model selections with validation (use setTimeout to ensure dropdowns are rendered)
+      setTimeout(() => {
+        if (claudeModelSelect) {
+          if (settings.claudeModel && this.isValidModelOption(claudeModelSelect, settings.claudeModel)) {
+            claudeModelSelect.value = settings.claudeModel;
+          } else {
+            // Set to first option as default
+            claudeModelSelect.selectedIndex = 0;
+          }
+        }
+        
+        if (openaiModelSelect) {
+          if (settings.openaiModel && this.isValidModelOption(openaiModelSelect, settings.openaiModel)) {
+            openaiModelSelect.value = settings.openaiModel;
+          } else {
+            // Set to first option as default
+            openaiModelSelect.selectedIndex = 0;
+          }
+        }
+        
+        if (geminiModelSelect) {
+          if (settings.geminiModel && this.isValidModelOption(geminiModelSelect, settings.geminiModel)) {
+            geminiModelSelect.value = settings.geminiModel;
+          } else {
+            // Set to first option as default
+            geminiModelSelect.selectedIndex = 0;
+          }
+        }
+      }, 100);
+      
       if (projectIdInput && settings.supabaseProjectId) {
         projectIdInput.value = settings.supabaseProjectId;
       }
@@ -2322,6 +2396,20 @@ class LovableDetector {
     } catch (error) {
       console.error('Failed to load API settings:', error);
     }
+  }
+
+  // Helper function to check if a model value exists in the dropdown options
+  isValidModelOption(selectElement, modelValue) {
+    if (!selectElement || !modelValue) return false;
+    
+    for (let option of selectElement.options) {
+      if (option.value === modelValue) {
+        return true;
+      }
+    }
+    
+    console.warn(`Model "${modelValue}" not found in dropdown options`);
+    return false;
   }
 
   async scrapeAllMessages() {
