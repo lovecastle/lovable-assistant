@@ -1251,10 +1251,10 @@ class LovableDetector {
           "></div>
         </div>
         
-        <!-- Input Enhancement -->
+        <!-- Prompt Helper -->
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-            ✨ Input Enhancement
+            ✨ Prompt Helper
           </h3>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
             <label style="color: #4a5568; font-size: 14px;">Auto-expand input area on new lines</label>
@@ -2969,11 +2969,11 @@ class LovableDetector {
 
   showPromptEnhancementMenu(inputElement) {
     // Remove existing menu
-    const existingMenu = document.getElementById('prompt-enhancement-menu');
+    const existingMenu = document.getElementById('prompt-helper-menu');
     if (existingMenu) existingMenu.remove();
     
     const menu = document.createElement('div');
-    menu.id = 'prompt-enhancement-menu';
+    menu.id = 'prompt-helper-menu';
     menu.innerHTML = `
       <div style="
         position: absolute; z-index: 999999; background: white; 
@@ -2983,7 +2983,7 @@ class LovableDetector {
         <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
           ✨ Enhance Your Prompt
         </h4>
-        <div id="prompt-templates-menu" style="display: grid; gap: 8px; max-height: 250px; overflow-y: auto;">
+        <div id="prompt-templates-menu" style="display: grid; gap: 8px; max-height: 400px; overflow-y: auto;">
           <!-- Templates will be loaded here -->
         </div>
         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center;">
@@ -3023,16 +3023,16 @@ class LovableDetector {
       
       if (chatContainerElement) {
         const containerRect = chatContainerElement.getBoundingClientRect();
-        // Position at the height of the container minus the height of the prompt helper
-        top = containerRect.height - menuRect.height;
+        // Position at the height of the container minus 514px
+        top = containerRect.height - 514;
         
         // Ensure minimum distance from top of viewport
         top = Math.max(top, 10);
         
-        console.log('📍 Positioned menu using chat container height:', {
+        console.log('📍 Positioned menu using chat container height minus 514px:', {
           containerHeight: containerRect.height,
-          menuHeight: menuRect.height,
-          calculatedTop: top
+          calculatedTop: top,
+          formula: 'containerHeight - 514px'
         });
       } else {
         throw new Error('Chat container element not found');
