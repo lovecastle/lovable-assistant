@@ -254,7 +254,7 @@ class SimpleConversationCapture {
       // Lovable message can be identified by aimsg_ prefix or by checking for prose content
       return messageId.startsWith('aimsg_') || 
              (el.querySelector('.prose, .prose-markdown, [class*="prose"]') !== null && 
-              !isUuidUserMessage(el));
+              !this.isUuidUserMessage(el));
     });
 
     if (this.verboseLogging) {

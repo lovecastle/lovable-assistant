@@ -29,6 +29,7 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
+    this.setupPromptEnhancement();
   }
 
   detectLovablePage() {
@@ -901,6 +902,9 @@ class LovableDetector {
     
     if (!content) return;
     
+    // Scroll to top of the dialog content
+    content.scrollTop = 0;
+    
     content.innerHTML = `
       <div style="padding: 20px;">
         <div style="margin-bottom: 20px;">
@@ -913,7 +917,7 @@ class LovableDetector {
         <!-- AI Provider Configuration -->
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-            🤖 AI Assistant Configuration
+            🤖 AI Model Configuration
           </h3>
           
           <div style="margin-bottom: 20px;">
@@ -964,12 +968,14 @@ class LovableDetector {
               <input type="password" id="claude-api-key" placeholder="sk-ant-..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 12px;
+                background: white; color: #1a202c;
               ">
               
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
               <select id="claude-model" style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+                color: #1a202c; appearance: auto; -webkit-appearance: menulist;
               ">
                 <option value="claude-opus-4-20250514">Claude Opus 4</option>
                 <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
@@ -981,6 +987,17 @@ class LovableDetector {
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: #667eea;">console.anthropic.com</a>
               </div>
+              
+              <button id="test-claude-connection" style="
+                background: #48bb78; color: white; border: none; padding: 8px 16px;
+                border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+                margin-top: 12px;
+              ">Test Claude Connection</button>
+              
+              <div id="claude-status" style="
+                margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 12px;
+                display: none;
+              "></div>
             </div>
             
             <!-- OpenAI API Key -->
@@ -989,23 +1006,36 @@ class LovableDetector {
               <input type="password" id="openai-api-key" placeholder="sk-..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 12px;
+                background: white; color: #1a202c;
               ">
               
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
               <select id="openai-model" style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+                color: #1a202c; appearance: auto; -webkit-appearance: menulist;
               ">
                 <option value="o4-mini-2025-04-16">O4 Mini</option>
                 <option value="gpt-4.1-2025-04-14">GPT-4.1</option>
                 <option value="gpt-4.1-mini-2025-04-14">GPT-4.1 Mini</option>
                 <option value="gpt-4o-2024-08-06">GPT-4o</option>
-                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                <option value="gpt-4o-mini-2024-07-18">GPT-4o Mini</option>
               </select>
               
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #667eea;">platform.openai.com</a>
               </div>
+              
+              <button id="test-openai-connection" style="
+                background: #48bb78; color: white; border: none; padding: 8px 16px;
+                border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+                margin-top: 12px;
+              ">Test OpenAI Connection</button>
+              
+              <div id="openai-status" style="
+                margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 12px;
+                display: none;
+              "></div>
             </div>
             
             <!-- Gemini API Key -->
@@ -1014,12 +1044,14 @@ class LovableDetector {
               <input type="password" id="gemini-api-key" placeholder="AIza..." style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 12px;
+                background: white; color: #1a202c;
               ">
               
               <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 13px;">Model</label>
               <select id="gemini-model" style="
                 width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
                 font-size: 14px; font-family: inherit; margin-bottom: 8px; background: white;
+                color: #1a202c; appearance: auto; -webkit-appearance: menulist;
               ">
                 <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash</option>
                 <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</option>
@@ -1029,6 +1061,17 @@ class LovableDetector {
               <div style="font-size: 12px; color: #718096;">
                 Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #667eea;">Google AI Studio</a>
               </div>
+              
+              <button id="test-gemini-connection" style="
+                background: #48bb78; color: white; border: none; padding: 8px 16px;
+                border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+                margin-top: 12px;
+              ">Test Gemini Connection</button>
+              
+              <div id="gemini-status" style="
+                margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 12px;
+                display: none;
+              "></div>
             </div>
           </div>
         </div>
@@ -1044,6 +1087,7 @@ class LovableDetector {
             <input type="text" id="supabase-project-id" placeholder="your-project-id" style="
               width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
               font-size: 14px; font-family: inherit;
+              background: white; color: #1a202c;
             ">
             <div style="margin-top: 4px; font-size: 12px; color: #718096;">
               Find this in your Supabase dashboard URL: https://[project-id].supabase.co
@@ -1055,34 +1099,21 @@ class LovableDetector {
             <input type="password" id="supabase-key" placeholder="eyJ..." style="
               width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
               font-size: 14px; font-family: inherit;
+              background: white; color: #1a202c;
             ">
           </div>
           
-          <div style="display: flex; gap: 8px;">
-            <button id="save-api-config" style="
-              background: #667eea; color: white; border: none; padding: 10px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
-            ">Save Configuration</button>
-            <button id="test-api-connection" style="
-              background: #48bb78; color: white; border: none; padding: 10px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
-            ">Test Connection</button>
-          </div>
+          <button id="test-database-connection" style="
+            background: #48bb78; color: white; border: none; padding: 10px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+          ">Test Database Connection</button>
           
-          <div id="api-status" style="
+          <div id="database-status" style="
             margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 13px;
             display: none;
           "></div>
         </div>
         
-        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-            📊 Usage & Limits
-          </h3>
-          <p style="margin: 0; color: #4a5568; font-size: 14px;">
-            Coming soon: Track your API usage and set spending limits.
-          </p>
-        </div>
         
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
@@ -1099,6 +1130,12 @@ class LovableDetector {
     this.setupAPIProviderSelection();
     this.setupAPIConfiguration();
     this.loadAPISettings();
+    
+    // Ensure dialog content is scrolled to top
+    const dialogContent = document.getElementById('dialog-content');
+    if (dialogContent) {
+      dialogContent.scrollTop = 0;
+    }
   }
 
   // ===========================
@@ -1231,32 +1268,29 @@ class LovableDetector {
           </div>
           <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
             <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
-              Prompt Enhancement (Ctrl+Enter / Cmd+Enter)
+              Prompt Helper Templates (Ctrl+Enter / Cmd+Enter)
             </h4>
-            <p style="margin: 0 0 8px 0; color: #4a5568; font-size: 13px;">
-              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to get prompt suggestions:
+            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 13px;">
+              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
             </p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #718096;">
-              <div>
-                <strong>🎨 Designing:</strong><br>
-                • UI Change<br>
-                • Optimize for Mobile
-              </div>
-              <div>
-                <strong>⚙️ Functioning:</strong><br>
-                • Modifying Function
-              </div>
-              <div>
-                <strong>🐛 Debugging:</strong><br>
-                • Minor Errors<br>
-                • Persistent Errors<br>
-                • Major Errors<br>
-                • Critical Errors
-              </div>
-              <div>
-                <strong>🔄 Refactoring:</strong><br>
-                • Code Refactoring
-              </div>
+            
+            <div id="prompt-templates-container" style="max-height: 400px; overflow-y: auto;">
+              <!-- Templates will be loaded here -->
+            </div>
+            
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+              <button id="load-prompt-templates-btn" style="
+                background: #667eea; color: white; border: none; padding: 6px 12px;
+                border-radius: 4px; cursor: pointer; font-size: 12px;
+              ">Load Templates</button>
+              <button id="save-prompt-templates-btn" style="
+                background: #48bb78; color: white; border: none; padding: 6px 12px;
+                border-radius: 4px; cursor: pointer; font-size: 12px;
+              ">Save Changes</button>
+              <button id="reset-prompt-templates-btn" style="
+                background: #f56565; color: white; border: none; padding: 6px 12px;
+                border-radius: 4px; cursor: pointer; font-size: 12px;
+              ">Reset to Default</button>
             </div>
           </div>
         </div>
@@ -2024,6 +2058,9 @@ class LovableDetector {
     // Setup input auto-expansion
     this.setupInputAutoExpansion();
     
+    // Setup prompt templates
+    this.setupPromptTemplates();
+    
     // Setup API configuration
     this.setupAPIConfiguration();
   }
@@ -2217,102 +2254,218 @@ class LovableDetector {
   }
   
   setupAPIConfiguration() {
-    const saveBtn = document.getElementById('save-api-config');
-    const testBtn = document.getElementById('test-api-connection');
-    const statusDiv = document.getElementById('api-status');
+    const testClaudeBtn = document.getElementById('test-claude-connection');
+    const testOpenAIBtn = document.getElementById('test-openai-connection');
+    const testGeminiBtn = document.getElementById('test-gemini-connection');
+    const testDatabaseBtn = document.getElementById('test-database-connection');
     
-    if (saveBtn) {
-      saveBtn.addEventListener('click', async () => {
-        const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
-        const projectId = document.getElementById('supabase-project-id').value;
-        const supabaseKey = document.getElementById('supabase-key').value;
-        
-        const configData = {
-          aiProvider: provider,
-          supabaseProjectId: projectId,
-          supabaseUrl: `https://${projectId}.supabase.co`,
-          supabaseKey: supabaseKey
+    // Auto-save function
+    const autoSaveConfiguration = async () => {
+      const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
+      const projectId = document.getElementById('supabase-project-id')?.value || '';
+      const supabaseKey = document.getElementById('supabase-key')?.value || '';
+      
+      const configData = {
+        aiProvider: provider,
+        supabaseProjectId: projectId,
+        supabaseUrl: projectId ? `https://${projectId}.supabase.co` : '',
+        supabaseKey: supabaseKey
+      };
+      
+      // Add provider-specific API key and model
+      switch (provider) {
+        case 'claude':
+          configData.claudeApiKey = document.getElementById('claude-api-key')?.value || '';
+          configData.claudeModel = document.getElementById('claude-model')?.value || '';
+          break;
+        case 'openai':
+          configData.openaiApiKey = document.getElementById('openai-api-key')?.value || '';
+          configData.openaiModel = document.getElementById('openai-model')?.value || '';
+          break;
+        case 'gemini':
+          configData.geminiApiKey = document.getElementById('gemini-api-key')?.value || '';
+          configData.geminiModel = document.getElementById('gemini-model')?.value || '';
+          break;
+      }
+      
+      try {
+        // Save to Chrome storage
+        await chrome.storage.sync.set(configData);
+        console.log('✅ Configuration auto-saved');
+      } catch (error) {
+        console.error('Failed to auto-save configuration:', error);
+      }
+    };
+    
+    // Setup auto-save on all input fields
+    const setupAutoSave = () => {
+      // Debounce function for text inputs
+      const debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
         };
-        
-        // Add provider-specific API key and model
-        switch (provider) {
-          case 'claude':
-            configData.claudeApiKey = document.getElementById('claude-api-key').value;
-            configData.claudeModel = document.getElementById('claude-model').value;
-            break;
-          case 'openai':
-            configData.openaiApiKey = document.getElementById('openai-api-key').value;
-            configData.openaiModel = document.getElementById('openai-model').value;
-            break;
-          case 'gemini':
-            configData.geminiApiKey = document.getElementById('gemini-api-key').value;
-            configData.geminiModel = document.getElementById('gemini-model').value;
-            break;
+      };
+      
+      const debouncedSave = debounce(autoSaveConfiguration, 1000);
+      
+      // Text inputs - save after user stops typing
+      const textInputs = [
+        'claude-api-key', 'openai-api-key', 'gemini-api-key',
+        'supabase-project-id', 'supabase-key'
+      ];
+      
+      textInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+          input.addEventListener('input', debouncedSave);
         }
+      });
+      
+      // Dropdowns and radio buttons - save immediately
+      const immediateInputs = [
+        ...document.querySelectorAll('input[name="ai-provider"]'),
+        document.getElementById('claude-model'),
+        document.getElementById('openai-model'),
+        document.getElementById('gemini-model')
+      ].filter(Boolean);
+      
+      immediateInputs.forEach(input => {
+        input.addEventListener('change', autoSaveConfiguration);
+      });
+    };
+    
+    // Initialize auto-save
+    setupAutoSave();
+    
+    // Helper function to show status message
+    const showStatus = (statusDivId, message, type = 'info') => {
+      const statusDiv = document.getElementById(statusDivId);
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
         
-        try {
-          // Save to Chrome storage
-          await chrome.storage.sync.set(configData);
-          
-          // Show success message
-          if (statusDiv) {
-            statusDiv.style.display = 'block';
+        switch (type) {
+          case 'success':
             statusDiv.style.background = '#f0fff4';
             statusDiv.style.color = '#22543d';
             statusDiv.style.border = '1px solid #9ae6b4';
-            statusDiv.textContent = '✅ Configuration saved successfully!';
-            
-            setTimeout(() => {
-              statusDiv.style.display = 'none';
-            }, 3000);
-          }
-        } catch (error) {
-          if (statusDiv) {
-            statusDiv.style.display = 'block';
+            break;
+          case 'error':
             statusDiv.style.background = '#fed7d7';
             statusDiv.style.color = '#742a2a';
             statusDiv.style.border = '1px solid #feb2b2';
-            statusDiv.textContent = '❌ Failed to save configuration: ' + error.message;
+            break;
+          default:
+            statusDiv.style.background = '#e6f7ff';
+            statusDiv.style.color = '#0369a1';
+            statusDiv.style.border = '1px solid #bae6fd';
+        }
+        
+        statusDiv.textContent = message;
+        
+        // Auto-hide after 5 seconds for success/error messages
+        if (type !== 'info') {
+          setTimeout(() => {
+            statusDiv.style.display = 'none';
+          }, 5000);
+        }
+      }
+    };
+    
+    // Test Claude Connection
+    if (testClaudeBtn) {
+      testClaudeBtn.addEventListener('click', async () => {
+        showStatus('claude-status', '🔄 Testing Claude connection...', 'info');
+        
+        // First save the current provider to Claude
+        await chrome.storage.sync.set({ aiProvider: 'claude' });
+        
+        try {
+          const response = await chrome.runtime.sendMessage({ 
+            action: 'testConnection'
+          });
+          
+          if (response.success) {
+            showStatus('claude-status', '✅ Claude API connection successful!', 'success');
+          } else {
+            showStatus('claude-status', '❌ Claude connection failed: ' + (response.error || 'Invalid API key'), 'error');
           }
+        } catch (error) {
+          showStatus('claude-status', '❌ Claude test failed: ' + error.message, 'error');
         }
       });
     }
     
-    if (testBtn) {
-      testBtn.addEventListener('click', async () => {
-        if (statusDiv) {
-          statusDiv.style.display = 'block';
-          statusDiv.style.background = '#e6f7ff';
-          statusDiv.style.color = '#0369a1';
-          statusDiv.style.border = '1px solid #bae6fd';
-          statusDiv.textContent = '🔄 Testing connection...';
-        }
+    // Test OpenAI Connection
+    if (testOpenAIBtn) {
+      testOpenAIBtn.addEventListener('click', async () => {
+        showStatus('openai-status', '🔄 Testing OpenAI connection...', 'info');
+        
+        // First save the current provider to OpenAI
+        await chrome.storage.sync.set({ aiProvider: 'openai' });
         
         try {
-          const response = await chrome.runtime.sendMessage({ action: 'testConnection' });
+          const response = await chrome.runtime.sendMessage({ 
+            action: 'testConnection'
+          });
           
-          if (statusDiv) {
-            if (response.success) {
-              statusDiv.style.background = '#f0fff4';
-              statusDiv.style.color = '#22543d';
-              statusDiv.style.border = '1px solid #9ae6b4';
-              const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
-              const providerName = provider === 'claude' ? 'Claude' : provider === 'openai' ? 'OpenAI' : 'Gemini';
-              statusDiv.textContent = `✅ Connection successful! ${providerName} API and Supabase are configured correctly.`;
-            } else {
-              statusDiv.style.background = '#fed7d7';
-              statusDiv.style.color = '#742a2a';
-              statusDiv.style.border = '1px solid #feb2b2';
-              statusDiv.textContent = '❌ Connection failed. Please check your API credentials.';
-            }
+          if (response.success) {
+            showStatus('openai-status', '✅ OpenAI API connection successful!', 'success');
+          } else {
+            showStatus('openai-status', '❌ OpenAI connection failed: ' + (response.error || 'Invalid API key'), 'error');
           }
         } catch (error) {
-          if (statusDiv) {
-            statusDiv.style.background = '#fed7d7';
-            statusDiv.style.color = '#742a2a';
-            statusDiv.style.border = '1px solid #feb2b2';
-            statusDiv.textContent = '❌ Test failed: ' + error.message;
+          showStatus('openai-status', '❌ OpenAI test failed: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    // Test Gemini Connection
+    if (testGeminiBtn) {
+      testGeminiBtn.addEventListener('click', async () => {
+        showStatus('gemini-status', '🔄 Testing Gemini connection...', 'info');
+        
+        // First save the current provider to Gemini
+        await chrome.storage.sync.set({ aiProvider: 'gemini' });
+        
+        try {
+          const response = await chrome.runtime.sendMessage({ 
+            action: 'testConnection'
+          });
+          
+          if (response.success) {
+            showStatus('gemini-status', '✅ Gemini API connection successful!', 'success');
+          } else {
+            showStatus('gemini-status', '❌ Gemini connection failed: ' + (response.error || 'Invalid API key'), 'error');
           }
+        } catch (error) {
+          showStatus('gemini-status', '❌ Gemini test failed: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    // Test Database Connection
+    if (testDatabaseBtn) {
+      testDatabaseBtn.addEventListener('click', async () => {
+        showStatus('database-status', '🔄 Testing database connection...', 'info');
+        
+        try {
+          const response = await chrome.runtime.sendMessage({ 
+            action: 'testConnection'
+          });
+          
+          if (response.success) {
+            showStatus('database-status', '✅ Supabase database connection successful!', 'success');
+          } else {
+            showStatus('database-status', '❌ Database connection failed: ' + (response.error || 'Invalid credentials'), 'error');
+          }
+        } catch (error) {
+          showStatus('database-status', '❌ Database test failed: ' + error.message, 'error');
         }
       });
     }
@@ -2326,12 +2479,21 @@ class LovableDetector {
         'supabaseProjectId', 'supabaseKey'
       ]);
       
+      // Debug log to check saved settings
+      console.log('Loading API settings:', {
+        provider: settings.aiProvider,
+        claudeModel: settings.claudeModel,
+        openaiModel: settings.openaiModel,
+        geminiModel: settings.geminiModel
+      });
+      
       // Set selected provider
       const provider = settings.aiProvider || 'claude';
       const providerRadio = document.getElementById(`provider-${provider}`);
       if (providerRadio) {
         providerRadio.checked = true;
-        providerRadio.dispatchEvent(new Event('change'));
+        // Manually trigger the change event to show the correct config section
+        providerRadio.dispatchEvent(new Event('change', { bubbles: true }));
       }
       
       // Load API keys
@@ -2361,27 +2523,36 @@ class LovableDetector {
         if (claudeModelSelect) {
           if (settings.claudeModel && this.isValidModelOption(claudeModelSelect, settings.claudeModel)) {
             claudeModelSelect.value = settings.claudeModel;
+            // Force update the displayed value
+            claudeModelSelect.dispatchEvent(new Event('change'));
           } else {
             // Set to first option as default
             claudeModelSelect.selectedIndex = 0;
+            claudeModelSelect.dispatchEvent(new Event('change'));
           }
         }
         
         if (openaiModelSelect) {
           if (settings.openaiModel && this.isValidModelOption(openaiModelSelect, settings.openaiModel)) {
             openaiModelSelect.value = settings.openaiModel;
+            // Force update the displayed value
+            openaiModelSelect.dispatchEvent(new Event('change'));
           } else {
             // Set to first option as default
             openaiModelSelect.selectedIndex = 0;
+            openaiModelSelect.dispatchEvent(new Event('change'));
           }
         }
         
         if (geminiModelSelect) {
           if (settings.geminiModel && this.isValidModelOption(geminiModelSelect, settings.geminiModel)) {
             geminiModelSelect.value = settings.geminiModel;
+            // Force update the displayed value
+            geminiModelSelect.dispatchEvent(new Event('change'));
           } else {
             // Set to first option as default
             geminiModelSelect.selectedIndex = 0;
+            geminiModelSelect.dispatchEvent(new Event('change'));
           }
         }
       }, 100);
@@ -2410,6 +2581,306 @@ class LovableDetector {
     
     console.warn(`Model "${modelValue}" not found in dropdown options`);
     return false;
+  }
+
+  setupPromptTemplates() {
+    const loadBtn = document.getElementById('load-prompt-templates-btn');
+    const saveBtn = document.getElementById('save-prompt-templates-btn');
+    const resetBtn = document.getElementById('reset-prompt-templates-btn');
+    
+    if (loadBtn) {
+      loadBtn.addEventListener('click', () => this.loadPromptTemplates());
+    }
+    
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => this.savePromptTemplates());
+    }
+    
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => this.resetPromptTemplates());
+    }
+    
+    // Auto-load templates when section is displayed
+    this.loadPromptTemplates();
+  }
+
+  getDefaultPromptTemplates() {
+    return [
+      {
+        category: 'Design',
+        name: 'UI Change',
+        template: 'Make only visual updates—do not impact functionality or logic in any way. Fully understand how the current UI integrates with the app, ensuring logic, state management, and APIs remain untouched. Test thoroughly to confirm the app behaves exactly as before. Stop if there\'s any doubt about unintended effects.',
+        shortcut: 'ui_change'
+      },
+      {
+        category: 'Design',
+        name: 'Optimize for Mobile',
+        template: 'Optimize the app for mobile without changing its design or functionality. Analyze the layout and responsiveness to identify necessary adjustments for smaller screens and touch interactions. Outline a detailed plan before editing any code, and test thoroughly across devices to ensure the app behaves exactly as it does now. Pause and propose solutions if unsure.',
+        shortcut: 'mobile_optimize'
+      },
+      {
+        category: 'Editing Features',
+        name: 'Modifying an Existing Feature',
+        template: 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
+        shortcut: 'modify_feature'
+      },
+      {
+        category: 'Editing Features',
+        name: 'Fragile Update',
+        template: 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.',
+        shortcut: 'fragile_update'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Minor Errors',
+        template: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+        shortcut: 'minor_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Persistent Errors',
+        template: 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
+        shortcut: 'persistent_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Major Errors',
+        template: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+        shortcut: 'major_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Clean up Console Logs',
+        template: 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
+        shortcut: 'clean_logs'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Critical Errors',
+        template: 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
+        shortcut: 'critical_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Extreme Errors',
+        template: 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.',
+        shortcut: 'extreme_errors'
+      },
+      {
+        category: 'Refactoring',
+        name: 'Refactoring After Request Made by Lovable',
+        template: 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.',
+        shortcut: 'refactor_lovable'
+      },
+      {
+        category: 'Using another LLM',
+        name: 'Generate Comprehensive Explanation',
+        template: 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.',
+        shortcut: 'explain_for_llm'
+      }
+    ];
+  }
+
+  loadPromptTemplates() {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return;
+    
+    // Try to load from localStorage first, then fall back to defaults
+    let templates;
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      console.warn('Failed to load stored templates, using defaults:', error);
+      templates = this.getDefaultPromptTemplates();
+    }
+    
+    this.renderPromptTemplates(templates);
+  }
+
+  renderPromptTemplates(templates) {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return;
+    
+    // Group templates by category
+    const categories = {};
+    templates.forEach(template => {
+      if (!categories[template.category]) {
+        categories[template.category] = [];
+      }
+      categories[template.category].push(template);
+    });
+    
+    let html = '';
+    Object.keys(categories).forEach(category => {
+      const icon = this.getCategoryIcon(category);
+      html += `
+        <div style="margin-bottom: 20px;">
+          <h5 style="margin: 0 0 12px 0; color: #1a202c; font-size: 13px; font-weight: 600; 
+                     border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+            ${icon} ${category}
+          </h5>
+      `;
+      
+      categories[category].forEach((template, index) => {
+        const templateId = `template-${template.category.replace(/\s+/g, '-').toLowerCase()}-${index}`;
+        html += `
+          <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <label style="font-weight: 500; color: #1a202c; font-size: 12px;">
+                ${template.name}
+              </label>
+              <button onclick="window.lovableDetector.copyTemplate('${templateId}')" style="
+                background: #667eea; color: white; border: none; padding: 4px 8px;
+                border-radius: 4px; cursor: pointer; font-size: 10px;
+              ">Copy</button>
+            </div>
+            <textarea id="${templateId}" data-category="${template.category}" data-name="${template.name}" data-shortcut="${template.shortcut}" 
+                      style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
+                             border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
+                             background: white; color: #1a202c;">${template.template}</textarea>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+    });
+    
+    container.innerHTML = html;
+  }
+
+  getCategoryIcon(category) {
+    const icons = {
+      'Design': '🎨',
+      'Editing Features': '✏️',
+      'Error Debugging': '🐛',
+      'Refactoring': '🔄',
+      'Using another LLM': '🤖'
+    };
+    return icons[category] || '📝';
+  }
+
+  copyTemplate(templateId) {
+    const textarea = document.getElementById(templateId);
+    if (textarea) {
+      textarea.select();
+      textarea.setSelectionRange(0, 99999); // For mobile devices
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        console.log('Template copied to clipboard');
+        // Show brief success message
+        const button = textarea.parentElement.querySelector('button');
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = '#48bb78';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.background = '#667eea';
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy template:', err);
+      });
+    }
+  }
+
+  savePromptTemplates() {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return;
+    
+    const textareas = container.querySelectorAll('textarea');
+    const templates = [];
+    
+    textareas.forEach(textarea => {
+      templates.push({
+        category: textarea.dataset.category,
+        name: textarea.dataset.name,
+        template: textarea.value,
+        shortcut: textarea.dataset.shortcut
+      });
+    });
+    
+    try {
+      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      console.log('✅ Prompt templates saved');
+      
+      // Show success message
+      const saveBtn = document.getElementById('save-prompt-templates-btn');
+      if (saveBtn) {
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saved!';
+        saveBtn.style.background = '#48bb78';
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = '#48bb78';
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to save prompt templates:', error);
+    }
+  }
+
+  resetPromptTemplates() {
+    if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {
+      localStorage.removeItem('lovable-prompt-templates');
+      this.loadPromptTemplates();
+      console.log('🔄 Prompt templates reset to defaults');
+    }
+  }
+
+  loadTemplatesIntoMenu() {
+    const menuContainer = document.getElementById('prompt-templates-menu');
+    if (!menuContainer) return;
+    
+    // Load templates from localStorage or defaults
+    let templates;
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      templates = this.getDefaultPromptTemplates();
+    }
+    
+    // Group templates by category
+    const categories = {};
+    templates.forEach(template => {
+      if (!categories[template.category]) {
+        categories[template.category] = [];
+      }
+      categories[template.category].push(template);
+    });
+    
+    let html = '';
+    Object.keys(categories).forEach(category => {
+      const icon = this.getCategoryIcon(category);
+      const color = this.getCategoryColor(category);
+      
+      html += `
+        <div class="prompt-category" data-category="${category.toLowerCase().replace(/\s+/g, '-')}">
+          <div style="font-weight: 600; color: ${color}; margin-bottom: 4px;">${icon} ${category}</div>
+      `;
+      
+      categories[category].forEach(template => {
+        html += `
+          <button class="prompt-option" data-template="${template.template}" title="${template.name}">
+            ${template.name}
+          </button>
+        `;
+      });
+      
+      html += '</div>';
+    });
+    
+    menuContainer.innerHTML = html;
+  }
+
+  getCategoryColor(category) {
+    const colors = {
+      'Design': '#667eea',
+      'Editing Features': '#48bb78',
+      'Error Debugging': '#f56565',
+      'Refactoring': '#805ad5',
+      'Using another LLM': '#ed8936'
+    };
+    return colors[category] || '#4a5568';
   }
 
   async scrapeAllMessages() {
@@ -2505,37 +2976,15 @@ class LovableDetector {
     menu.id = 'prompt-enhancement-menu';
     menu.innerHTML = `
       <div style="
-        position: absolute; z-index: 10002; background: white; 
+        position: absolute; z-index: 999999; background: white; 
         border: 1px solid #c9cfd7; border-radius: 8px; box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        padding: 16px; min-width: 300px; font-family: system-ui, sans-serif;
+        padding: 16px; min-width: 300px; max-width: 400px; font-family: system-ui, sans-serif;
       ">
         <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
           ✨ Enhance Your Prompt
         </h4>
-        <div style="display: grid; gap: 8px;">
-          <div class="prompt-category" data-category="designing">
-            <div style="font-weight: 600; color: #667eea; margin-bottom: 4px;">🎨 Designing</div>
-            <button class="prompt-option" data-text="Please help me with UI changes - ">UI Change</button>
-            <button class="prompt-option" data-text="Please optimize this for mobile devices - ">Optimize for Mobile</button>
-          </div>
-          
-          <div class="prompt-category" data-category="functioning">
-            <div style="font-weight: 600; color: #48bb78; margin-bottom: 4px;">⚙️ Functioning</div>
-            <button class="prompt-option" data-text="I need to modify this function - ">Modifying Function</button>
-          </div>
-          
-          <div class="prompt-category" data-category="debugging">
-            <div style="font-weight: 600; color: #f56565; margin-bottom: 4px;">🐛 Debugging</div>
-            <button class="prompt-option" data-text="I'm experiencing minor errors - ">Minor Errors</button>
-            <button class="prompt-option" data-text="I have persistent errors that keep occurring - ">Persistent Errors</button>
-            <button class="prompt-option" data-text="There are major errors affecting functionality - ">Major Errors</button>
-            <button class="prompt-option" data-text="URGENT: Critical errors need immediate attention - ">Critical Errors</button>
-          </div>
-          
-          <div class="prompt-category" data-category="refactoring">
-            <div style="font-weight: 600; color: #805ad5; margin-bottom: 4px;">🔄 Refactoring</div>
-            <button class="prompt-option" data-text="Please help me refactor this code to improve - ">Code Refactoring</button>
-          </div>
+        <div id="prompt-templates-menu" style="display: grid; gap: 8px; max-height: 250px; overflow-y: auto;">
+          <!-- Templates will be loaded here -->
         </div>
         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center;">
           <button id="close-prompt-menu" style="
@@ -2546,11 +2995,96 @@ class LovableDetector {
       </div>
     `;
     
-    // Position menu near the input
+    // Position menu near the input with smart positioning
+    document.body.appendChild(menu);
+    
     const rect = inputElement.getBoundingClientRect();
+    
     menu.style.position = 'fixed';
-    menu.style.top = (rect.top - 200) + 'px';
-    menu.style.left = rect.left + 'px';
+    menu.style.visibility = 'hidden'; // Hide while calculating position
+    
+    // Force a layout to get accurate dimensions
+    menu.offsetHeight;
+    
+    const menuRect = menu.getBoundingClientRect();
+    
+    // Calculate position based on the specific Lovable chat container element
+    let top, left = rect.left;
+    
+    try {
+      // Find the specific element: /html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]
+      const chatContainerElement = document.evaluate(
+        '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[1]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      ).singleNodeValue;
+      
+      if (chatContainerElement) {
+        const containerRect = chatContainerElement.getBoundingClientRect();
+        // Position at the height of the container minus the height of the prompt helper
+        top = containerRect.height - menuRect.height;
+        
+        // Ensure minimum distance from top of viewport
+        top = Math.max(top, 10);
+        
+        console.log('📍 Positioned menu using chat container height:', {
+          containerHeight: containerRect.height,
+          menuHeight: menuRect.height,
+          calculatedTop: top
+        });
+      } else {
+        throw new Error('Chat container element not found');
+      }
+    } catch (error) {
+      console.warn('Could not find specific chat container element, using fallback positioning:', error);
+      
+      // Fallback to original positioning above input
+      top = rect.top - menuRect.height - 15;
+      
+      // Ensure menu stays within viewport
+      if (top < 10) {
+        // Calculate available space above input
+        const availableSpace = rect.top - 20;
+        
+        if (availableSpace < menuRect.height) {
+          // Reduce menu height to fit available space
+          const maxMenuHeight = Math.max(200, availableSpace - 10);
+          const templatesContainer = menu.querySelector('#prompt-templates-menu');
+          if (templatesContainer) {
+            templatesContainer.style.maxHeight = (maxMenuHeight - 100) + 'px';
+          }
+          
+          // Recalculate menu height after adjustment
+          menu.offsetHeight;
+          const newMenuRect = menu.getBoundingClientRect();
+          top = rect.top - newMenuRect.height - 10;
+        } else {
+          top = 10;
+        }
+        
+        // Ensure minimum gap from input
+        top = Math.min(top, rect.top - 50);
+      }
+    }
+    
+    // Ensure menu doesn't go off the right edge
+    if (left + menuRect.width > window.innerWidth - 20) {
+      left = window.innerWidth - menuRect.width - 20;
+    }
+    
+    // Ensure menu doesn't go off the left edge
+    if (left < 20) {
+      left = 20;
+    }
+    
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+    menu.style.visibility = 'visible'; // Show after positioning
+    
+    // Load prompt templates into menu
+    this.loadTemplatesIntoMenu();
     
     // Add menu styles
     if (!document.getElementById('prompt-menu-styles')) {
@@ -2573,14 +3107,19 @@ class LovableDetector {
       document.head.appendChild(style);
     }
     
-    document.body.appendChild(menu);
-    
     // Add event listeners
     menu.querySelectorAll('.prompt-option').forEach(btn => {
       btn.addEventListener('click', () => {
-        const enhancementText = btn.getAttribute('data-text');
-        const currentValue = inputElement.value;
-        inputElement.value = enhancementText + currentValue;
+        const templateContent = btn.getAttribute('data-template');
+        const currentValue = inputElement.value.trim();
+        
+        // Add template content with proper formatting
+        if (currentValue) {
+          inputElement.value = templateContent + '\n\n' + currentValue;
+        } else {
+          inputElement.value = templateContent;
+        }
+        
         inputElement.focus();
         menu.remove();
       });
