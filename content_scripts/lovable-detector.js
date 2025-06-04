@@ -2780,30 +2780,15 @@ class LovableDetector {
     
     // Add event listeners after HTML is rendered
     this.setupTemplateEventListeners();
-    
-    // Debug: Check if event listeners were attached
-    console.log('🔧 Debug: Event listeners attached to:', {
-      editableCategories: container.querySelectorAll('.editable-category').length,
-      editableTemplateNames: container.querySelectorAll('.editable-template-name').length,
-      copyButtons: container.querySelectorAll('.copy-template-btn').length,
-      deleteButtons: container.querySelectorAll('.delete-template-btn').length,
-      addButtons: container.querySelectorAll('.add-template-btn').length
-    });
   }
 
   setupTemplateEventListeners() {
     const container = document.getElementById('prompt-templates-container');
-    if (!container) {
-      console.warn('🔧 Debug: prompt-templates-container not found');
-      return;
-    }
-    
-    console.log('🔧 Debug: Setting up template event listeners...');
+    if (!container) return;
     
     // Editable category names
     container.querySelectorAll('.editable-category').forEach(element => {
       element.addEventListener('click', () => {
-        console.log('🔧 Debug: Category clicked:', element.id);
         this.makeEditable(element.id, 'category');
       });
     });
@@ -2811,7 +2796,6 @@ class LovableDetector {
     // Editable template names
     container.querySelectorAll('.editable-template-name').forEach(element => {
       element.addEventListener('click', () => {
-        console.log('🔧 Debug: Template name clicked:', element.id);
         this.makeEditable(element.id, 'template-name');
       });
     });
@@ -2819,7 +2803,6 @@ class LovableDetector {
     // Copy template buttons
     container.querySelectorAll('.copy-template-btn').forEach(button => {
       button.addEventListener('click', () => {
-        console.log('🔧 Debug: Copy button clicked:', button.dataset.templateId);
         const templateId = button.dataset.templateId;
         this.copyTemplate(templateId);
       });
@@ -2828,7 +2811,6 @@ class LovableDetector {
     // Delete template buttons
     container.querySelectorAll('.delete-template-btn').forEach(button => {
       button.addEventListener('click', () => {
-        console.log('🔧 Debug: Delete template button clicked:', button.dataset.templateId);
         const templateId = button.dataset.templateId;
         this.deleteTemplate(templateId);
       });
@@ -2837,7 +2819,6 @@ class LovableDetector {
     // Delete section buttons
     container.querySelectorAll('.delete-section-btn').forEach(button => {
       button.addEventListener('click', () => {
-        console.log('🔧 Debug: Delete section button clicked:', button.dataset.category);
         const category = button.dataset.category;
         this.deleteSection(category);
       });
@@ -2846,7 +2827,6 @@ class LovableDetector {
     // Add template buttons
     container.querySelectorAll('.add-template-btn').forEach(button => {
       button.addEventListener('click', () => {
-        console.log('🔧 Debug: Add template button clicked:', button.dataset.category);
         const category = button.dataset.category;
         this.addNewTemplate(category);
       });
@@ -3272,11 +3252,25 @@ class LovableDetector {
         <div id="prompt-templates-menu" style="display: grid; gap: 8px; max-height: 400px; overflow-y: auto;">
           <!-- Templates will be loaded here -->
         </div>
-        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; text-align: center;">
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; gap: 6px; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 6px;">
+            <button id="translate-prompt-btn" style="
+              background: #3182ce; color: white; border: none;
+              padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+            ">Translate</button>
+            <button id="rewrite-prompt-btn" style="
+              background: #38a169; color: white; border: none;
+              padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+            ">Rewrite</button>
+            <button id="enhance-prompt-btn" style="
+              background: #805ad5; color: white; border: none;
+              padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+            ">Enhance</button>
+          </div>
           <button id="close-prompt-menu" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
             padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
-          ">Cancel</button>
+          ">Close</button>
         </div>
       </div>
     `;
@@ -3389,6 +3383,21 @@ class LovableDetector {
         .prompt-category {
           margin-bottom: 12px;
         }
+        #translate-prompt-btn:hover {
+          background: #2c5aa0 !important;
+        }
+        #rewrite-prompt-btn:hover {
+          background: #2f855a !important;
+        }
+        #enhance-prompt-btn:hover {
+          background: #6b46c1 !important;
+        }
+        #translate-prompt-btn:disabled,
+        #rewrite-prompt-btn:disabled,
+        #enhance-prompt-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
       `;
       document.head.appendChild(style);
     }
@@ -3411,6 +3420,19 @@ class LovableDetector {
       });
     });
     
+    // Add event listeners for new buttons
+    document.getElementById('translate-prompt-btn')?.addEventListener('click', () => {
+      this.translatePrompt(inputElement, menu);
+    });
+    
+    document.getElementById('rewrite-prompt-btn')?.addEventListener('click', () => {
+      this.rewritePrompt(inputElement, menu);
+    });
+    
+    document.getElementById('enhance-prompt-btn')?.addEventListener('click', () => {
+      this.enhancePromptWithHandbook(inputElement, menu);
+    });
+    
     document.getElementById('close-prompt-menu')?.addEventListener('click', () => {
       menu.remove();
     });
@@ -3423,6 +3445,286 @@ class LovableDetector {
       }
     };
     setTimeout(() => document.addEventListener('click', closeMenu), 100);
+  }
+
+  updateInputFieldValue(inputElement, newValue) {
+    // Safety checks
+    if (!inputElement || !newValue || typeof newValue !== 'string') {
+      console.error('❌ Invalid input element or value for updateInputFieldValue');
+      return;
+    }
+    
+    try {
+      // Multiple approaches to ensure the value is set properly
+      
+      // 1. Set the value directly
+      inputElement.value = newValue;
+      
+      // 2. Clear the field first, then set the new value
+      if (inputElement.select && inputElement.setRangeText) {
+        inputElement.select();
+        inputElement.setRangeText(newValue, 0, inputElement.value.length, 'end');
+      }
+      
+      // 3. Trigger multiple events to ensure any listeners are notified
+      const events = ['input', 'change', 'keyup', 'paste'];
+      events.forEach(eventType => {
+        try {
+          inputElement.dispatchEvent(new Event(eventType, { 
+            bubbles: true, 
+            cancelable: true 
+          }));
+        } catch (e) {
+          console.warn('Failed to dispatch event:', eventType, e);
+        }
+      });
+      
+      // 4. Force the cursor to the end
+      if (inputElement.setSelectionRange) {
+        try {
+          inputElement.setSelectionRange(newValue.length, newValue.length);
+        } catch (e) {
+          console.warn('Failed to set selection range:', e);
+        }
+      }
+      
+      // 5. Ensure the field is focused
+      if (inputElement.focus) {
+        inputElement.focus();
+      }
+      
+      console.log('✅ Input field updated with:', newValue.substring(0, 50) + '...');
+      
+    } catch (error) {
+      console.error('❌ Error updating input field:', error);
+      // Fallback: just set the value
+      inputElement.value = newValue;
+    }
+  }
+
+  async translatePrompt(inputElement, menu) {
+    if (!inputElement || !menu) {
+      console.error('❌ Missing required elements for translatePrompt');
+      return;
+    }
+    
+    const currentPrompt = inputElement.value ? inputElement.value.trim() : '';
+    if (!currentPrompt) {
+      alert('Please enter a prompt to translate.');
+      return;
+    }
+
+    const button = document.getElementById('translate-prompt-btn');
+    if (!button) {
+      console.error('❌ Translate button not found');
+      return;
+    }
+    
+    const originalText = button.textContent;
+    button.textContent = 'Translating...';
+    button.disabled = true;
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'aiRequest',
+        prompt: `You must translate the following text to English. Your response should contain ONLY the translated text with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the translation:" or similar phrases. Just output the direct translation:
+
+${currentPrompt}`
+      });
+
+      if (response && response.success && response.content) {
+        // Clean the response to remove any potential wrapper text
+        let cleanedContent = response.content.trim();
+        
+        // Remove common AI response prefixes/suffixes
+        cleanedContent = cleanedContent.replace(/^(Here is the translation:|The translation is:|Translated text:|Translation:)\s*/i, '');
+        cleanedContent = cleanedContent.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+        
+        this.updateInputFieldValue(inputElement, cleanedContent);
+        
+        // Small delay to ensure the value is properly set before closing menu
+        setTimeout(() => {
+          menu.remove();
+        }, 100);
+      } else {
+        alert('Translation failed: ' + (response?.error || 'No response received'));
+      }
+    } catch (error) {
+      alert('Translation failed: ' + error.message);
+    } finally {
+      if (button) {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+  }
+
+  async rewritePrompt(inputElement, menu) {
+    if (!inputElement || !menu) {
+      console.error('❌ Missing required elements for rewritePrompt');
+      return;
+    }
+    
+    const currentPrompt = inputElement.value ? inputElement.value.trim() : '';
+    if (!currentPrompt) {
+      alert('Please enter a prompt to rewrite.');
+      return;
+    }
+
+    const button = document.getElementById('rewrite-prompt-btn');
+    if (!button) {
+      console.error('❌ Rewrite button not found');
+      return;
+    }
+    
+    const originalText = button.textContent;
+    button.textContent = 'Rewriting...';
+    button.disabled = true;
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'aiRequest',
+        prompt: `You must fix grammar, spelling errors, and sentence structure to make the following text more fluent and professional. Your response should contain ONLY the corrected text with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the corrected text:" or similar phrases. Just output the direct rewritten text:
+
+${currentPrompt}`
+      });
+
+      if (response && response.success && response.content) {
+        // Clean the response to remove any potential wrapper text
+        let cleanedContent = response.content.trim();
+        
+        // Remove common AI response prefixes/suffixes
+        cleanedContent = cleanedContent.replace(/^(Here is the corrected text:|The corrected text is:|Rewritten text:|Corrected:)\s*/i, '');
+        cleanedContent = cleanedContent.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+        
+        this.updateInputFieldValue(inputElement, cleanedContent);
+        
+        // Small delay to ensure the value is properly set before closing menu
+        setTimeout(() => {
+          menu.remove();
+        }, 100);
+      } else {
+        alert('Rewrite failed: ' + (response?.error || 'No response received'));
+      }
+    } catch (error) {
+      alert('Rewrite failed: ' + error.message);
+    } finally {
+      if (button) {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+  }
+
+  async enhancePromptWithHandbook(inputElement, menu) {
+    if (!inputElement || !menu) {
+      console.error('❌ Missing required elements for enhancePromptWithHandbook');
+      return;
+    }
+    
+    const currentPrompt = inputElement.value ? inputElement.value.trim() : '';
+    if (!currentPrompt) {
+      alert('Please enter a prompt to enhance.');
+      return;
+    }
+
+    const button = document.getElementById('enhance-prompt-btn');
+    if (!button) {
+      console.error('❌ Enhance button not found');
+      return;
+    }
+    
+    const originalText = button.textContent;
+    button.textContent = 'Enhancing...';
+    button.disabled = true;
+
+    try {
+      const enhancementInstructions = this.getLovablePromptingHandbookInstructions();
+      
+      const response = await chrome.runtime.sendMessage({
+        action: 'aiRequest',
+        prompt: `${enhancementInstructions}
+
+Now enhance the following prompt according to these Lovable best practices. Your response should contain ONLY the enhanced prompt with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the enhanced prompt:" or similar phrases. Just output the direct enhanced prompt:
+
+${currentPrompt}`
+      });
+
+      if (response && response.success && response.content) {
+        // Clean the response to remove any potential wrapper text
+        let cleanedContent = response.content.trim();
+        
+        // Remove common AI response prefixes/suffixes
+        cleanedContent = cleanedContent.replace(/^(Here is the enhanced prompt:|The enhanced prompt is:|Enhanced prompt:|Enhanced:)\s*/i, '');
+        cleanedContent = cleanedContent.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+        
+        this.updateInputFieldValue(inputElement, cleanedContent);
+        
+        // Small delay to ensure the value is properly set before closing menu
+        setTimeout(() => {
+          menu.remove();
+        }, 100);
+      } else {
+        alert('Enhancement failed: ' + (response?.error || 'No response received'));
+      }
+    } catch (error) {
+      alert('Enhancement failed: ' + error.message);
+    } finally {
+      if (button) {
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+  }
+
+  getLovablePromptingHandbookInstructions() {
+    return `You are an expert at enhancing prompts for Lovable, an AI-powered full-stack development platform. Enhance user prompts according to these Lovable best practices:
+
+**KEY PRINCIPLES:**
+1. **Be Clear and Specific**: Clear, verbose prompts = better output. Be specific about the exact page, component, or behavior.
+2. **Step-by-Step Approach**: Avoid assigning multiple tasks simultaneously. Focus on one task at a time.
+3. **Use Structured Format**: Break prompts into sections: Context, Task, Guidelines, Constraints.
+4. **Role-Based Clarity**: If the app has multiple roles (Admin, User, etc.), always specify which role applies.
+5. **Mobile-First Responsive Design**: Ensure all designs are completely responsive using modern UI/UX practices.
+
+**SPECIFIC ENHANCEMENTS TO APPLY:**
+- Add clear context about what the user is building
+- Break down complex requests into specific, actionable steps
+- Include technical preferences (React, Tailwind, ShadCN, Supabase, etc.)
+- Specify responsive design requirements
+- Add accessibility considerations
+- Include guardrails about what NOT to touch
+- Mention specific files or components if relevant
+- Add testing or validation requirements
+- Include error handling considerations
+
+**STRUCTURE FORMAT:**
+If the prompt is complex, organize it as:
+- **Context**: Background or role setup
+- **Task**: Specific goal to achieve
+- **Guidelines**: Preferred approach or style
+- **Constraints**: Hard limits or must-not-dos
+
+**RESPONSIVE DESIGN GUIDELINES:**
+- Ensure mobile-first approach
+- Use Tailwind's standard breakpoints
+- Avoid custom breakpoints unless specified
+- Plan responsive implementation from largest to smallest components
+
+**ACCESSIBILITY & BEST PRACTICES:**
+- Include ARIA labels and keyboard navigation
+- Follow modern accessibility standards
+- Use semantic HTML elements
+- Ensure proper color contrast
+
+**CAUTIOUS APPROACH FOR CRITICAL CHANGES:**
+If the change affects critical parts, add warnings about:
+- Examining related code and dependencies before changes
+- Avoiding modifications to unrelated components
+- Ensuring thorough testing after changes
+- Pausing if uncertain
+
+Transform the user's prompt to follow these guidelines while preserving their original intent.`;
   }
 
   setupInputAutoExpansion() {

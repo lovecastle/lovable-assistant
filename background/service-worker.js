@@ -100,6 +100,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'aiRequest':
+      handleAIRequest(request.prompt).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -135,6 +141,33 @@ async function handleChatMessage(message, context) {
     
   } catch (error) {
     return { success: false, error: error.message };
+  }
+}
+
+async function handleAIRequest(prompt) {
+  try {
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('Invalid prompt provided');
+    }
+    
+    console.log('🤖 AI Request received:', prompt.substring(0, 100) + '...');
+    
+    const response = await aiAPI.generateResponse(prompt);
+    
+    if (!response || typeof response !== 'string') {
+      throw new Error('Invalid response from AI API');
+    }
+    
+    console.log('✅ AI Response generated:', response.substring(0, 100) + '...');
+    return { success: true, content: response };
+    
+  } catch (error) {
+    console.error('❌ AI Request failed:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Unknown error occurred',
+      details: error.toString()
+    };
   }
 }
 
