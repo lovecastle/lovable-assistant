@@ -939,4 +939,3 @@ const uiInjector = new UIInjector();
 // Make it globally accessible for debugging
 window.uiInjector = uiInjector;
 
-console.log('🎨 Lovable.dev UI Injector initialized');

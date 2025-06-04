@@ -2,7 +2,6 @@
 import { SupabaseClient } from './database-sync.js';
 import { AIAPI } from './ai-api.js';
 
-console.log('Service worker starting...');
 
 // Initialize database client
 const supabase = new SupabaseClient();
@@ -593,4 +592,3 @@ async function handleActivateTab(tabId) {
   }
 }
 
-console.log('Service worker initialized');

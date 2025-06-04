@@ -4,7 +4,7 @@
 // Organized into focused sections for better maintainability
 // Each section has a clear responsibility and purpose
 
-console.log('🚀 Lovable Assistant: Loading enhanced detector...');
+// Lovable Assistant: Loading enhanced detector...
 
 // ===========================
 // SECTION 1: CORE DETECTOR CLASS

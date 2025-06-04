@@ -12,7 +12,7 @@ class SimpleConversationCapture {
   }
 
   init() {
-    console.log('🚀 Simple Conversation Capture initialized');
+    // Simple Conversation Capture initialized
     this.startMonitoring();
     
     // Process periodically
@@ -23,7 +23,6 @@ class SimpleConversationCapture {
     if (this.isMonitoring) return;
     
     this.isMonitoring = true;
-    console.log('👀 Starting chat monitoring...');
     
     // Find and monitor chat container
     this.findAndSetupMonitoring();
@@ -876,4 +875,3 @@ window.conversationCapture = {
   }
 };
 
-console.log('✅ Lovable.dev Simple Conversation Capture ready');
