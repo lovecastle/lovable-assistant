@@ -18,6 +18,8 @@ class LovableDetector {
     this.projectId = null;
     this.assistantDialog = null;
     this.verboseLogging = false; // Control verbose console logging
+    this.isClosing = false; // Flag to prevent race conditions
+    this.lastToggleTime = 0; // Debounce rapid toggles
     
     try {
       this.init();
@@ -70,18 +72,30 @@ class LovableDetector {
   }
 
   setupKeyboardShortcuts() {
+    // Remove any existing listeners first
+    if (this.handleKeydown) {
+      document.removeEventListener('keydown', this.handleKeydown, true);
+      window.removeEventListener('keydown', this.handleKeydown, true);
+    }
+    
     this.handleKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         console.log('🤖 Assistant shortcut triggered');
         e.preventDefault();
         e.stopPropagation();
-        this.toggleAssistant();
+        e.stopImmediatePropagation();
+        
+        // Add small delay to prevent event conflicts
+        setTimeout(() => {
+          this.toggleAssistant();
+        }, 10);
+        
         return false;
       }
     };
     
+    // Only use document listener to avoid double events
     document.addEventListener('keydown', this.handleKeydown, true);
-    window.addEventListener('keydown', this.handleKeydown, true);
     
     console.log('🎹 Keyboard shortcuts registered');
   }
@@ -98,15 +112,66 @@ class LovableDetector {
   // This section manages the main assistant dialog and all its views
 
   toggleAssistant() {
-    console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog);
+    const now = Date.now();
+    
+    // Debounce rapid toggles (prevent toggles within 300ms)
+    if (now - this.lastToggleTime < 300) {
+      console.log('🚫 Toggle ignored (too rapid)');
+      return;
+    }
+    
+    this.lastToggleTime = now;
+    
+    console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog, 'isClosing:', this.isClosing);
+    
+    // Prevent actions if currently in the middle of closing
+    if (this.isClosing) {
+      console.log('🚫 Toggle ignored (currently closing)');
+      return;
+    }
     
     if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
       console.log('🔒 Closing assistant dialog');
-      this.assistantDialog.remove();
-      this.assistantDialog = null;
+      this.closeAssistant();
     } else {
       console.log('🚀 Opening assistant dialog');
       this.showAssistant();
+    }
+  }
+
+  closeAssistant() {
+    if (this.assistantDialog && !this.isClosing) {
+      this.isClosing = true;
+      console.log('🔒 Starting close process...');
+      
+      try {
+        // Remove any existing event listeners to prevent conflicts
+        this.removeDialogEventListeners();
+        
+        // Remove the dialog from DOM
+        this.assistantDialog.remove();
+        this.assistantDialog = null;
+        
+        console.log('🔒 Assistant dialog closed and cleaned up');
+      } catch (error) {
+        console.error('Error during close:', error);
+      } finally {
+        // Reset closing flag after a short delay
+        setTimeout(() => {
+          this.isClosing = false;
+          console.log('🔓 Close process completed');
+        }, 100);
+      }
+    }
+  }
+
+  removeDialogEventListeners() {
+    // Remove any close button listeners that might be attached
+    const closeBtn = document.getElementById('close-btn');
+    if (closeBtn) {
+      // Clone the button to remove all event listeners
+      const newCloseBtn = closeBtn.cloneNode(true);
+      closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
     }
   }
 
@@ -157,10 +222,42 @@ class LovableDetector {
     this.assistantDialog = this.createAssistantDialog();
     document.body.appendChild(this.assistantDialog);
     
+    // Set up the close button handler immediately after creating the dialog
+    this.setupCloseButton();
+    
     setTimeout(() => {
       this.makeDraggable();
       this.showWelcomePage(); // Start with welcome page instead of chat
     }, 50);
+  }
+
+  setupCloseButton() {
+    const closeBtn = document.getElementById('close-btn');
+    if (closeBtn) {
+      // Remove any existing listeners first
+      closeBtn.onclick = null;
+      
+      // Add single close handler with debounce
+      let lastClickTime = 0;
+      closeBtn.addEventListener('click', (e) => {
+        const now = Date.now();
+        if (now - lastClickTime < 300) {
+          console.log('🚫 Close button click ignored (too rapid)');
+          return;
+        }
+        lastClickTime = now;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('🔒 Close button clicked');
+        
+        // Add small delay to prevent race conditions
+        setTimeout(() => {
+          this.closeAssistant();
+        }, 10);
+      });
+    }
   }
 
   extractProjectId(url = window.location.href) {
@@ -494,16 +591,10 @@ class LovableDetector {
   setupChatFunctionality() {
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
-    const closeBtn = document.getElementById('close-btn');
     
     if (!chatInput || !sendBtn) return;
 
-    // Setup close button handler
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.toggleAssistant(); // Use toggleAssistant for proper cleanup
-      });
-    }
+    // Note: Close button is handled centrally in setupCloseButton()
 
     const sendMessage = async () => {
       const message = chatInput.value.trim();
@@ -734,14 +825,27 @@ class LovableDetector {
 
   // Cleanup method
   destroy() {
+    console.log('🧹 Destroying LovableDetector...');
+    
+    // Reset flags
+    this.isClosing = false;
+    this.lastToggleTime = 0;
+    
+    // Remove keyboard listeners
     if (this.handleKeydown) {
       document.removeEventListener('keydown', this.handleKeydown, true);
       window.removeEventListener('keydown', this.handleKeydown, true);
+      this.handleKeydown = null;
     }
     
+    // Close dialog and clean up
     if (this.assistantDialog) {
+      this.removeDialogEventListeners();
       this.assistantDialog.remove();
+      this.assistantDialog = null;
     }
+    
+    console.log('🧹 LovableDetector destroyed and cleaned up');
     
     // The notification monitoring system has been removed
   }
@@ -772,13 +876,7 @@ class LovableDetector {
       });
     });
     
-    // Setup close button
-    const closeBtn = document.getElementById('close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.toggleAssistant();
-      });
-    }
+    // Note: Close button is handled centrally in setupCloseButton()
   }
 
   handleFeatureSelection(feature) {
