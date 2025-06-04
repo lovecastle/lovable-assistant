@@ -2940,11 +2940,16 @@ class LovableDetector {
         
         // Check if we're in a Lovable input field
         if (this.isLovableInputField(target)) {
+          // Prevent all default behaviors to stop message sending
           e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          
           this.showPromptEnhancementMenu(target);
+          return false;
         }
       }
-    });
+    }, true); // Use capture phase to intercept early
   }
 
   isLovableInputField(element) {
