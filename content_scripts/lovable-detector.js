@@ -42,7 +42,7 @@ class LovableDetector {
       this.isLovablePage = true;
       this.projectId = this.extractProjectId(url);
       
-      console.log('✅ Lovable.dev project detected:', this.projectId);
+      // Lovable.dev project detected
       
       setTimeout(() => {
         this.showReadyNotification();
@@ -59,7 +59,7 @@ class LovableDetector {
           }
         }).catch(error => {
           if (!error.message?.includes('Extension context invalidated')) {
-            console.log('Could not send message to background:', error);
+            // Could not send message to background
           }
         });
       }
@@ -80,7 +80,6 @@ class LovableDetector {
     
     this.handleKeydown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        console.log('🤖 Assistant shortcut triggered');
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -96,8 +95,6 @@ class LovableDetector {
     
     // Only use document listener to avoid double events
     document.addEventListener('keydown', this.handleKeydown, true);
-    
-    console.log('🎹 Keyboard shortcuts registered');
   }
 
 
@@ -116,25 +113,19 @@ class LovableDetector {
     
     // Debounce rapid toggles (prevent toggles within 300ms)
     if (now - this.lastToggleTime < 300) {
-      console.log('🚫 Toggle ignored (too rapid)');
       return;
     }
     
     this.lastToggleTime = now;
     
-    console.log('🎯 toggleAssistant called, current dialog:', !!this.assistantDialog, 'isClosing:', this.isClosing);
-    
     // Prevent actions if currently in the middle of closing
     if (this.isClosing) {
-      console.log('🚫 Toggle ignored (currently closing)');
       return;
     }
     
     if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
-      console.log('🔒 Closing assistant dialog');
       this.closeAssistant();
     } else {
-      console.log('🚀 Opening assistant dialog');
       this.showAssistant();
     }
   }
@@ -142,7 +133,6 @@ class LovableDetector {
   closeAssistant() {
     if (this.assistantDialog && !this.isClosing) {
       this.isClosing = true;
-      console.log('🔒 Starting close process...');
       
       try {
         // Remove any existing event listeners to prevent conflicts
@@ -151,15 +141,12 @@ class LovableDetector {
         // Remove the dialog from DOM
         this.assistantDialog.remove();
         this.assistantDialog = null;
-        
-        console.log('🔒 Assistant dialog closed and cleaned up');
       } catch (error) {
         console.error('Error during close:', error);
       } finally {
         // Reset closing flag after a short delay
         setTimeout(() => {
           this.isClosing = false;
-          console.log('🔓 Close process completed');
         }, 100);
       }
     }
@@ -176,7 +163,6 @@ class LovableDetector {
   }
 
   showReadyNotification() {
-    console.log('🎉 showReadyNotification called successfully!');
     const notification = document.createElement('div');
     notification.innerHTML = `
       <div style="
@@ -242,7 +228,6 @@ class LovableDetector {
       closeBtn.addEventListener('click', (e) => {
         const now = Date.now();
         if (now - lastClickTime < 300) {
-          console.log('🚫 Close button click ignored (too rapid)');
           return;
         }
         lastClickTime = now;
@@ -250,7 +235,6 @@ class LovableDetector {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        console.log('🔒 Close button clicked');
         
         // Add small delay to prevent race conditions
         setTimeout(() => {
@@ -825,8 +809,6 @@ class LovableDetector {
 
   // Cleanup method
   destroy() {
-    console.log('🧹 Destroying LovableDetector...');
-    
     // Reset flags
     this.isClosing = false;
     this.lastToggleTime = 0;
@@ -844,8 +826,6 @@ class LovableDetector {
       this.assistantDialog.remove();
       this.assistantDialog = null;
     }
-    
-    console.log('🧹 LovableDetector destroyed and cleaned up');
     
     // The notification monitoring system has been removed
   }
@@ -5287,4 +5267,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-console.log('🚀 Lovable Assistant: Enhanced scraping with database saving ready!');
+// Lovable Assistant: Enhanced scraping with database saving ready!
