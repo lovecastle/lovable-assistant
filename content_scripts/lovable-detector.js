@@ -345,57 +345,7 @@ class LovableDetector {
         </div>
         
         <div style="display: grid; gap: 12px; margin-bottom: 24px;">
-          <!-- Project Manager -->
-          <div class="feature-card" data-feature="chat" style="
-            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
-            padding: 20px; cursor: pointer; transition: all 0.2s ease;
-            text-align: left; position: relative; overflow: hidden;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; width: 40px; height: 40px; border-radius: 10px;
-                display: flex; align-items: center; justify-content: center;
-                font-size: 18px; font-weight: bold;
-              ">💬</div>
-              <div style="flex: 1;">
-                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Project Manager
-                </h3>
-                <p style="margin: 0; color: #718096; font-size: 14px;">
-                  AI-powered chat for development assistance and coding help
-                </p>
-              </div>
-              <div style="color: #cbd5e0; font-size: 18px;">→</div>
-            </div>
-          </div>
-          
-          <!-- Prompt History -->
-          <div class="feature-card" data-feature="history" style="
-            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
-            padding: 20px; cursor: pointer; transition: all 0.2s ease;
-            text-align: left; position: relative; overflow: hidden;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="
-                background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-                color: white; width: 40px; height: 40px; border-radius: 10px;
-                display: flex; align-items: center; justify-content: center;
-                font-size: 18px; font-weight: bold;
-              ">📚</div>
-              <div style="flex: 1;">
-                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Conversation History
-                </h3>
-                <p style="margin: 0; color: #718096; font-size: 14px;">
-                  Browse and search your past conversations and development activities
-                </p>
-              </div>
-              <div style="color: #cbd5e0; font-size: 18px;">→</div>
-            </div>
-          </div>
-          
-          <!-- Project Knowledge -->
+          <!-- PROJECT SETTING -->
           <div class="feature-card" data-feature="knowledge" style="
             background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
@@ -410,7 +360,7 @@ class LovableDetector {
               ">🧠</div>
               <div style="flex: 1;">
                 <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Project Knowledge
+                  Project Setting
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
                   Store important project information, instructions, and knowledge
@@ -423,6 +373,56 @@ class LovableDetector {
               background: #fed7d7; color: #c53030; padding: 2px 6px;
               border-radius: 4px; font-size: 10px; font-weight: 600;
             ">COMING SOON</div>
+          </div>
+          
+          <!-- PROJECT AI ASSISTANT -->
+          <div class="feature-card" data-feature="chat" style="
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">💬</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Project Assistant
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  AI-powered chat for development assistance and coding help
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
+          </div>
+          
+          <!-- Lovable's Chat History -->
+          <div class="feature-card" data-feature="history" style="
+            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
+            padding: 20px; cursor: pointer; transition: all 0.2s ease;
+            text-align: left; position: relative; overflow: hidden;
+          ">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="
+                background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+                color: white; width: 40px; height: 40px; border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 18px; font-weight: bold;
+              ">📚</div>
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                  Lovable's Chat History
+                </h3>
+                <p style="margin: 0; color: #718096; font-size: 14px;">
+                  Browse and search your past conversations and development activities
+                </p>
+              </div>
+              <div style="color: #cbd5e0; font-size: 18px;">→</div>
+            </div>
           </div>
           
           <!-- Utilities -->
@@ -1333,7 +1333,7 @@ class LovableDetector {
     const title = document.getElementById('dialog-title');
     
     if (title) {
-      title.textContent = '📚 Conversation History';
+      title.textContent = '📚 Lovable\'s Chat History';
     }
     
     if (!content) return;
