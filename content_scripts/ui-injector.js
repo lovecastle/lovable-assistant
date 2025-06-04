@@ -51,7 +51,7 @@ class UIInjector {
                 Welcome! I'm here to help enhance your Lovable.dev development experience.
                 <br><br>
                 • Type in the chat below to get real-time assistance
-                • Use Ctrl+Enter to enhance your prompts
+                • Use Ctrl+Enter to open prompt helper menu
                 • Use Ctrl+K to search your conversation history
               </div>
             </div>
@@ -290,7 +290,7 @@ class UIInjector {
               Welcome! I'm here to help enhance your Lovable.dev development experience.
               <br><br>
               • Type in the chat below to get real-time assistance
-              • Use Ctrl+Enter to enhance your prompts
+              • Use Ctrl+Enter to open prompt helper menu
               • Use Ctrl+K to search your conversation history
             </div>
           </div>

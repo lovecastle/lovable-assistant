@@ -340,7 +340,7 @@ class LovableDetector {
             Welcome! 👋
           </h2>
           <p style="margin: 0; color: #4a5568; font-size: 16px;">
-            AI Assistant for project <strong style="color: #667eea;">${projectName}</strong>
+            AI assistant for project <strong style="color: #667eea;">${projectName}</strong>
           </p>
         </div>
         
@@ -1274,19 +1274,15 @@ class LovableDetector {
               Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
             </p>
             
-            <div id="prompt-templates-container" style="max-height: 400px; overflow-y: auto;">
+            <div id="prompt-templates-container">
               <!-- Templates will be loaded here -->
             </div>
             
             <div style="margin-top: 12px; display: flex; gap: 8px;">
-              <button id="load-prompt-templates-btn" style="
+              <button id="create-section-btn" style="
                 background: #667eea; color: white; border: none; padding: 6px 12px;
                 border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Load Templates</button>
-              <button id="save-prompt-templates-btn" style="
-                background: #48bb78; color: white; border: none; padding: 6px 12px;
-                border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Save Changes</button>
+              ">Create Section</button>
               <button id="reset-prompt-templates-btn" style="
                 background: #f56565; color: white; border: none; padding: 6px 12px;
                 border-radius: 4px; cursor: pointer; font-size: 12px;
@@ -2584,16 +2580,11 @@ class LovableDetector {
   }
 
   setupPromptTemplates() {
-    const loadBtn = document.getElementById('load-prompt-templates-btn');
-    const saveBtn = document.getElementById('save-prompt-templates-btn');
+    const createSectionBtn = document.getElementById('create-section-btn');
     const resetBtn = document.getElementById('reset-prompt-templates-btn');
     
-    if (loadBtn) {
-      loadBtn.addEventListener('click', () => this.loadPromptTemplates());
-    }
-    
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => this.savePromptTemplates());
+    if (createSectionBtn) {
+      createSectionBtn.addEventListener('click', () => this.createNewSection());
     }
     
     if (resetBtn) {
@@ -2712,30 +2703,56 @@ class LovableDetector {
     });
     
     let html = '';
-    Object.keys(categories).forEach(category => {
+    Object.keys(categories).forEach((category, categoryIndex) => {
       const icon = this.getCategoryIcon(category);
+      const categoryId = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
+      
       html += `
-        <div style="margin-bottom: 20px;">
-          <h5 style="margin: 0 0 12px 0; color: #1a202c; font-size: 13px; font-weight: 600; 
-                     border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-            ${icon} ${category}
-          </h5>
+        <div style="margin-bottom: 20px;" data-category-container="${category}">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h5 id="${categoryId}" class="editable-category"
+               style="margin: 0; color: #1a202c; font-size: 13px; font-weight: 600; 
+                      border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; cursor: pointer;
+                      flex: 1; margin-right: 8px;"
+               data-original-value="${category}" data-edit-type="category">
+              ${icon} ${category}
+            </h5>
+            <button class="delete-section-btn" data-category="${category}" style="
+              background: #f56565; color: white; border: none; padding: 2px 6px;
+              border-radius: 3px; cursor: pointer; font-size: 10px; margin-left: 8px;
+            ">Delete Section</button>
+          </div>
       `;
       
       categories[category].forEach((template, index) => {
         const templateId = `template-${template.category.replace(/\s+/g, '-').toLowerCase()}-${index}`;
+        const templateNameId = `name-${templateId}`;
+        
         html += `
-          <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white;">
+          <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white;"
+               data-template-container="${templateId}">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <label style="font-weight: 500; color: #1a202c; font-size: 12px;">
+              <span id="${templateNameId}" class="editable-template-name"
+                    style="font-weight: 500; color: #1a202c; font-size: 12px; cursor: pointer; 
+                           border: 1px solid transparent; padding: 2px 4px; border-radius: 3px;"
+                    data-original-value="${template.name}" data-template-id="${templateId}" data-edit-type="template-name">
                 ${template.name}
-              </label>
-              <button onclick="window.lovableDetector.copyTemplate('${templateId}')" style="
-                background: #667eea; color: white; border: none; padding: 4px 8px;
-                border-radius: 4px; cursor: pointer; font-size: 10px;
-              ">Copy</button>
+              </span>
+              <div style="display: flex; gap: 4px;">
+                <button class="copy-template-btn" data-template-id="${templateId}" style="
+                  background: #667eea; color: white; border: none; padding: 4px 8px;
+                  border-radius: 4px; cursor: pointer; font-size: 10px;
+                ">Copy</button>
+                <button class="delete-template-btn" data-template-id="${templateId}" style="
+                  background: #f56565; color: white; border: none; padding: 4px 8px;
+                  border-radius: 4px; cursor: pointer; font-size: 10px;
+                ">Delete</button>
+              </div>
             </div>
-            <textarea id="${templateId}" data-category="${template.category}" data-name="${template.name}" data-shortcut="${template.shortcut}" 
+            <textarea id="${templateId}" class="template-content"
+                      data-category="${template.category}" 
+                      data-name="${template.name}" 
+                      data-shortcut="${template.shortcut}"
                       style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
                              border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
                              background: white; color: #1a202c;">${template.template}</textarea>
@@ -2743,10 +2760,112 @@ class LovableDetector {
         `;
       });
       
+      // Add "Add Template" button at the bottom of each section
+      html += `
+        <div style="margin-bottom: 8px;">
+          <button class="add-template-btn" data-category="${category}" style="
+            background: #e2e8f0; color: #4a5568; border: 1px dashed #9ca3af; padding: 8px 12px;
+            border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%;
+            transition: all 0.2s ease;
+          ">
+            + Add Template
+          </button>
+        </div>
+      `;
+      
       html += '</div>';
     });
     
     container.innerHTML = html;
+    
+    // Add event listeners after HTML is rendered
+    this.setupTemplateEventListeners();
+    
+    // Debug: Check if event listeners were attached
+    console.log('🔧 Debug: Event listeners attached to:', {
+      editableCategories: container.querySelectorAll('.editable-category').length,
+      editableTemplateNames: container.querySelectorAll('.editable-template-name').length,
+      copyButtons: container.querySelectorAll('.copy-template-btn').length,
+      deleteButtons: container.querySelectorAll('.delete-template-btn').length,
+      addButtons: container.querySelectorAll('.add-template-btn').length
+    });
+  }
+
+  setupTemplateEventListeners() {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) {
+      console.warn('🔧 Debug: prompt-templates-container not found');
+      return;
+    }
+    
+    console.log('🔧 Debug: Setting up template event listeners...');
+    
+    // Editable category names
+    container.querySelectorAll('.editable-category').forEach(element => {
+      element.addEventListener('click', () => {
+        console.log('🔧 Debug: Category clicked:', element.id);
+        this.makeEditable(element.id, 'category');
+      });
+    });
+    
+    // Editable template names
+    container.querySelectorAll('.editable-template-name').forEach(element => {
+      element.addEventListener('click', () => {
+        console.log('🔧 Debug: Template name clicked:', element.id);
+        this.makeEditable(element.id, 'template-name');
+      });
+    });
+    
+    // Copy template buttons
+    container.querySelectorAll('.copy-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        console.log('🔧 Debug: Copy button clicked:', button.dataset.templateId);
+        const templateId = button.dataset.templateId;
+        this.copyTemplate(templateId);
+      });
+    });
+    
+    // Delete template buttons
+    container.querySelectorAll('.delete-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        console.log('🔧 Debug: Delete template button clicked:', button.dataset.templateId);
+        const templateId = button.dataset.templateId;
+        this.deleteTemplate(templateId);
+      });
+    });
+    
+    // Delete section buttons
+    container.querySelectorAll('.delete-section-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        console.log('🔧 Debug: Delete section button clicked:', button.dataset.category);
+        const category = button.dataset.category;
+        this.deleteSection(category);
+      });
+    });
+    
+    // Add template buttons
+    container.querySelectorAll('.add-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        console.log('🔧 Debug: Add template button clicked:', button.dataset.category);
+        const category = button.dataset.category;
+        this.addNewTemplate(category);
+      });
+      
+      // Add hover effects
+      button.addEventListener('mouseover', () => {
+        button.style.background = '#d1d5db';
+      });
+      button.addEventListener('mouseout', () => {
+        button.style.background = '#e2e8f0';
+      });
+    });
+    
+    // Auto-save for template content
+    container.querySelectorAll('.template-content').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        this.autoSaveTemplate(textarea.id);
+      });
+    });
   }
 
   getCategoryIcon(category) {
@@ -2782,12 +2901,189 @@ class LovableDetector {
     }
   }
 
-  savePromptTemplates() {
-    const container = document.getElementById('prompt-templates-container');
-    if (!container) return;
+
+  resetPromptTemplates() {
+    if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {
+      localStorage.removeItem('lovable-prompt-templates');
+      this.loadPromptTemplates();
+      console.log('🔄 Prompt templates reset to defaults');
+    }
+  }
+
+  createNewSection() {
+    const sectionName = prompt('Enter section name:');
+    if (!sectionName || !sectionName.trim()) return;
     
-    const textareas = container.querySelectorAll('textarea');
+    const templates = this.getCurrentTemplates();
+    // Check if section already exists
+    const exists = templates.some(t => t.category === sectionName.trim());
+    if (exists) {
+      alert('Section already exists!');
+      return;
+    }
+    
+    // Add a placeholder template to create the section
+    templates.push({
+      category: sectionName.trim(),
+      name: 'New Template',
+      template: 'Enter your template content here...',
+      shortcut: sectionName.toLowerCase().replace(/\s+/g, '_')
+    });
+    
+    this.saveTemplatesAndReload(templates);
+  }
+
+  addNewTemplate(category) {
+    const templateName = prompt('Enter template name:');
+    if (!templateName || !templateName.trim()) return;
+    
+    const templates = this.getCurrentTemplates();
+    templates.push({
+      category: category,
+      name: templateName.trim(),
+      template: 'Enter your template content here...',
+      shortcut: templateName.toLowerCase().replace(/\s+/g, '_')
+    });
+    
+    this.saveTemplatesAndReload(templates);
+  }
+
+  deleteSection(category) {
+    if (!confirm(`Are you sure you want to delete the entire "${category}" section and all its templates?`)) return;
+    
+    const templates = this.getCurrentTemplates();
+    const filteredTemplates = templates.filter(t => t.category !== category);
+    this.saveTemplatesAndReload(filteredTemplates);
+  }
+
+  deleteTemplate(templateId) {
+    const textarea = document.getElementById(templateId);
+    if (!textarea) return;
+    
+    const category = textarea.dataset.category;
+    const name = textarea.dataset.name;
+    
+    if (!confirm(`Are you sure you want to delete the template "${name}"?`)) return;
+    
+    const templates = this.getCurrentTemplates();
+    const filteredTemplates = templates.filter(t => !(t.category === category && t.name === name));
+    this.saveTemplatesAndReload(filteredTemplates);
+  }
+
+  makeEditable(elementId, type) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const originalValue = element.dataset.originalValue || element.textContent.replace(/^[🎨✏️🐛🔄🤖📝]\s*/, '');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = originalValue;
+    input.style.cssText = `
+      width: 100%; border: 1px solid #667eea; border-radius: 3px; padding: 2px 4px;
+      font-size: ${type === 'category' ? '13px' : '12px'}; font-weight: ${type === 'category' ? '600' : '500'};
+      background: white; color: #1a202c;
+    `;
+    
+    const saveEdit = () => {
+      const newValue = input.value.trim();
+      if (!newValue) {
+        input.focus();
+        return;
+      }
+      
+      if (type === 'category') {
+        this.updateCategoryName(originalValue, newValue);
+      } else if (type === 'template-name') {
+        const templateId = element.dataset.templateId;
+        this.updateTemplateName(templateId, newValue);
+      }
+      
+      element.style.display = '';
+      input.remove();
+    };
+    
+    const cancelEdit = () => {
+      element.style.display = '';
+      input.remove();
+    };
+    
+    input.addEventListener('blur', saveEdit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEdit();
+      }
+    });
+    
+    element.style.display = 'none';
+    element.parentNode.insertBefore(input, element);
+    input.focus();
+    input.select();
+  }
+
+  updateCategoryName(oldName, newName) {
+    const templates = this.getCurrentTemplates();
+    templates.forEach(template => {
+      if (template.category === oldName) {
+        template.category = newName;
+      }
+    });
+    this.saveTemplatesAndReload(templates);
+  }
+
+  updateTemplateName(templateId, newName) {
+    const textarea = document.getElementById(templateId);
+    if (!textarea) return;
+    
+    const templates = this.getCurrentTemplates();
+    const template = templates.find(t => 
+      t.category === textarea.dataset.category && 
+      t.name === textarea.dataset.name
+    );
+    
+    if (template) {
+      template.name = newName;
+      textarea.dataset.name = newName;
+      this.saveTemplatesAndReload(templates);
+    }
+  }
+
+  autoSaveTemplate(templateId) {
+    // Debounce auto-save to prevent excessive saves
+    clearTimeout(this.autoSaveTimeout);
+    this.autoSaveTimeout = setTimeout(() => {
+      this.saveCurrentTemplates();
+    }, 1000);
+  }
+
+  saveCurrentTemplates() {
+    const templates = this.getCurrentTemplatesFromDOM();
+    try {
+      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      console.log('✅ Templates auto-saved');
+    } catch (error) {
+      console.error('Failed to auto-save templates:', error);
+    }
+  }
+
+  getCurrentTemplates() {
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      return stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      return this.getDefaultPromptTemplates();
+    }
+  }
+
+  getCurrentTemplatesFromDOM() {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return [];
+    
     const templates = [];
+    const textareas = container.querySelectorAll('textarea');
     
     textareas.forEach(textarea => {
       templates.push({
@@ -2798,31 +3094,16 @@ class LovableDetector {
       });
     });
     
-    try {
-      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
-      console.log('✅ Prompt templates saved');
-      
-      // Show success message
-      const saveBtn = document.getElementById('save-prompt-templates-btn');
-      if (saveBtn) {
-        const originalText = saveBtn.textContent;
-        saveBtn.textContent = 'Saved!';
-        saveBtn.style.background = '#48bb78';
-        setTimeout(() => {
-          saveBtn.textContent = originalText;
-          saveBtn.style.background = '#48bb78';
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Failed to save prompt templates:', error);
-    }
+    return templates;
   }
 
-  resetPromptTemplates() {
-    if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {
-      localStorage.removeItem('lovable-prompt-templates');
+  saveTemplatesAndReload(templates) {
+    try {
+      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
       this.loadPromptTemplates();
-      console.log('🔄 Prompt templates reset to defaults');
+      console.log('✅ Templates saved and reloaded');
+    } catch (error) {
+      console.error('Failed to save templates:', error);
     }
   }
 
@@ -2986,7 +3267,7 @@ class LovableDetector {
         padding: 16px; min-width: 300px; max-width: 400px; font-family: system-ui, sans-serif;
       ">
         <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
-          ✨ Enhance Your Prompt
+          ✨ Prompt Helper Menu
         </h4>
         <div id="prompt-templates-menu" style="display: grid; gap: 8px; max-height: 400px; overflow-y: auto;">
           <!-- Templates will be loaded here -->
@@ -3029,7 +3310,7 @@ class LovableDetector {
       if (chatContainerElement) {
         const containerRect = chatContainerElement.getBoundingClientRect();
         // Position at the height of the container minus 514px
-        top = containerRect.height - 514;
+        top = containerRect.height - 465;
         
         // Ensure minimum distance from top of viewport
         top = Math.max(top, 10);
