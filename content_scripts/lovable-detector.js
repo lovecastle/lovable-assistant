@@ -441,19 +441,14 @@ class LovableDetector {
               ">🧠</div>
               <div style="flex: 1;">
                 <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Project Setting
+                  Project Manager
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
-                  Store important project information, instructions, and knowledge
+                  Manage your projects, settings, and knowledge base
                 </p>
               </div>
               <div style="color: #cbd5e0; font-size: 18px;">→</div>
             </div>
-            <div style="
-              position: absolute; top: 8px; right: 8px;
-              background: #fed7d7; color: #c53030; padding: 2px 6px;
-              border-radius: 4px; font-size: 10px; font-weight: 600;
-            ">COMING SOON</div>
           </div>
           
           <!-- PROJECT AI ASSISTANT -->
@@ -871,7 +866,7 @@ class LovableDetector {
         this.showUtilitiesPage();
         break;
       case 'knowledge':
-        this.showComingSoon('Project Knowledge');
+        this.showProjectManager();
         break;
       case 'settings':
         this.showSettingsPage();
@@ -908,6 +903,329 @@ class LovableDetector {
     `;
     
     this.setupBackButton();
+  }
+
+  showProjectManager() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '📁 Project Manager';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-welcome-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Welcome</button>
+        </div>
+        
+        <div id="project-list-container">
+          <div style="margin-bottom: 16px;">
+            <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+              Your Projects
+            </h3>
+          </div>
+          
+          <div id="project-list" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Projects will be populated here -->
+          </div>
+        </div>
+      </div>
+    `;
+    
+    this.setupBackButton();
+    this.loadProjectsList();
+  }
+
+  showProjectSettings(project) {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '⚙️ Project Settings';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-projects-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Projects</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+            Project Information
+          </h3>
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+              Project Name
+            </label>
+            <input type="text" id="project-name" value="${project.name}" disabled style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; box-sizing: border-box; background: #f7fafc; color: #718096;
+            ">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+              Project URL
+            </label>
+            <input type="text" id="project-url" value="${project.url}" disabled style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; box-sizing: border-box; background: #f7fafc; color: #718096;
+            ">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+              Project Description (max 150 characters)
+            </label>
+            <textarea id="project-description" placeholder="Enter a short description..." maxlength="150" style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; box-sizing: border-box; height: 60px; resize: vertical;
+            ">${project.description || ''}</textarea>
+          </div>
+        </div>
+
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+            Project Knowledge
+          </h3>
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+              Documents & Instructions
+            </label>
+            <textarea id="project-knowledge" placeholder="Add project-specific documentation, guidelines, and instructions..." style="
+              width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; box-sizing: border-box; height: 120px; resize: vertical;
+            ">${project.knowledge || ''}</textarea>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button id="save-project-settings" style="
+            background: #667eea; color: white; border: none; padding: 10px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; flex: 1;
+          ">💾 Save Settings</button>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('back-to-projects-btn').addEventListener('click', () => {
+      this.showProjectManager();
+    });
+    
+    document.getElementById('save-project-settings').addEventListener('click', async () => {
+      await this.saveProjectSettings(project);
+    });
+  }
+
+  async loadProjectsList() {
+    try {
+      const currentProject = await this.getCurrentProject();
+      const savedProjects = await this.getSavedProjects();
+      
+      const projectListElement = document.getElementById('project-list');
+      if (!projectListElement) return;
+      
+      projectListElement.innerHTML = '';
+      
+      // Add current project first if it exists
+      if (currentProject) {
+        const currentProjectElement = this.createProjectElement(currentProject, true);
+        projectListElement.appendChild(currentProjectElement);
+      }
+      
+      // Add other projects
+      Object.values(savedProjects).forEach(project => {
+        if (!currentProject || project.id !== currentProject.id) {
+          const projectElement = this.createProjectElement(project, false);
+          projectListElement.appendChild(projectElement);
+        }
+      });
+      
+      // If no projects, show empty state
+      if (projectListElement.children.length === 0) {
+        projectListElement.innerHTML = `
+          <div style="
+            background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;
+            text-align: center; color: #4a5568;
+          ">
+            <p style="margin: 0; font-size: 14px;">
+              No projects found. Visit Lovable.dev project pages to start tracking projects.
+            </p>
+          </div>
+        `;
+      }
+    } catch (error) {
+      console.error('Error loading projects list:', error);
+    }
+  }
+
+  createProjectElement(project, isCurrent) {
+    const projectDiv = document.createElement('div');
+    projectDiv.style.cssText = `
+      background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 12px;
+      cursor: pointer; transition: all 0.2s; ${isCurrent ? 'border-color: #667eea; background: #f0f4ff;' : ''}
+    `;
+    
+    projectDiv.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <div style="
+          width: 16px; height: 16px; background: #667eea; border-radius: 4px;
+          display: flex; align-items: center; justify-content: center; color: white;
+          font-size: 10px; font-weight: bold;
+        ">L</div>
+        <div style="font-weight: 600; color: #1a202c; font-size: 14px; flex: 1;">
+          ${project.name}
+        </div>
+        ${isCurrent ? '<div style="background: #48bb78; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 500;">Current</div>' : ''}
+      </div>
+      <div style="font-size: 11px; color: #667eea; margin-bottom: 4px;">
+        ${project.url}
+      </div>
+      <div style="font-size: 12px; color: #4a5568; line-height: 1.4;">
+        ${project.description || 'No description provided'}
+      </div>
+    `;
+    
+    projectDiv.addEventListener('click', () => {
+      if (isCurrent) {
+        this.showProjectSettings(project);
+      } else {
+        chrome.runtime.sendMessage({
+          action: 'openTab',
+          url: project.url
+        });
+      }
+    });
+    
+    projectDiv.addEventListener('mouseenter', () => {
+      if (!isCurrent) {
+        projectDiv.style.borderColor = '#667eea';
+        projectDiv.style.boxShadow = '0 2px 4px rgba(102, 126, 234, 0.1)';
+      }
+    });
+    
+    projectDiv.addEventListener('mouseleave', () => {
+      if (!isCurrent) {
+        projectDiv.style.borderColor = '#c9cfd7';
+        projectDiv.style.boxShadow = 'none';
+      }
+    });
+    
+    return projectDiv;
+  }
+
+  async getCurrentProject() {
+    try {
+      const currentUrl = window.location.href;
+      if (!currentUrl.includes('lovable.dev/projects/')) {
+        return null;
+      }
+      
+      const urlMatch = currentUrl.match(/lovable\.dev\/projects\/([^/?]+)/);
+      if (!urlMatch) return null;
+      
+      const projectId = urlMatch[1];
+      const projectName = this.getProjectNameFromTitle();
+      
+      const currentProject = {
+        id: projectId,
+        name: projectName,
+        url: currentUrl,
+        description: '',
+        knowledge: ''
+      };
+      
+      // Load saved project data if it exists
+      const savedProjects = await this.getSavedProjects();
+      if (savedProjects[projectId]) {
+        Object.assign(currentProject, savedProjects[projectId]);
+      }
+      
+      return currentProject;
+    } catch (error) {
+      console.error('Error getting current project:', error);
+      return null;
+    }
+  }
+
+  getProjectNameFromTitle() {
+    try {
+      if (document.title && document.title.includes('Lovable')) {
+        const titleMatch = document.title.match(/(.+?)\s*[-|]\s*Lovable/);
+        if (titleMatch) {
+          return titleMatch[1].trim();
+        }
+      }
+      
+      // Fallback to project ID from URL
+      const urlMatch = window.location.href.match(/lovable\.dev\/projects\/([^/?]+)/);
+      return urlMatch ? urlMatch[1] : 'Unknown Project';
+    } catch (error) {
+      return 'Unknown Project';
+    }
+  }
+
+  async getSavedProjects() {
+    try {
+      return new Promise((resolve) => {
+        chrome.storage.local.get('lovable_projects', (result) => {
+          resolve(result.lovable_projects || {});
+        });
+      });
+    } catch (error) {
+      console.error('Error getting saved projects:', error);
+      return {};
+    }
+  }
+
+  async saveProjectSettings(project) {
+    try {
+      const description = document.getElementById('project-description').value;
+      const knowledge = document.getElementById('project-knowledge').value;
+      
+      project.description = description;
+      project.knowledge = knowledge;
+      
+      const savedProjects = await this.getSavedProjects();
+      savedProjects[project.id] = project;
+      
+      chrome.storage.local.set({ lovable_projects: savedProjects }, () => {
+        // Show success feedback
+        const saveBtn = document.getElementById('save-project-settings');
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = '✅ Saved!';
+        saveBtn.style.background = '#48bb78';
+        
+        setTimeout(() => {
+          saveBtn.textContent = originalText;
+          saveBtn.style.background = '#667eea';
+          this.showProjectManager();
+        }, 1500);
+      });
+    } catch (error) {
+      console.error('Error saving project settings:', error);
+      
+      // Show error feedback
+      const saveBtn = document.getElementById('save-project-settings');
+      const originalText = saveBtn.textContent;
+      saveBtn.textContent = '❌ Error';
+      saveBtn.style.background = '#f56565';
+      
+      setTimeout(() => {
+        saveBtn.textContent = originalText;
+        saveBtn.style.background = '#667eea';
+      }, 2000);
+    }
   }
 
   // ===========================

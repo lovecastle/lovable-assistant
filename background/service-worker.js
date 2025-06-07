@@ -105,6 +105,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'openTab':
+      handleOpenTab(request.url).then(result => {
+        sendResponse(result);
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -588,6 +594,24 @@ async function handleActivateTab(tabId) {
     return { success: true };
   } catch (error) {
     console.error(`❌ [Tab ${tabId}] Failed to activate tab:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleOpenTab(url) {
+  try {
+    // Validate URL
+    if (!url || typeof url !== 'string') {
+      throw new Error('Invalid URL provided');
+    }
+    
+    // Create new tab
+    const tab = await chrome.tabs.create({ url: url });
+    
+    console.log(`✅ Opened new tab: ${url}`);
+    return { success: true, tabId: tab.id };
+  } catch (error) {
+    console.error('❌ Failed to open tab:', error);
     return { success: false, error: error.message };
   }
 }
