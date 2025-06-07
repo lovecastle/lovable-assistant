@@ -105,31 +105,219 @@
       font-size: 12px;
       color: #718096;
     }
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: block;
+    }
+    .nav-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      color: #667eea;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 8px;
+      padding: 4px;
+    }
+    .page-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a202c;
+      margin: 0;
+    }
+    .project-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .project-item {
+      background: white;
+      border: 1px solid #c9cfd7;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .project-item:hover {
+      border-color: #667eea;
+      box-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+    }
+    .project-item.current {
+      border-color: #667eea;
+      background: #f0f4ff;
+    }
+    .project-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .platform-logo {
+      width: 16px;
+      height: 16px;
+      background: #667eea;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .project-name {
+      font-weight: 600;
+      color: #1a202c;
+      font-size: 14px;
+      flex: 1;
+    }
+    .current-badge {
+      background: #48bb78;
+      color: white;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    .project-url {
+      font-size: 11px;
+      color: #667eea;
+      margin-bottom: 4px;
+      text-decoration: none;
+    }
+    .project-description {
+      font-size: 12px;
+      color: #4a5568;
+      line-height: 1.4;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a202c;
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #c9cfd7;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .form-input:disabled {
+      background: #f7fafc;
+      color: #718096;
+    }
+    .form-textarea {
+      height: 60px;
+      resize: vertical;
+    }
+    .section {
+      background: white;
+      border: 1px solid #c9cfd7;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a202c;
+      margin: 0 0 12px 0;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🎯 Lovable Assistant</h1>
-    <p>Enhance your Lovable.dev experience</p>
+  <!-- Main Page -->
+  <div class="page active" id="main-page">
+    <div class="header">
+      <h1>🎯 Lovable Assistant</h1>
+      <p>Enhance your Lovable.dev experience</p>
+    </div>
+
+    <div class="status-indicator">
+      <div class="status-dot" id="status-dot"></div>
+      <div class="status-text" id="status-text">Checking connection...</div>
+    </div>
+
+    <div class="info-box">
+      <h3>📍 Quick Access</h3>
+      <p>Open Lovable Assistant on any Lovable.dev project page by clicking the floating button in the bottom-right corner.</p>
+    </div>
+
+    <div class="quick-actions">
+      <button class="btn" id="project-manager">📁 Project Manager</button>
+      <button class="btn" id="open-settings">⚙️ Open Settings</button>
+      <button class="btn btn-secondary" id="check-connection">🔄 Check Connection</button>
+    </div>
+
+    <div class="footer">
+      Version 1.0.0
+    </div>
   </div>
 
-  <div class="status-indicator">
-    <div class="status-dot" id="status-dot"></div>
-    <div class="status-text" id="status-text">Checking connection...</div>
+  <!-- Project Manager Page -->
+  <div class="page" id="project-manager-page">
+    <div class="nav-header">
+      <button class="back-btn" id="back-to-main">←</button>
+      <h2 class="page-title">Project Manager</h2>
+    </div>
+    
+    <div class="project-list" id="project-list">
+      <!-- Projects will be populated here -->
+    </div>
   </div>
 
-  <div class="info-box">
-    <h3>📍 Quick Access</h3>
-    <p>Open Lovable Assistant on any Lovable.dev project page by clicking the floating button in the bottom-right corner.</p>
-  </div>
+  <!-- Project Settings Page -->
+  <div class="page" id="project-settings-page">
+    <div class="nav-header">
+      <button class="back-btn" id="back-to-projects">←</button>
+      <h2 class="page-title">Project Settings</h2>
+    </div>
+    
+    <div class="section">
+      <h3 class="section-title">Project Information</h3>
+      <div class="form-group">
+        <label class="form-label">Project Name</label>
+        <input type="text" class="form-input" id="project-name" disabled>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Project URL</label>
+        <input type="text" class="form-input" id="project-url" disabled>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Project Short Description</label>
+        <textarea class="form-input form-textarea" id="project-description" placeholder="Enter a short description (max 150 characters)" maxlength="150"></textarea>
+      </div>
+    </div>
 
-  <div class="quick-actions">
-    <button class="btn" id="open-settings">⚙️ Open Settings</button>
-    <button class="btn btn-secondary" id="check-connection">🔄 Check Connection</button>
-  </div>
+    <div class="section">
+      <h3 class="section-title">Project Knowledge</h3>
+      <div class="form-group">
+        <label class="form-label">Documents & Instructions</label>
+        <textarea class="form-input" id="project-knowledge" placeholder="Add project-specific documentation, guidelines, and instructions..." style="height: 120px;"></textarea>
+      </div>
+    </div>
 
-  <div class="footer">
-    Version 1.0.0
+    <div class="quick-actions">
+      <button class="btn" id="save-project-settings">💾 Save Settings</button>
+    </div>
   </div>
   
   <script src="popup.js"></script>
