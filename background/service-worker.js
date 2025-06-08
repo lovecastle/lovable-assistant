@@ -23,66 +23,88 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'testConnection':
       testConnection().then(result => {
         sendResponse({ success: result });
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'chatMessage':
       handleChatMessage(request.message, request.context).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'saveConversation':
       handleSaveConversation(request.data).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'saveMessageGroup':
       handleSaveMessageGroup(request.data).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'bulkSaveConversations':
       handleBulkSaveConversations(request.data).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'getConversations':
       handleGetConversations(request.filters || {}).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'deleteConversations':
       handleDeleteConversations(request.filters || {}).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'showNotification':
       handleShowNotification(request.data).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'updateNotificationSettings':
       handleUpdateNotificationSettings(request.settings).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'getNotificationSettings':
       handleGetNotificationSettings().then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'startWorkingStatusMonitor':
       handleStartWorkingStatusMonitor(sender.tab.id).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
@@ -90,24 +112,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // Content script will send current status
       handleWorkingStatusUpdate(sender.tab.id, request.data).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'activateTab':
       handleActivateTab(sender.tab.id).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'aiRequest':
       handleAIRequest(request.prompt).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
     case 'openTab':
       handleOpenTab(request.url).then(result => {
         sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
       });
       break;
       
