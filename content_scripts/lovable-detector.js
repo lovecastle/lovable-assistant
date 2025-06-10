@@ -64,6 +64,11 @@ class LovableDetector {
         });
       }
       
+      // Auto-save project information on page load
+      setTimeout(() => {
+        this.autoSaveProjectInfo();
+      }, 2000);
+      
       // Initialize working status monitor after page detection
       setTimeout(() => {
         this.initializeWorkingStatusMonitor();
@@ -1223,6 +1228,7 @@ class LovableDetector {
       };
       
       // Load saved project data from database if it exists
+      let existingProject = null;
       try {
         console.log('🔍 Fetching project data from database...');
         const response = await this.safeSendMessage({
@@ -1233,6 +1239,7 @@ class LovableDetector {
         console.log('🔍 Database response:', response);
         
         if (response?.success && response.data) {
+          existingProject = response.data;
           currentProject.description = response.data.description || '';
           currentProject.knowledge = response.data.knowledge || '';
           console.log('✅ Loaded project data from database');
@@ -1243,11 +1250,58 @@ class LovableDetector {
         console.warn('⚠️ Could not load project data from database:', error);
       }
       
+      // Auto-save project name and URL if not exists or if name/URL has changed
+      if (!existingProject || 
+          existingProject.project_name !== projectName || 
+          existingProject.project_url !== currentUrl) {
+        
+        console.log('💾 Auto-saving project information to database...');
+        try {
+          const projectManagerData = {
+            project_id: projectId,
+            project_name: projectName,
+            project_url: currentUrl,
+            description: currentProject.description,
+            knowledge: currentProject.knowledge
+          };
+          
+          const saveResponse = await this.safeSendMessage({
+            action: 'saveProjectManager',
+            data: projectManagerData
+          });
+          
+          if (saveResponse?.success) {
+            console.log('✅ Project information auto-saved successfully');
+          } else {
+            console.warn('⚠️ Failed to auto-save project information:', saveResponse?.error);
+          }
+        } catch (error) {
+          console.warn('⚠️ Error auto-saving project information:', error);
+        }
+      } else {
+        console.log('ℹ️ Project information already exists and is up to date');
+      }
+      
       console.log('✅ Final current project:', currentProject);
       return currentProject;
     } catch (error) {
       console.error('❌ Error getting current project:', error);
       return null;
+    }
+  }
+
+  async autoSaveProjectInfo() {
+    try {
+      console.log('🚀 Auto-saving project information on page load...');
+      const currentProject = await this.getCurrentProject();
+      
+      if (currentProject) {
+        console.log('✅ Project information auto-saved on page load:', currentProject.name);
+      } else {
+        console.log('❌ No project information found to auto-save');
+      }
+    } catch (error) {
+      console.warn('⚠️ Error during auto-save on page load:', error);
     }
   }
 
