@@ -141,6 +141,46 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'saveProjectManager':
+      handleSaveProjectManager(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'getProjectManager':
+      handleGetProjectManager(request.projectId).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'getAllProjectManagers':
+      handleGetAllProjectManagers().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'updateProjectManager':
+      handleUpdateProjectManager(request.projectId, request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'deleteProjectManager':
+      handleDeleteProjectManager(request.projectId).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -642,6 +682,102 @@ async function handleOpenTab(url) {
     return { success: true, tabId: tab.id };
   } catch (error) {
     console.error('❌ Failed to open tab:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Project Manager handler functions
+async function handleSaveProjectManager(projectManagerData) {
+  try {
+    console.log(`🔍 Service Worker: Saving project manager for project ${projectManagerData.project_id}`);
+    
+    const result = await supabase.saveProjectManager(projectManagerData);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Project manager saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save project manager:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving project manager:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetProjectManager(projectId) {
+  try {
+    console.log(`🔍 Service Worker: Getting project manager for project ${projectId}`);
+    
+    const result = await supabase.getProjectManager(projectId);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Project manager retrieved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get project manager:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting project manager:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetAllProjectManagers() {
+  try {
+    console.log('🔍 Service Worker: Getting all project managers');
+    
+    const result = await supabase.getAllProjectManagers();
+    
+    if (result.success) {
+      console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} project managers`);
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get all project managers:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting all project managers:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleUpdateProjectManager(projectId, updateData) {
+  try {
+    console.log(`🔍 Service Worker: Updating project manager for project ${projectId}`);
+    
+    const result = await supabase.updateProjectManager(projectId, updateData);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Project manager updated successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to update project manager:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error updating project manager:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleDeleteProjectManager(projectId) {
+  try {
+    console.log(`🔍 Service Worker: Deleting project manager for project ${projectId}`);
+    
+    const result = await supabase.deleteProjectManager(projectId);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Project manager deleted successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to delete project manager:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error deleting project manager:', error);
     return { success: false, error: error.message };
   }
 }

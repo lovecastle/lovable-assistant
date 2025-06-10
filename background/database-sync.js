@@ -235,6 +235,107 @@ export class SupabaseClient {
     });
   }
 
+  // Project Manager CRUD operations
+  async saveProjectManager(projectManagerData) {
+    console.log('🔍 Database-sync: Saving project manager:', projectManagerData.project_id);
+    
+    const projectManager = {
+      project_id: projectManagerData.project_id,
+      project_name: projectManagerData.project_name,
+      project_url: projectManagerData.project_url,
+      description: projectManagerData.description || '',
+      knowledge: projectManagerData.knowledge || '',
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = await this.request('project_manager', {
+        method: 'POST',
+        body: JSON.stringify(projectManager),
+        headers: {
+          'Prefer': 'resolution=merge-duplicates'
+        }
+      });
+
+      console.log('✅ Database-sync: Project manager saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save project manager:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getProjectManager(projectId) {
+    console.log('🔍 Database-sync: Getting project manager for project:', projectId);
+    
+    try {
+      const result = await this.request(`project_manager?project_id=eq.${projectId}&limit=1`);
+      
+      if (result && result.length > 0) {
+        console.log('✅ Database-sync: Project manager found');
+        return { success: true, data: result[0] };
+      } else {
+        console.log('📭 Database-sync: No project manager found for project');
+        return { success: true, data: null };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get project manager:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAllProjectManagers() {
+    console.log('🔍 Database-sync: Getting all project managers');
+    
+    try {
+      const result = await this.request('project_manager?order=updated_at.desc');
+      
+      console.log(`✅ Database-sync: Found ${result?.length || 0} project managers`);
+      return { success: true, data: result || [] };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get project managers:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateProjectManager(projectId, updateData) {
+    console.log('🔍 Database-sync: Updating project manager:', projectId);
+    
+    const updateFields = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = await this.request(`project_manager?project_id=eq.${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateFields)
+      });
+
+      console.log('✅ Database-sync: Project manager updated successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to update project manager:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteProjectManager(projectId) {
+    console.log('🔍 Database-sync: Deleting project manager:', projectId);
+    
+    try {
+      const result = await this.request(`project_manager?project_id=eq.${projectId}`, {
+        method: 'DELETE'
+      });
+
+      console.log('✅ Database-sync: Project manager deleted successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to delete project manager:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async saveEmbedding(conversationId, embedding, content) {
     const embeddingData = {
       conversation_id: conversationId,
