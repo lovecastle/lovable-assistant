@@ -31,6 +31,7 @@
         "content_scripts/conversation-history.js",
         "content_scripts/utilities-manager.js",
         "content_scripts/status-monitor.js",
+        "content_scripts/message-scraper.js",
         "content_scripts/lovable-detector.js",
         "content_scripts/conversation-capture-simple.js",
         "content_scripts/ui-injector.js"
