@@ -156,33 +156,7 @@ window.UIDialogManager = {
     return match ? match[1] : null;
   },
 
-  extractProjectName() {
-    // Try to get project name from the page
-    const nameElement = document.querySelector('p.hidden.truncate.text-sm.font-medium.md\\:block');
-    if (nameElement && nameElement.textContent.trim()) {
-      return nameElement.textContent.trim();
-    }
-    
-    // Fallback: try other common selectors
-    const fallbackSelectors = [
-      'h1[data-testid="project-name"]',
-      '.project-name',
-      'h1',
-      'title'
-    ];
-    
-    for (const selector of fallbackSelectors) {
-      const element = document.querySelector(selector);
-      if (element && element.textContent.trim()) {
-        const text = element.textContent.trim();
-        if (text !== 'Lovable' && text.length > 0) {
-          return text;
-        }
-      }
-    }
-    
-    return this.projectId || 'Unknown Project';
-  },
+  // extractProjectName() method moved to chat-interface.js
 
   escapeHtml(text) {
     const div = document.createElement('div');
