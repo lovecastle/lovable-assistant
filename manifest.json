@@ -25,6 +25,8 @@
       "matches": ["https://lovable.dev/projects/*"],
       "js": [
         "markdown-formatter.js",
+        "content_scripts/ui-dialog-manager.js",
+        "content_scripts/project-manager.js",
         "content_scripts/lovable-detector.js",
         "content_scripts/conversation-capture-simple.js",
         "content_scripts/ui-injector.js"
