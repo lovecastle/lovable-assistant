@@ -67,7 +67,7 @@ window.ChatInterface = {
       <div style="
         position: absolute; z-index: 999999; background: white; 
         border: 1px solid #c9cfd7; border-radius: 8px; box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        padding: 16px; min-width: 300px; max-width: 400px; font-family: system-ui, sans-serif;
+        padding: 10px; min-width: 300px; max-width: 400px; font-family: system-ui, sans-serif;
       ">
         <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
           ✨ Prompt Helper Menu
@@ -194,6 +194,21 @@ window.ChatInterface = {
       const style = document.createElement('style');
       style.id = 'prompt-menu-styles';
       style.textContent = `
+        /* Minimalist scrollbar for prompt menu */
+        #prompt-templates-menu::-webkit-scrollbar {
+          width: 3px;
+        }
+        #prompt-templates-menu::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        #prompt-templates-menu::-webkit-scrollbar-thumb {
+          background: #cbd5e0;
+          border-radius: 2px;
+        }
+        #prompt-templates-menu::-webkit-scrollbar-thumb:hover {
+          background: #a0aec0;
+        }
+        
         .prompt-option {
           display: block; width: 100%; text-align: left; 
           background: #f8fafc; border: 1px solid #e2e8f0; 
