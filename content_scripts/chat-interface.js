@@ -932,7 +932,7 @@ Transform the user's prompt to follow these guidelines while preserving their or
     return null;
   },
 
-  updateProjectNameInUI(projectName) {
+  updateProjectNameInUI: function(projectName) {
     // Update all UI elements that display the project name
     
     // Update chat greeting if present

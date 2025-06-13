@@ -834,19 +834,39 @@ window.UIDialogManager = {
   handleFeatureSelection(feature) {
     switch (feature) {
       case 'chat':
-        this.showChatInterface();
+        if (typeof this.showChatInterface === 'function') {
+          this.showChatInterface();
+        } else {
+          console.error('showChatInterface method not available');
+        }
         break;
       case 'history':
-        this.showConversationHistory();
+        if (typeof this.showConversationHistory === 'function') {
+          this.showConversationHistory();
+        } else {
+          console.error('showConversationHistory method not available');
+        }
         break;
       case 'utilities':
-        this.showUtilitiesPage();
+        if (typeof this.showUtilitiesPage === 'function') {
+          this.showUtilitiesPage();
+        } else {
+          console.error('showUtilitiesPage method not available');
+        }
         break;
       case 'knowledge':
-        this.showProjectManager();
+        if (typeof this.showProjectManager === 'function') {
+          this.showProjectManager();
+        } else {
+          console.error('showProjectManager method not available');
+        }
         break;
       case 'settings':
-        this.showSettingsPage();
+        if (typeof this.showSettingsPage === 'function') {
+          this.showSettingsPage();
+        } else {
+          console.error('showSettingsPage method not available');
+        }
         break;
       default:
         console.log('Unknown feature:', feature);
