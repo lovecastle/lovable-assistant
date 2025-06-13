@@ -284,7 +284,17 @@ window.UIDialogManager = {
   },
 
   showWelcomePage() {
-    const projectName = this.extractProjectName();
+    // Safely get project name with fallback
+    let projectName = 'Current Project';
+    if (typeof this.extractProjectName === 'function') {
+      projectName = this.extractProjectName();
+    } else {
+      // Fallback: extract project ID from URL
+      const url = window.location.href;
+      const match = url.match(/\/projects\/([^\/\?]+)/);
+      projectName = match ? match[1] : 'Current Project';
+    }
+    
     const content = document.getElementById('dialog-content');
     const title = document.getElementById('dialog-title');
     
@@ -301,7 +311,7 @@ window.UIDialogManager = {
             Welcome! 👋
           </h2>
           <p style="margin: 0; color: #4a5568; font-size: 16px;">
-            AI assistant for project <strong style="color: #667eea;">${projectName}</strong>
+            AI assistant for project <strong style="color: #667eea;" data-project-name>${projectName}</strong>
           </p>
         </div>
         
@@ -356,7 +366,7 @@ window.UIDialogManager = {
             </div>
           </div>
           
-          <!-- Lovable's Chat History -->
+          <!-- Lovable Chat History -->
           <div class="feature-card" data-feature="history" style="
             background: white; border: 2px solid #c9cfd7; border-radius: 12px;
             padding: 20px; cursor: pointer; transition: all 0.2s ease;
@@ -371,7 +381,7 @@ window.UIDialogManager = {
               ">📚</div>
               <div style="flex: 1;">
                 <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Lovable's Chat History
+                  Lovable Chat History
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
                   Browse and search your past conversations and development activities
@@ -453,6 +463,9 @@ window.UIDialogManager = {
     
     if (!chatInput || !sendBtn) return;
 
+    // Load conversation history when chat opens
+    this.loadConversationHistory();
+
     // Note: Close button is handled centrally in setupCloseButton()
 
     const sendMessage = async () => {
@@ -464,22 +477,33 @@ window.UIDialogManager = {
       this.showTypingIndicator();
 
       try {
+        // Get conversation history for context
+        const conversationHistory = await this.getRecentConversations();
+        
         const response = await chrome.runtime.sendMessage({
           action: 'chatMessage',
           message: message,
-          context: { projectId: this.projectId, url: window.location.href }
+          context: { 
+            projectId: this.projectId, 
+            url: window.location.href,
+            projectName: this.extractProjectName(),
+            conversationHistory: conversationHistory
+          }
         });
 
         this.hideTypingIndicator();
 
         if (response.success) {
           this.addMessage(response.data, 'assistant');
+          
+          // Save the conversation to database
+          this.saveConversation(message, response.data);
         } else {
           this.addMessage('Sorry, I encountered an error: ' + response.error, 'error');
         }
       } catch (error) {
         this.hideTypingIndicator();
-        this.addMessage('Connection error. Please check your Claude API key.', 'error');
+        this.addMessage('Connection error. Please check your API configuration.', 'error');
       }
     };
 
@@ -496,7 +520,80 @@ window.UIDialogManager = {
     chatInput.focus();
   },
 
-  addMessage(content, type) {
+  async loadConversationHistory() {
+    try {
+      const response = await this.safeSendMessage({
+        action: 'getAssistantConversations',
+        projectId: this.projectId,
+        limit: 10
+      });
+      
+      if (response.success && response.data && response.data.length > 0) {
+        const messagesContainer = document.getElementById('chat-messages');
+        if (!messagesContainer) return;
+        
+        // Clear the initial greeting
+        messagesContainer.innerHTML = '';
+        
+        // Add conversation history
+        response.data.reverse().forEach(conv => {
+          this.addMessage(conv.user_message, 'user', false);
+          this.addMessage(conv.assistant_response, 'assistant', false);
+        });
+        
+        // Scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } catch (error) {
+      console.error('Failed to load conversation history:', error);
+    }
+  },
+
+  async getRecentConversations() {
+    try {
+      const response = await this.safeSendMessage({
+        action: 'getAssistantConversations',
+        projectId: this.projectId,
+        limit: 5
+      });
+      
+      if (response.success && response.data) {
+        return response.data.map(conv => ({
+          user: conv.user_message,
+          assistant: conv.assistant_response
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to get recent conversations:', error);
+    }
+    return [];
+  },
+
+  async saveConversation(userMessage, assistantResponse) {
+    try {
+      const response = await this.safeSendMessage({
+        action: 'saveAssistantConversation',
+        data: {
+          project_id: this.projectId,
+          user_message: userMessage,
+          assistant_response: assistantResponse,
+          metadata: {
+            project_name: this.extractProjectName(),
+            url: window.location.href,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+      
+      if (!response.success) {
+        console.error('Failed to save conversation:', response.error);
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+    }
+  },
+
+  addMessage(content, type, addTimestamp = true) {
     const messagesContainer = document.getElementById('chat-messages');
     if (!messagesContainer) return;
 

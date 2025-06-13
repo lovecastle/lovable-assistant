@@ -530,4 +530,86 @@ export class SupabaseClient {
     
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
+
+  // Assistant Conversation Methods
+  async saveAssistantConversation(conversationData) {
+    console.log('💾 Database-sync: Saving assistant conversation');
+    
+    try {
+      // Generate UUID if not provided
+      if (!conversationData.id) {
+        conversationData.id = this.generateUUID();
+      }
+      
+      const result = await this.request('assistant_conversations', {
+        method: 'POST',
+        body: JSON.stringify(conversationData)
+      });
+
+      console.log('✅ Database-sync: Assistant conversation saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save assistant conversation:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAssistantConversations(projectId, limit = 10) {
+    console.log(`🔍 Database-sync: Getting assistant conversations for project ${projectId}`);
+    
+    try {
+      const endpoint = `assistant_conversations?project_id=eq.${projectId}&order=created_at.desc&limit=${limit}`;
+      const result = await this.request(endpoint);
+      
+      console.log(`✅ Database-sync: Retrieved ${result.length} assistant conversations`);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get assistant conversations:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteAssistantConversation(conversationId) {
+    console.log('🔍 Database-sync: Deleting assistant conversation:', conversationId);
+    
+    try {
+      const result = await this.request(`assistant_conversations?id=eq.${conversationId}`, {
+        method: 'DELETE'
+      });
+
+      console.log('✅ Database-sync: Assistant conversation deleted successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to delete assistant conversation:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async searchAssistantConversations(query, projectId = null, limit = 20) {
+    console.log('🔍 Database-sync: Searching assistant conversations');
+    
+    try {
+      let endpoint = 'assistant_conversations?';
+      const conditions = [];
+      
+      // Text search in messages
+      if (query) {
+        conditions.push(`or=(user_message.ilike.*${query}*,assistant_response.ilike.*${query}*)`);
+      }
+      
+      // Filter by project
+      if (projectId) {
+        conditions.push(`project_id=eq.${projectId}`);
+      }
+      
+      endpoint += conditions.join('&') + `&order=created_at.desc&limit=${limit}`;
+      
+      const result = await this.request(endpoint);
+      console.log(`✅ Database-sync: Found ${result.length} assistant conversations`);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to search assistant conversations:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }

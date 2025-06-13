@@ -157,6 +157,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'getProjectInfo':
+      handleGetProjectInfo(request.projectId).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'saveAssistantConversation':
+      handleSaveAssistantConversation(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'getAssistantConversations':
+      handleGetAssistantConversations(request.projectId, request.limit).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     case 'getAllProjectManagers':
       handleGetAllProjectManagers().then(result => {
         sendResponse(result);
@@ -206,10 +230,74 @@ async function testConnection() {
 
 async function handleChatMessage(message, context) {
   try {
-    const systemPrompt = `You are a helpful development assistant for Lovable.dev projects. 
-    Help with coding, debugging, and best practices. Be concise but helpful.
+    // Build context information
+    const projectName = context?.projectName || 'Unknown Project';
+    const projectId = context?.projectId || 'unknown';
     
-    Project: ${context?.projectId || 'Unknown'}`;
+    // Get project information
+    let projectInfo = '';
+    if (context?.projectId) {
+      try {
+        const projectResult = await supabase.getProjectManager(context.projectId);
+        if (projectResult.success && projectResult.data) {
+          const project = projectResult.data;
+          projectInfo = '\n\nProject Information:\n';
+          if (project.description) {
+            projectInfo += `Description: ${project.description}\n`;
+          }
+          if (project.notes) {
+            projectInfo += `Notes: ${project.notes}\n`;
+          }
+          if (project.tech_stack) {
+            projectInfo += `Tech Stack: ${project.tech_stack}\n`;
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch project info:', error);
+      }
+    }
+    
+    // Get recent Lovable conversations for context
+    let lovableHistory = '';
+    if (context?.projectId) {
+      try {
+        const conversations = await supabase.getConversations(context.projectId, 10);
+        if (conversations && conversations.length > 0) {
+          lovableHistory = '\n\nRecent Lovable conversations:\n' + 
+            conversations.slice(0, 5).map(conv => 
+              `User: ${conv.user_message?.substring(0, 100)}...\nLovable: ${conv.lovable_response?.substring(0, 100)}...`
+            ).join('\n\n');
+        }
+      } catch (error) {
+        console.warn('Could not fetch Lovable history:', error);
+      }
+    }
+    
+    // Build conversation history context
+    let conversationContext = '';
+    if (context?.conversationHistory && context.conversationHistory.length > 0) {
+      conversationContext = '\n\nPrevious assistant conversations:\n' +
+        context.conversationHistory.map(conv => 
+          `User: ${conv.user}\nAssistant: ${conv.assistant}`
+        ).join('\n\n');
+    }
+    
+    const systemPrompt = `You are a helpful development assistant for Lovable.dev projects. 
+    You are assisting with the project "${projectName}".
+    
+    Help with coding, debugging, and best practices. Be concise but helpful.
+    You have access to the project's information and conversation history to provide context-aware assistance.
+    ${projectInfo}
+    ${lovableHistory}
+    ${conversationContext}
+    
+    Current context:
+    - Project: ${projectName}
+    - Project ID: ${projectId}
+    - URL: ${context?.url || 'Unknown'}
+    
+    Provide helpful, specific advice based on the project context and history.
+    When greeting the user, always use the project name "${projectName}" not the project ID.`;
 
     const response = await aiAPI.generateResponse(message, systemPrompt);
     return { success: true, data: response };
@@ -740,6 +828,80 @@ async function handleGetAllProjectManagers() {
     }
   } catch (error) {
     console.error('❌ Service Worker: Error getting all project managers:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetProjectInfo(projectId) {
+  try {
+    console.log(`🔍 Service Worker: Getting project info for ${projectId}`);
+    
+    // First try to get from project_managers table
+    const result = await supabase.getProjectManager(projectId);
+    
+    if (result.success && result.data) {
+      console.log('✅ Service Worker: Project info retrieved successfully');
+      return { 
+        success: true, 
+        data: {
+          id: result.data.project_id,
+          name: result.data.project_name || result.data.name || 'Unnamed Project',
+          url: result.data.project_url || result.data.url,
+          description: result.data.description,
+          notes: result.data.notes
+        }
+      };
+    }
+    
+    // If not found in project_managers, return basic info
+    return {
+      success: true,
+      data: {
+        id: projectId,
+        name: null // Will trigger UI to use fallback
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting project info:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSaveAssistantConversation(conversationData) {
+  try {
+    console.log('💾 Service Worker: Saving assistant conversation');
+    
+    const result = await supabase.saveAssistantConversation(conversationData);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Assistant conversation saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save assistant conversation:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving assistant conversation:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetAssistantConversations(projectId, limit = 10) {
+  try {
+    console.log(`🔍 Service Worker: Getting assistant conversations for project ${projectId}`);
+    
+    const result = await supabase.getAssistantConversations(projectId, limit);
+    
+    if (result.success) {
+      console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} assistant conversations`);
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get assistant conversations:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting assistant conversations:', error);
     return { success: false, error: error.message };
   }
 }

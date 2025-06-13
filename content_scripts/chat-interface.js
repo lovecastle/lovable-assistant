@@ -596,7 +596,8 @@ Transform the user's prompt to follow these guidelines while preserving their or
     
     if (!content) return;
     
-    const projectName = this.extractProjectName();
+    // Get initial project name (may be cached or placeholder)
+    const initialProjectName = this.extractProjectName();
     
     content.innerHTML = `
       <div id="chat-messages" style="
@@ -608,7 +609,7 @@ Transform the user's prompt to follow these guidelines while preserving their or
           padding: 12px 16px; margin-bottom: 12px; font-size: 14px; color: #234e52;
           align-self: flex-start; max-width: 85%;
         ">
-          👋 Hello! I'm your AI assistant for project <strong>${projectName}</strong>.
+          👋 Hello! I'm your AI assistant for project <strong data-project-name>${initialProjectName}</strong>.
         </div>
       </div>
       
@@ -887,39 +888,73 @@ Transform the user's prompt to follow these guidelines while preserving their or
   },
 
   extractProjectName() {
-    // Try to get project name from page title first
-    const titleElement = document.querySelector('title');
-    if (titleElement && titleElement.textContent) {
-      const title = titleElement.textContent.trim();
-      
-      // Extract from Lovable title format "Project Name - Lovable"
-      if (title.includes(' - Lovable')) {
-        return title.replace(' - Lovable', '').trim();
-      }
-      
-      // Extract from other possible formats
-      if (title.includes('Lovable')) {
-        return title.replace(/Lovable/g, '').replace(/[-|]/g, '').trim();
-      }
-      
-      // If title doesn't contain Lovable, return as is (up to first 50 chars)
-      return title.length > 50 ? title.substring(0, 50) + '...' : title;
-    }
-    
-    // Fallback: try to extract from URL
+    // Get project ID from URL
     const url = window.location.href;
     const projectIdMatch = url.match(/\/projects\/([^\/\?]+)/);
+    
     if (projectIdMatch && projectIdMatch[1]) {
-      // Convert URL-safe project ID to readable format
-      return projectIdMatch[1]
-        .replace(/-/g, ' ')
-        .replace(/_/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+      const projectId = projectIdMatch[1];
+      
+      // Always fetch from database asynchronously
+      this.fetchProjectName(projectId).then(name => {
+        if (name) {
+          // Update all UI elements that show the project name
+          if (typeof this.updateProjectNameInUI === 'function') {
+            this.updateProjectNameInUI(name);
+          }
+          
+          // Store for future use
+          this._cachedProjectName = name;
+        }
+      }).catch(console.error);
+      
+      // Return cached name if available, otherwise loading placeholder
+      return this._cachedProjectName || 'Loading...';
     }
     
-    // Final fallback
+    // No project ID found
     return 'Current Project';
+  },
+
+  async fetchProjectName(projectId) {
+    try {
+      const response = await this.safeSendMessage({
+        action: 'getProjectInfo',
+        projectId: projectId
+      });
+      
+      if (response && response.success && response.data && response.data.name) {
+        return response.data.name;
+      }
+    } catch (error) {
+      console.error('Failed to fetch project name:', error);
+    }
+    return null;
+  },
+
+  updateProjectNameInUI(projectName) {
+    // Update all UI elements that display the project name
+    
+    // Update chat greeting if present
+    const greetingElement = document.querySelector('#chat-messages > div:first-child');
+    if (greetingElement && greetingElement.innerHTML.includes('project <strong>')) {
+      greetingElement.innerHTML = greetingElement.innerHTML.replace(
+        /project <strong[^>]*>.*<\/strong>/,
+        `project <strong data-project-name>${projectName}</strong>`
+      );
+    }
+    
+    // Update welcome page project name if present  
+    const welcomeProjectElement = document.querySelector('[style*="color: #667eea"]');
+    if (welcomeProjectElement && welcomeProjectElement.parentElement && 
+        welcomeProjectElement.parentElement.textContent.includes('AI assistant for project')) {
+      welcomeProjectElement.textContent = projectName;
+    }
+    
+    // Update any other places that might show the project name
+    const allProjectNameElements = document.querySelectorAll('[data-project-name]');
+    allProjectNameElements.forEach(element => {
+      element.textContent = projectName;
+    });
   }
 };

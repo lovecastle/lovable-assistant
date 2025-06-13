@@ -14,34 +14,53 @@ class LovableDetector {
     this.lastToggleTime = 0; // Debounce rapid toggles
     
     // Mix in UI Dialog Manager methods
-    Object.assign(this, window.UIDialogManager);
+    if (window.UIDialogManager) {
+      Object.assign(this, window.UIDialogManager);
+    }
     
     // Mix in Project Manager methods
-    Object.assign(this, window.ProjectManager);
+    if (window.ProjectManager) {
+      Object.assign(this, window.ProjectManager);
+    }
     
     // Mix in Chat Interface methods
-    Object.assign(this, window.ChatInterface);
+    if (window.ChatInterface) {
+      Object.assign(this, window.ChatInterface);
+    }
     
     // Mix in Conversation History methods
-    Object.assign(this, window.ConversationHistory);
+    if (window.ConversationHistory) {
+      Object.assign(this, window.ConversationHistory);
+    }
     
     // Mix in Utilities Manager methods
-    Object.assign(this, window.UtilitiesManager);
+    if (window.UtilitiesManager) {
+      Object.assign(this, window.UtilitiesManager);
+    }
     
     // Mix in Status Monitor methods
-    Object.assign(this, window.StatusMonitor);
-    
-    try {
-      this.init();
-    } catch (error) {
-      console.error('Error during LovableDetector initialization:', error);
+    if (window.StatusMonitor) {
+      Object.assign(this, window.StatusMonitor);
     }
+    
+    // Initialize after a brief delay to ensure all mixins are loaded
+    setTimeout(() => {
+      try {
+        this.init();
+      } catch (error) {
+        console.error('Error during LovableDetector initialization:', error);
+      }
+    }, 100);
   }
 
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
-    this.setupPromptEnhancement();
+    
+    // Only call setupPromptEnhancement if it exists (from ChatInterface mixin)
+    if (typeof this.setupPromptEnhancement === 'function') {
+      this.setupPromptEnhancement();
+    }
   }
 
   detectLovablePage() {
@@ -50,12 +69,21 @@ class LovableDetector {
     
     if (isProjectPage) {
       this.isLovablePage = true;
-      this.projectId = this.extractProjectId(url);
+      
+      // Extract project ID from URL (fallback if extractProjectId method not available)
+      if (typeof this.extractProjectId === 'function') {
+        this.projectId = this.extractProjectId(url);
+      } else {
+        const match = url.match(/\/projects\/([^\/\?]+)/);
+        this.projectId = match ? match[1] : null;
+      }
       
       // Lovable.dev project detected
       
       setTimeout(() => {
-        this.showReadyNotification();
+        if (typeof this.showReadyNotification === 'function') {
+          this.showReadyNotification();
+        }
       }, 100);
       
       // Safely send message to background
@@ -78,12 +106,16 @@ class LovableDetector {
       // Automatically saves project name and URL to database on page load
       // No user interaction required - eliminates manual "Save Settings" step
       setTimeout(() => {
-        this.autoSaveProjectInfo();
+        if (typeof this.autoSaveProjectInfo === 'function') {
+          this.autoSaveProjectInfo();
+        }
       }, 2000); // 2-second delay ensures page is fully loaded
       
       // Initialize working status monitor after page detection
       setTimeout(() => {
-        this.initializeWorkingStatusMonitor();
+        if (typeof this.initializeWorkingStatusMonitor === 'function') {
+          this.initializeWorkingStatusMonitor();
+        }
       }, 1000);
     }
   }
