@@ -56,12 +56,25 @@ window.StatusMonitor = {
   
   detectWorkingStatus() {
     // Check for stop button using multiple strategies
-    // Strategy 1: Look for buttons with the specific stop icon SVG path
-    const stopButtonPath = 'M360-330h240q12.75 0 21.38-8.63Q630-347.25 630-360v-240q0-12.75-8.62-21.38Q612.75-630 600-630H360q-12.75 0-21.37 8.62Q330-612.75 330-600v240q0 12.75 8.63 21.37Q347.25-330 360-330';
-    const pathElements = document.querySelectorAll(`path[d*="${stopButtonPath.substring(0, 50)}"]`);
+    // Strategy 1: Look for buttons with the NEW stop icon SVG path
+    const newStopButtonPath = 'M240-300v-360q0-24.75 17.63-42.38Q275.25-720 300-720h360q24.75 0 42.38 17.62Q720-684.75 720-660v360q0 24.75-17.62 42.37Q684.75-240 660-240H300q-24.75 0-42.37-17.63Q240-275.25 240-300';
+    const oldStopButtonPath = 'M360-330h240q12.75 0 21.38-8.63Q630-347.25 630-360v-240q0-12.75-8.62-21.38Q612.75-630 600-630H360q-12.75 0-21.37 8.62Q330-612.75 330-600v240q0 12.75 8.63 21.37Q347.25-330 360-330';
     
-    for (const path of pathElements) {
-      // Find the parent button
+    // Check for new stop button path
+    const newPathElements = document.querySelectorAll(`path[d*="${newStopButtonPath.substring(0, 50)}"]`);
+    for (const path of newPathElements) {
+      const button = path.closest('button');
+      if (button) {
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return true;
+        }
+      }
+    }
+    
+    // Check for old stop button path (backward compatibility)
+    const oldPathElements = document.querySelectorAll(`path[d*="${oldStopButtonPath.substring(0, 50)}"]`);
+    for (const path of oldPathElements) {
       const button = path.closest('button');
       if (button) {
         const rect = button.getBoundingClientRect();
@@ -79,29 +92,55 @@ window.StatusMonitor = {
         // Check if it's a small square button (typical stop button size)
         const rect = button.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0 && rect.width <= 30 && rect.height <= 30) {
-          // Check if the path contains the stop icon pattern
+          // Check if the path contains either stop icon pattern
           const path = svg.querySelector('path');
-          if (path && path.getAttribute('d')?.includes('M360-330')) {
+          if (path) {
+            const d = path.getAttribute('d');
+            if (d && (d.includes('M240-300') || d.includes('M360-330'))) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    
+    // Strategy 3: Look for buttons with the new classes (size-6 rounded-full)
+    const sizeButtons = document.querySelectorAll('button.size-6.rounded-full');
+    for (const button of sizeButtons) {
+      const svg = button.querySelector('svg[viewBox*="-960 960 960"]');
+      if (svg) {
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          // Additional check for stop icon path if needed
+          const path = svg.querySelector('path');
+          if (path && path.getAttribute('d')?.includes('M240-300')) {
             return true;
           }
         }
       }
     }
     
-    // Strategy 3: XPath-based detection for the specific location
-    const xpathResult = document.evaluate(
-      '//form//button[contains(@class, "h-6 w-6") and .//svg[contains(@viewBox, "-960 960 960")]]',
-      document,
-      null,
-      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-      null
-    );
+    // Strategy 4: XPath-based detection for both old and new button classes
+    const xpathQueries = [
+      '//form//button[contains(@class, "size-6") and contains(@class, "rounded-full") and .//svg[contains(@viewBox, "-960 960 960")]]',
+      '//form//button[contains(@class, "h-6 w-6") and .//svg[contains(@viewBox, "-960 960 960")]]'
+    ];
     
-    for (let i = 0; i < xpathResult.snapshotLength; i++) {
-      const button = xpathResult.snapshotItem(i);
-      const rect = button.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        return true;
+    for (const query of xpathQueries) {
+      const xpathResult = document.evaluate(
+        query,
+        document,
+        null,
+        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+        null
+      );
+      
+      for (let i = 0; i < xpathResult.snapshotLength; i++) {
+        const button = xpathResult.snapshotItem(i);
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return true;
+        }
       }
     }
     
