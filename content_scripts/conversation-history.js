@@ -13,14 +13,21 @@
 // Create ConversationHistory class that will be mixed into LovableDetector
 window.ConversationHistory = {
   showConversationHistory() {
-    const content = document.getElementById('dialog-content');
-    const title = document.getElementById('dialog-title');
-    
-    if (title) {
-      title.textContent = '📚 Lovable\'s Chat History';
+    // Show loading state immediately
+    if (typeof this.showDialogLoading === 'function') {
+      this.showDialogLoading('Lovable\'s Chat History');
     }
     
-    if (!content) return;
+    // Load the actual content after a brief delay
+    setTimeout(() => {
+      const content = document.getElementById('dialog-content');
+      const title = document.getElementById('dialog-title');
+      
+      if (title) {
+        title.textContent = '📚 Lovable\'s Chat History';
+      }
+      
+      if (!content) return;
     
     content.innerHTML = `
       <div id="chat-messages" style="
@@ -102,9 +109,10 @@ window.ConversationHistory = {
       </div>
     `;
     
-    this.setupBackButton();
-    this.setupHistoryFilters();
-    this.loadHistoryMessages();
+      this.setupBackButton();
+      this.setupHistoryFilters();
+      this.loadHistoryMessages();
+    }, 100);
   },
 
   setupHistoryFilters() {

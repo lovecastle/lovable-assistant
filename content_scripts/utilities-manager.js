@@ -14,14 +14,21 @@
 // Create UtilitiesManager class that will be mixed into LovableDetector
 window.UtilitiesManager = {
   showUtilitiesPage() {
-    const content = document.getElementById('dialog-content');
-    const title = document.getElementById('dialog-title');
-    
-    if (title) {
-      title.textContent = '🛠️ Utilities';
+    // Show loading state immediately
+    if (typeof this.showDialogLoading === 'function') {
+      this.showDialogLoading('Utilities');
     }
     
-    if (!content) return;
+    // Load the actual content after a brief delay
+    setTimeout(() => {
+      const content = document.getElementById('dialog-content');
+      const title = document.getElementById('dialog-title');
+      
+      if (title) {
+        title.textContent = '🛠️ Utilities';
+      }
+      
+      if (!content) return;
     
     content.innerHTML = `
       <div style="padding: 20px;">
@@ -177,9 +184,10 @@ window.UtilitiesManager = {
       </div>
     `;
     
-    this.setupBackButton();
-    this.setupUtilitiesEvents();
-    this.loadUtilitiesSettings();
+      this.setupBackButton();
+      this.setupUtilitiesEvents();
+      this.loadUtilitiesSettings();
+    }, 100);
   },
 
   setupBackButton() {

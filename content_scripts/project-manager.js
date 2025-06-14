@@ -14,40 +14,48 @@
 // Create ProjectManager class that will be mixed into LovableDetector
 window.ProjectManager = {
   showProjectManager() {
-    const content = document.getElementById('dialog-content');
-    const title = document.getElementById('dialog-title');
-    
-    if (title) {
-      title.textContent = '📁 Project Manager';
+    // Show loading state immediately
+    if (typeof this.showDialogLoading === 'function') {
+      this.showDialogLoading('Project Manager');
     }
     
-    if (!content) return;
-    
-    content.innerHTML = `
-      <div style="padding: 20px;">
-        <div style="margin-bottom: 20px;">
-          <button id="back-to-welcome-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">← Back to Welcome</button>
-        </div>
-        
-        <div id="project-list-container">
-          <div style="margin-bottom: 16px;">
-            <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-              Your Projects
-            </h3>
+    // Load the actual content after a brief delay
+    setTimeout(() => {
+      const content = document.getElementById('dialog-content');
+      const title = document.getElementById('dialog-title');
+      
+      if (title) {
+        title.textContent = '📁 Project Manager';
+      }
+      
+      if (!content) return;
+      
+      content.innerHTML = `
+        <div style="padding: 20px;">
+          <div style="margin-bottom: 20px;">
+            <button id="back-to-welcome-btn" style="
+              background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+              padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            ">← Back to Welcome</button>
           </div>
           
-          <div id="project-list" style="display: flex; flex-direction: column; gap: 12px;">
-            <!-- Projects will be populated here -->
+          <div id="project-list-container">
+            <div style="margin-bottom: 16px;">
+              <h3 style="margin: 0 0 12px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+                Your Projects
+              </h3>
+            </div>
+            
+            <div id="project-list" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Projects will be populated here -->
+            </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    this.setupBackButton();
-    this.loadProjectsList();
+      `;
+      
+      this.setupBackButton();
+      this.loadProjectsList();
+    }, 100);
   },
 
   showProjectSettings(project) {
@@ -419,7 +427,7 @@ window.ProjectManager = {
    * AUTO-SAVE PROJECT INFORMATION
    * 
    * Automatically saves project name and URL to database when page loads.
-   * This is triggered 2 seconds after page detection to ensure page is fully loaded.
+   * This is triggered immediately after page detection for instant saving.
    * 
    * Feature: Saves project info without requiring user to click "Save Settings"
    * - Detects project ID from URL
@@ -430,16 +438,23 @@ window.ProjectManager = {
    */
   async autoSaveProjectInfo() {
     try {
-      console.log('🚀 Auto-saving project information on page load...');
+      console.log('🚀 Auto-saving project information immediately on page load...');
+      
+      // Wait a moment for page title to be fully loaded
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const currentProject = await this.getCurrentProject();
       
       if (currentProject) {
-        console.log('✅ Project information auto-saved on page load:', currentProject.name);
+        console.log('✅ Project information auto-saved immediately:', currentProject.name);
+        return currentProject;
       } else {
         console.log('❌ No project information found to auto-save');
+        return null;
       }
     } catch (error) {
-      console.warn('⚠️ Error during auto-save on page load:', error);
+      console.warn('⚠️ Error during immediate auto-save:', error);
+      throw error;
     }
   },
 

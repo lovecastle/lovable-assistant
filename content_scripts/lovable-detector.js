@@ -102,14 +102,14 @@ class LovableDetector {
         });
       }
       
-      // *** NEW FEATURE: AUTO-SAVE PROJECT INFO ***
+      // *** IMMEDIATE PROJECT INFO DETECTION AND SAVE ***
       // Automatically saves project name and URL to database on page load
       // No user interaction required - eliminates manual "Save Settings" step
       setTimeout(() => {
         if (typeof this.autoSaveProjectInfo === 'function') {
           this.autoSaveProjectInfo();
         }
-      }, 2000); // 2-second delay ensures page is fully loaded
+      }, 500); // Immediate detection for faster saving
       
       // Initialize working status monitor after page detection
       setTimeout(() => {

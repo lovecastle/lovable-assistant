@@ -150,6 +150,54 @@ window.UIDialogManager = {
     }
   },
 
+  // Loading state management for dialog content
+  showDialogLoading(title = 'Loading...') {
+    const content = document.getElementById('dialog-content');
+    const dialogTitle = document.getElementById('dialog-title');
+    
+    if (dialogTitle) {
+      dialogTitle.textContent = `🤖 ${title}`;
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #4a5568;
+        font-size: 14px;
+        gap: 16px;
+      ">
+        <div style="
+          width: 32px;
+          height: 32px;
+          border: 3px solid #e2e8f0;
+          border-top: 3px solid #667eea;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        "></div>
+        <div>Loading...</div>
+      </div>
+    `;
+    
+    // Add spinner animation if not exists
+    if (!document.getElementById('spinner-styles')) {
+      const style = document.createElement('style');
+      style.id = 'spinner-styles';
+      style.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  },
+
   extractProjectId(url = window.location.href) {
     if (!url) return null;
     const match = url.match(/\/projects\/([^\/\?]+)/);
