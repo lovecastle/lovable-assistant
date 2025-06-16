@@ -620,8 +620,11 @@ Transform the user's prompt to follow these guidelines while preserving their or
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
-          ">← Back</button>
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 36px; min-width: 80px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back</button>
         </div>
         <div style="display: flex; gap: 8px;">
           <textarea id="chat-input" placeholder="Ask me anything about your project..." style="
@@ -659,8 +662,11 @@ Transform the user's prompt to follow these guidelines while preserving their or
         <div style="margin-bottom: 20px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">← Back to Welcome</button>
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 40px; min-width: 120px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Welcome</button>
         </div>
         
         <!-- AI Provider Configuration -->

@@ -45,8 +45,11 @@ window.ConversationHistory = {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
-          ">← Back</button>
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 36px; min-width: 80px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back</button>
           <div style="color: #718096; font-size: 12px;">
             <span id="message-count">0</span>
           </div>

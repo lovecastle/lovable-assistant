@@ -35,8 +35,11 @@ window.ProjectManager = {
           <div style="margin-bottom: 20px;">
             <button id="back-to-welcome-btn" style="
               background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-              padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">← Back to Welcome</button>
+              padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+              display: inline-flex; align-items: center; justify-content: center;
+              min-height: 40px; min-width: 120px; transition: all 0.2s ease;
+            " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+               onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Welcome</button>
           </div>
           
           <div id="project-list-container">
@@ -73,8 +76,11 @@ window.ProjectManager = {
         <div style="margin-bottom: 20px;">
           <button id="back-to-projects-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">← Back to Projects</button>
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 40px; min-width: 120px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Projects</button>
         </div>
         
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 16px; margin-bottom: 16px;">

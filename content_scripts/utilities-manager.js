@@ -35,8 +35,11 @@ window.UtilitiesManager = {
         <div style="margin-bottom: 20px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">← Back to Welcome</button>
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 40px; min-width: 120px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Welcome</button>
         </div>
         
         <!-- Message Scraping -->
@@ -222,7 +225,7 @@ window.UtilitiesManager = {
     this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
     this.setupToggleSwitch('tab-rename-toggle', 'lovable-tab-rename');
     this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
-    this.setupNotificationToggle();
+    this.setupToggleSwitch('notifications-toggle', 'lovable-notifications');
 
     // Settings buttons
     const resetBtn = document.getElementById('reset-utilities-btn');
@@ -253,12 +256,44 @@ window.UtilitiesManager = {
 
   setupToggleSwitch(toggleId, settingKey) {
     const toggle = document.getElementById(toggleId);
-    if (!toggle) return;
+    if (!toggle) {
+      console.warn(`⚠️ Toggle element not found: ${toggleId}`);
+      return;
+    }
+    
+    console.log(`🔧 Setting up toggle switch: ${toggleId} for ${settingKey}`);
 
-    toggle.addEventListener('change', () => {
+    toggle.addEventListener('change', async () => {
       const isEnabled = toggle.checked;
-      localStorage.setItem(settingKey, isEnabled.toString());
-      console.log(`🔧 ${settingKey} ${isEnabled ? 'enabled' : 'disabled'}`);
+      
+      console.log(`🔄 Toggle changed: ${settingKey} = ${isEnabled}`);
+      
+      // Save to database instead of localStorage
+      try {
+        const message = {
+          action: 'saveUIPreference',
+          data: {
+            preferenceKey: settingKey,
+            preferenceValue: isEnabled
+          }
+        };
+        
+        console.log(`💾 Saving UI preference:`, message);
+        const response = await this.safeSendMessage(message);
+        console.log(`📝 Save response:`, response);
+        
+        if (response.success) {
+          console.log(`✅ ${settingKey} ${isEnabled ? 'enabled' : 'disabled'}`);
+        } else {
+          console.error('❌ Failed to save setting:', response.error);
+          // Revert toggle state on error
+          toggle.checked = !isEnabled;
+        }
+      } catch (error) {
+        console.error('❌ Error saving setting:', error);
+        // Revert toggle state on error
+        toggle.checked = !isEnabled;
+      }
     });
   },
 
@@ -291,111 +326,55 @@ window.UtilitiesManager = {
     document.head.appendChild(style);
   },
 
-  loadUtilitiesSettings() {
-    // Load saved settings from localStorage
+  async loadUtilitiesSettings() {
+    // Load saved settings from database
     const settings = [
       { id: 'auto-expand-toggle', key: 'lovable-auto-expand' },
       { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
-      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' }
+      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
+      { id: 'notifications-toggle', key: 'lovable-notifications' }
     ];
 
-    settings.forEach(({ id, key }) => {
-      const toggle = document.getElementById(id);
-      if (toggle) {
-        const saved = localStorage.getItem(key);
-        toggle.checked = saved === 'true';
+    try {
+      // Get all UI preferences from database
+      const message = { action: 'getAllUIPreferences' };
+      const response = await this.safeSendMessage(message);
+      
+      if (response.success) {
+        const preferences = response.data || {};
+        
+        settings.forEach(({ id, key }) => {
+          const toggle = document.getElementById(id);
+          if (toggle) {
+            // Use database value or default to false
+            toggle.checked = preferences[key] === true;
+          }
+        });
+      } else {
+        console.error('❌ Failed to load UI settings:', response.error);
+        // Fallback to default values
+        settings.forEach(({ id }) => {
+          const toggle = document.getElementById(id);
+          if (toggle) {
+            toggle.checked = false;
+          }
+        });
       }
-    });
-    
-    // Load notification settings
-    this.loadNotificationSettings();
+    } catch (error) {
+      console.error('❌ Error loading UI settings:', error);
+      // Fallback to default values
+      settings.forEach(({ id }) => {
+        const toggle = document.getElementById(id);
+        if (toggle) {
+          toggle.checked = false;
+        }
+      });
+    }
     
     // Load API settings
     this.loadAPISettings();
   },
   
-  async loadNotificationSettings() {
-    try {
-      // Check if extension context is still valid
-      if (!chrome.runtime?.id) {
-        console.warn('Extension context lost - page needs refresh');
-        return;
-      }
-      
-      const response = await chrome.runtime.sendMessage({
-        action: 'getNotificationSettings'
-      });
-      
-      if (response?.success) {
-        const toggle = document.getElementById('notifications-toggle');
-        if (toggle) {
-          toggle.checked = response.settings.enabled;
-        }
-      }
-    } catch (error) {
-      if (error.message?.includes('Extension context invalidated')) {
-        console.warn('Extension was reloaded - notification settings unavailable until page refresh');
-      } else {
-        console.error('Failed to load notification settings:', error);
-      }
-    }
-  },
-  
-  setupNotificationToggle() {
-    const toggle = document.getElementById('notifications-toggle');
-    const statusDiv = document.getElementById('notification-status');
-    
-    if (!toggle) return;
-    
-    toggle.addEventListener('change', async (e) => {
-      const enabled = e.target.checked;
-      
-      try {
-        // Check if extension context is still valid
-        if (!chrome.runtime?.id) {
-          throw new Error('Extension context lost - please refresh the page');
-        }
-        
-        // Update settings in background
-        const response = await chrome.runtime.sendMessage({
-          action: 'updateNotificationSettings',
-          settings: { enabled }
-        });
-        
-        if (response?.success) {
-          // Show status message
-          if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.color = '#48bb78';
-            statusDiv.textContent = enabled ? 
-              '✅ Notifications enabled! You\'ll be notified when Lovable completes tasks.' : 
-              '🔕 Notifications disabled.';
-            
-            setTimeout(() => {
-              statusDiv.style.display = 'none';
-            }, 3000);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to update notification settings:', error);
-        
-        // Revert toggle on error
-        toggle.checked = !enabled;
-        
-        if (statusDiv) {
-          statusDiv.style.display = 'block';
-          statusDiv.style.color = '#f56565';
-          statusDiv.textContent = error.message?.includes('Extension context') ?
-            '❌ Extension was reloaded. Please refresh the page.' :
-            '❌ Failed to update notification settings.';
-          
-          setTimeout(() => {
-            statusDiv.style.display = 'none';
-          }, 3000);
-        }
-      }
-    });
-  },
   
   setupAPIProviderSelection() {
     const providerOptions = document.querySelectorAll('input[name="ai-provider"]');
@@ -581,21 +560,24 @@ window.UtilitiesManager = {
       testClaudeBtn.addEventListener('click', async () => {
         showStatus('claude-status', '🔄 Testing Claude connection...', 'info');
         
-        // First save the current provider to Claude
         try {
-          if (chrome?.storage?.sync) {
-            await chrome.storage.sync.set({ aiProvider: 'claude' });
+          // Get the current Claude API key from the form
+          const apiKeyInput = document.getElementById('claude-api-key');
+          const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+          
+          if (!apiKey) {
+            showStatus('claude-status', '❌ Please enter your Claude API key first', 'error');
+            return;
           }
-        } catch (error) {
-          console.warn('Could not save AI provider:', error);
-        }
-        
-        try {
+          
+          // Test connection with specific provider
           const response = await this.safeSendMessage({ 
-            action: 'testConnection'
+            action: 'testSpecificConnection',
+            provider: 'claude',
+            apiKey: apiKey
           });
           
-          if (response.success) {
+          if (response && response.success) {
             showStatus('claude-status', '✅ Claude API connection successful!', 'success');
           } else {
             showStatus('claude-status', '❌ Claude connection failed: ' + (response.error || 'Invalid API key'), 'error');
@@ -611,21 +593,24 @@ window.UtilitiesManager = {
       testOpenAIBtn.addEventListener('click', async () => {
         showStatus('openai-status', '🔄 Testing OpenAI connection...', 'info');
         
-        // First save the current provider to OpenAI
         try {
-          if (chrome?.storage?.sync) {
-            await chrome.storage.sync.set({ aiProvider: 'openai' });
+          // Get the current OpenAI API key from the form
+          const apiKeyInput = document.getElementById('openai-api-key');
+          const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+          
+          if (!apiKey) {
+            showStatus('openai-status', '❌ Please enter your OpenAI API key first', 'error');
+            return;
           }
-        } catch (error) {
-          console.warn('Could not save AI provider:', error);
-        }
-        
-        try {
+          
+          // Test connection with specific provider
           const response = await this.safeSendMessage({ 
-            action: 'testConnection'
+            action: 'testSpecificConnection',
+            provider: 'openai',
+            apiKey: apiKey
           });
           
-          if (response.success) {
+          if (response && response.success) {
             showStatus('openai-status', '✅ OpenAI API connection successful!', 'success');
           } else {
             showStatus('openai-status', '❌ OpenAI connection failed: ' + (response.error || 'Invalid API key'), 'error');
@@ -641,21 +626,24 @@ window.UtilitiesManager = {
       testGeminiBtn.addEventListener('click', async () => {
         showStatus('gemini-status', '🔄 Testing Gemini connection...', 'info');
         
-        // First save the current provider to Gemini
         try {
-          if (chrome?.storage?.sync) {
-            await chrome.storage.sync.set({ aiProvider: 'gemini' });
+          // Get the current Gemini API key from the form
+          const apiKeyInput = document.getElementById('gemini-api-key');
+          const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+          
+          if (!apiKey) {
+            showStatus('gemini-status', '❌ Please enter your Gemini API key first', 'error');
+            return;
           }
-        } catch (error) {
-          console.warn('Could not save AI provider:', error);
-        }
-        
-        try {
+          
+          // Test connection with specific provider
           const response = await this.safeSendMessage({ 
-            action: 'testConnection'
+            action: 'testSpecificConnection',
+            provider: 'gemini',
+            apiKey: apiKey
           });
           
-          if (response.success) {
+          if (response && response.success) {
             showStatus('gemini-status', '✅ Gemini API connection successful!', 'success');
           } else {
             showStatus('gemini-status', '❌ Gemini connection failed: ' + (response.error || 'Invalid API key'), 'error');
@@ -672,11 +660,26 @@ window.UtilitiesManager = {
         showStatus('database-status', '🔄 Testing database connection...', 'info');
         
         try {
+          // Get the current database credentials from the form
+          const projectIdInput = document.getElementById('supabase-project-id');
+          const apiKeyInput = document.getElementById('supabase-api-key');
+          
+          const projectId = projectIdInput ? projectIdInput.value.trim() : '';
+          const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+          
+          if (!projectId || !apiKey) {
+            showStatus('database-status', '❌ Please enter both Project ID and API Key first', 'error');
+            return;
+          }
+          
+          // Test database connection with specific credentials
           const response = await this.safeSendMessage({ 
-            action: 'testConnection'
+            action: 'testDatabaseConnection',
+            projectId: projectId,
+            apiKey: apiKey
           });
           
-          if (response.success) {
+          if (response && response.success) {
             showStatus('database-status', '✅ Supabase database connection successful!', 'success');
           } else {
             showStatus('database-status', '❌ Database connection failed: ' + (response.error || 'Invalid credentials'), 'error');
@@ -805,7 +808,7 @@ window.UtilitiesManager = {
     const resetBtn = document.getElementById('reset-prompt-templates-btn');
     
     if (createSectionBtn) {
-      createSectionBtn.addEventListener('click', () => this.createNewSection());
+      createSectionBtn.addEventListener('click', async () => await this.createNewSection());
     }
     
     if (resetBtn) {
@@ -893,17 +896,32 @@ window.UtilitiesManager = {
     ];
   },
 
-  loadPromptTemplates() {
+  async loadPromptTemplates() {
     const container = document.getElementById('prompt-templates-container');
     if (!container) return;
     
-    // Try to load from localStorage first, then fall back to defaults
+    // Try to load from database first, then fall back to defaults
     let templates;
     try {
-      const stored = localStorage.getItem('lovable-prompt-templates');
-      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+      const message = { action: 'getPromptTemplates' };
+      const response = await this.safeSendMessage(message);
+      
+      if (response.success && response.data && response.data.length > 0) {
+        // Convert database format to expected format
+        templates = response.data.map(template => ({
+          category: template.category,
+          name: template.name,
+          template: template.template, // Use 'template' column directly
+          shortcut: template.shortcut
+        }));
+      } else {
+        // No templates in database, use defaults
+        templates = this.getDefaultPromptTemplates();
+        // Save defaults to database for future use
+        await this.saveAllTemplatesToDatabase(templates);
+      }
     } catch (error) {
-      console.warn('Failed to load stored templates, using defaults:', error);
+      console.warn('Failed to load templates from database, using defaults:', error);
       templates = this.getDefaultPromptTemplates();
     }
     
@@ -1031,25 +1049,25 @@ window.UtilitiesManager = {
     
     // Delete template buttons
     container.querySelectorAll('.delete-template-btn').forEach(button => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const templateId = button.dataset.templateId;
-        this.deleteTemplate(templateId);
+        await this.deleteTemplate(templateId);
       });
     });
     
     // Delete section buttons
     container.querySelectorAll('.delete-section-btn').forEach(button => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const category = button.dataset.category;
-        this.deleteSection(category);
+        await this.deleteSection(category);
       });
     });
     
     // Add template buttons
     container.querySelectorAll('.add-template-btn').forEach(button => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const category = button.dataset.category;
-        this.addNewTemplate(category);
+        await this.addNewTemplate(category);
       });
       
       // Add hover effects
@@ -1102,19 +1120,25 @@ window.UtilitiesManager = {
     }
   },
 
-  resetPromptTemplates() {
+  async resetPromptTemplates() {
     if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {
-      localStorage.removeItem('lovable-prompt-templates');
-      this.loadPromptTemplates();
-      console.log('🔄 Prompt templates reset to defaults');
+      try {
+        const defaultTemplates = this.getDefaultPromptTemplates();
+        await this.saveAllTemplatesToDatabase(defaultTemplates);
+        await this.loadPromptTemplates();
+        console.log('🔄 Prompt templates reset to defaults');
+      } catch (error) {
+        console.error('❌ Failed to reset templates:', error);
+        alert('Failed to reset templates. Please try again.');
+      }
     }
   },
 
-  createNewSection() {
+  async createNewSection() {
     const sectionName = prompt('Enter section name:');
     if (!sectionName || !sectionName.trim()) return;
     
-    const templates = this.getCurrentTemplates();
+    const templates = await this.getCurrentTemplates();
     // Check if section already exists
     const exists = templates.some(t => t.category === sectionName.trim());
     if (exists) {
@@ -1133,11 +1157,11 @@ window.UtilitiesManager = {
     this.saveTemplatesAndReload(templates);
   },
 
-  addNewTemplate(category) {
+  async addNewTemplate(category) {
     const templateName = prompt('Enter template name:');
     if (!templateName || !templateName.trim()) return;
     
-    const templates = this.getCurrentTemplates();
+    const templates = await this.getCurrentTemplates();
     templates.push({
       category: category,
       name: templateName.trim(),
@@ -1148,15 +1172,15 @@ window.UtilitiesManager = {
     this.saveTemplatesAndReload(templates);
   },
 
-  deleteSection(category) {
+  async deleteSection(category) {
     if (!confirm(`Are you sure you want to delete the entire "${category}" section and all its templates?`)) return;
     
-    const templates = this.getCurrentTemplates();
+    const templates = await this.getCurrentTemplates();
     const filteredTemplates = templates.filter(t => t.category !== category);
     this.saveTemplatesAndReload(filteredTemplates);
   },
 
-  deleteTemplate(templateId) {
+  async deleteTemplate(templateId) {
     const textarea = document.getElementById(templateId);
     if (!textarea) return;
     
@@ -1165,7 +1189,7 @@ window.UtilitiesManager = {
     
     if (!confirm(`Are you sure you want to delete the template "${name}"?`)) return;
     
-    const templates = this.getCurrentTemplates();
+    const templates = await this.getCurrentTemplates();
     const filteredTemplates = templates.filter(t => !(t.category === category && t.name === name));
     this.saveTemplatesAndReload(filteredTemplates);
   },
@@ -1224,8 +1248,8 @@ window.UtilitiesManager = {
     input.select();
   },
 
-  updateCategoryName(oldName, newName) {
-    const templates = this.getCurrentTemplates();
+  async updateCategoryName(oldName, newName) {
+    const templates = await this.getCurrentTemplates();
     templates.forEach(template => {
       if (template.category === oldName) {
         template.category = newName;
@@ -1234,11 +1258,11 @@ window.UtilitiesManager = {
     this.saveTemplatesAndReload(templates);
   },
 
-  updateTemplateName(templateId, newName) {
+  async updateTemplateName(templateId, newName) {
     const textarea = document.getElementById(templateId);
     if (!textarea) return;
     
-    const templates = this.getCurrentTemplates();
+    const templates = await this.getCurrentTemplates();
     const template = templates.find(t => 
       t.category === textarea.dataset.category && 
       t.name === textarea.dataset.name
@@ -1259,20 +1283,31 @@ window.UtilitiesManager = {
     }, 1000);
   },
 
-  saveCurrentTemplates() {
+  async saveCurrentTemplates() {
     const templates = this.getCurrentTemplatesFromDOM();
     try {
-      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      await this.saveAllTemplatesToDatabase(templates);
       console.log('✅ Templates auto-saved');
     } catch (error) {
       console.error('Failed to auto-save templates:', error);
     }
   },
 
-  getCurrentTemplates() {
+  async getCurrentTemplates() {
     try {
-      const stored = localStorage.getItem('lovable-prompt-templates');
-      return stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+      const message = { action: 'getPromptTemplates' };
+      const response = await this.safeSendMessage(message);
+      
+      if (response.success && response.data && response.data.length > 0) {
+        return response.data.map(template => ({
+          category: template.category,
+          name: template.name,
+          template: template.template, // Use 'template' column directly
+          shortcut: template.shortcut
+        }));
+      } else {
+        return this.getDefaultPromptTemplates();
+      }
     } catch (error) {
       return this.getDefaultPromptTemplates();
     }
@@ -1297,25 +1332,55 @@ window.UtilitiesManager = {
     return templates;
   },
 
-  saveTemplatesAndReload(templates) {
+  async saveAllTemplatesToDatabase(templates) {
     try {
-      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
-      this.loadPromptTemplates();
+      const message = {
+        action: 'saveAllPromptTemplates',
+        data: { templates }
+      };
+      const response = await this.safeSendMessage(message);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to save templates');
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Failed to save templates to database:', error);
+      throw error;
+    }
+  },
+
+  async saveTemplatesAndReload(templates) {
+    try {
+      await this.saveAllTemplatesToDatabase(templates);
+      await this.loadPromptTemplates();
       console.log('✅ Templates saved and reloaded');
     } catch (error) {
       console.error('Failed to save templates:', error);
     }
   },
 
-  loadTemplatesIntoMenu() {
+  async loadTemplatesIntoMenu() {
     const menuContainer = document.getElementById('prompt-templates-menu');
     if (!menuContainer) return;
     
-    // Load templates from localStorage or defaults
+    // Load templates from database or defaults
     let templates;
     try {
-      const stored = localStorage.getItem('lovable-prompt-templates');
-      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+      const message = { action: 'getPromptTemplates' };
+      const response = await this.safeSendMessage(message);
+      
+      if (response.success && response.data && response.data.length > 0) {
+        templates = response.data.map(template => ({
+          category: template.category,
+          name: template.name,
+          template: template.template, // Use 'template' column directly
+          shortcut: template.shortcut
+        }));
+      } else {
+        templates = this.getDefaultPromptTemplates();
+      }
     } catch (error) {
       templates = this.getDefaultPromptTemplates();
     }

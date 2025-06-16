@@ -28,6 +28,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'testSpecificConnection':
+      handleTestSpecificConnection(request.provider, request.apiKey).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'testDatabaseConnection':
+      handleTestDatabaseConnection(request.projectId, request.apiKey).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     case 'chatMessage':
       handleChatMessage(request.message, request.context).then(result => {
         sendResponse(result);
@@ -205,6 +221,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    // UI Preferences handlers
+    case 'saveUIPreference':
+      handleSaveUIPreference(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'getUIPreference':
+      handleGetUIPreference(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'getAllUIPreferences':
+      handleGetAllUIPreferences().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    // Prompt Templates handlers
+    case 'getPromptTemplates':
+      handleGetPromptTemplates().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'saveAllPromptTemplates':
+      handleSaveAllPromptTemplates(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    // AI Preferences handlers
+    case 'getAIPreferences':
+      handleGetAIPreferences().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'saveAIPreferences':
+      handleSaveAIPreferences(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -282,22 +357,147 @@ async function handleChatMessage(message, context) {
         ).join('\n\n');
     }
     
-    const systemPrompt = `You are a helpful development assistant for Lovable.dev projects. 
-    You are assisting with the project "${projectName}".
-    
-    Help with coding, debugging, and best practices. Be concise but helpful.
-    You have access to the project's information and conversation history to provide context-aware assistance.
-    ${projectInfo}
-    ${lovableHistory}
-    ${conversationContext}
-    
-    Current context:
-    - Project: ${projectName}
-    - Project ID: ${projectId}
-    - URL: ${context?.url || 'Unknown'}
-    
-    Provide helpful, specific advice based on the project context and history.
-    When greeting the user, always use the project name "${projectName}" not the project ID.`;
+    const systemPrompt = `# LOVABLE PROJECT ASSISTANT 🚀
+
+## CORE IDENTITY & MISSION
+You are the **Lovable Project Assistant** - an expert development planning and documentation specialist for "${projectName}". Your primary mission is to help users create comprehensive development plans and high-quality project documentation that rivals the standards of codeguide.dev.
+
+## PRIMARY RESPONSIBILITIES
+
+### 🎯 **Development Planning Excellence**
+- Create detailed, step-by-step development roadmaps
+- Design scalable project architectures with frontend-first approach
+- Plan mobile-responsive implementations (mobile-first design)
+- Structure feature development in logical phases
+- Provide timeline estimates and milestone breakdowns
+
+### 📚 **Documentation Mastery**
+- Generate comprehensive project knowledge bases
+- Create detailed technical specifications
+- Write clear, actionable development guidelines
+- Produce codeguide.dev-quality documentation
+- Maintain consistent documentation standards
+
+### 🏗️ **Technical Architecture**
+- Design modern web application structures
+- Recommend optimal tech stacks for Lovable projects
+- Plan database schemas and API architectures
+- Ensure responsive, accessible, and performant designs
+- Integrate security and testing strategies from the start
+
+## LOVABLE DEVELOPMENT PRINCIPLES
+
+### **Frontend-First Approach**
+- Always start with UI/UX design and frontend implementation
+- Prioritize responsive design with mobile-first methodology
+- Focus on user experience before backend complexity
+- Use modern CSS frameworks and component libraries
+
+### **Progressive Development**
+- Begin with blank project, build incrementally
+- Implement core features before advanced functionality
+- Validate each phase before proceeding to next
+- Maintain working prototypes throughout development
+
+### **Quality Standards**
+- Write clean, maintainable, and well-documented code
+- Implement comprehensive testing strategies
+- Follow accessibility guidelines (WCAG standards)
+- Optimize for performance and SEO
+
+## DOCUMENTATION STRUCTURE TEMPLATE
+
+When creating project documentation, follow this comprehensive structure:
+
+### 1. **Project Overview**
+- Clear project description and objectives
+- Target audience and use case scenarios
+- Key features and functionality summary
+- Success metrics and project goals
+
+### 2. **Technical Specifications**
+- Complete tech stack breakdown
+- Architecture diagrams and system design
+- Database schema and data models
+- API documentation and endpoints
+
+### 3. **Development Roadmap**
+- Phase-by-phase implementation plan
+- Feature prioritization and dependencies
+- Timeline estimates and milestones
+- Resource requirements and team roles
+
+### 4. **Implementation Guidelines**
+- Coding standards and conventions
+- File structure and organization
+- Component architecture patterns
+- Testing and deployment procedures
+
+### 5. **User Experience Design**
+- User flow diagrams and wireframes
+- Responsive design specifications
+- Accessibility requirements
+- Performance optimization strategies
+
+## RESPONSE FORMATTING
+
+### **For Development Plans:**
+Use numbered sections with clear hierarchies:
+1. **Phase 1: Foundation** (Setup & Core UI)
+2. **Phase 2: Features** (Core Functionality)
+3. **Phase 3: Enhancement** (Advanced Features)
+4. **Phase 4: Optimization** (Performance & Deploy)
+
+### **For Documentation:**
+- Use clear headings and subheadings
+- Include code examples and snippets
+- Provide actionable next steps
+- Add FAQ sections when relevant
+- Include troubleshooting guides
+
+### **For Technical Advice:**
+- Start with context understanding
+- Provide step-by-step solutions
+- Explain the "why" behind recommendations
+- Include best practice alternatives
+- Suggest testing and validation approaches
+
+## CONTEXT AWARENESS
+
+You have access to the following project context:
+${projectInfo}
+
+Recent Lovable conversations:
+${lovableHistory}
+
+Previous assistant conversations:
+${conversationContext}
+
+**Current Project Details:**
+- Project: ${projectName}
+- Project ID: ${projectId}
+- URL: ${context?.url || 'Unknown'}
+
+## INTERACTION GUIDELINES
+
+1. **Always greet using the project name "${projectName}"** (never use project ID)
+2. **Ask clarifying questions** when requirements are unclear
+3. **Provide comprehensive, actionable responses** rather than brief answers
+4. **Reference project context** when making recommendations
+5. **Suggest iterative improvements** and follow-up actions
+6. **Maintain professional yet friendly tone** throughout interactions
+
+## QUALITY COMMITMENT
+
+Every response should:
+- ✅ Be detailed and comprehensive
+- ✅ Follow mobile-first, responsive design principles
+- ✅ Include specific, actionable next steps
+- ✅ Reference relevant best practices
+- ✅ Consider scalability and maintainability
+- ✅ Provide clear structure and organization
+
+Remember: Your goal is to be the most helpful development planning and documentation expert the user has ever worked with. Create responses that could serve as standalone project guides.`;
 
     const response = await aiAPI.generateResponse(message, systemPrompt);
     return { success: true, data: response };
@@ -941,6 +1141,386 @@ async function handleDeleteProjectManager(projectId) {
   } catch (error) {
     console.error('❌ Service Worker: Error deleting project manager:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// User ID helper function (for now using 'default', can be enhanced later)
+function getCurrentUserId() {
+  return 'default'; // TODO: Implement proper user authentication
+}
+
+// UI Preferences handlers
+async function handleSaveUIPreference(data) {
+  try {
+    console.log('🔍 Service Worker: Saving UI preference:', data.preferenceKey);
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.saveUIPreference(userId, data.preferenceKey, data.preferenceValue);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: UI preference saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save UI preference:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving UI preference:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetUIPreference(data) {
+  try {
+    console.log('🔍 Service Worker: Getting UI preference:', data.preferenceKey);
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.getUIPreference(userId, data.preferenceKey);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: UI preference retrieved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get UI preference:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting UI preference:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetAllUIPreferences() {
+  try {
+    console.log('🔍 Service Worker: Getting all UI preferences');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.getAllUIPreferences(userId);
+    
+    if (result.success) {
+      console.log(`✅ Service Worker: Retrieved ${Object.keys(result.data || {}).length} UI preferences`);
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get UI preferences:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting UI preferences:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Prompt Templates handlers
+async function handleGetPromptTemplates() {
+  try {
+    console.log('🔍 Service Worker: Getting prompt templates');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.getPromptTemplates(userId);
+    
+    if (result.success) {
+      console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} prompt templates`);
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get prompt templates:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSaveAllPromptTemplates(data) {
+  try {
+    console.log('🔍 Service Worker: Saving all prompt templates');
+    
+    const userId = getCurrentUserId();
+    
+    // Convert templates to database format
+    const templates = data.templates.map(template => ({
+      category: template.category,
+      name: template.name,
+      template: template.template, // Use 'template' column name
+      shortcut: template.shortcut
+    }));
+    
+    const result = await supabase.saveAllPromptTemplates(userId, templates);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: All prompt templates saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save prompt templates:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// AI Preferences handlers
+async function handleGetAIPreferences() {
+  try {
+    console.log('🔍 Service Worker: Getting AI preferences');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.getAIPreferences(userId);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: AI preferences retrieved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to get AI preferences:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error getting AI preferences:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSaveAIPreferences(data) {
+  try {
+    console.log('🔍 Service Worker: Saving AI preferences');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.saveAIPreferences(userId, data);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: AI preferences saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save AI preferences:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving AI preferences:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Test Specific Connection handler
+async function handleTestSpecificConnection(provider, apiKey) {
+  try {
+    console.log('🔍 Service Worker: Testing specific connection for provider:', provider);
+    
+    if (!provider || !apiKey) {
+      return { success: false, error: 'Provider and API key are required' };
+    }
+    
+    // Test the specific provider directly without changing global settings
+    const result = await testSpecificProvider(provider, apiKey);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Specific connection test successful for', provider);
+      return { success: true };
+    } else {
+      console.error('❌ Service Worker: Specific connection test failed for', provider, ':', result.error);
+      return { success: false, error: result.error };
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error testing specific connection:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Test specific provider function
+async function testSpecificProvider(provider, apiKey) {
+  try {
+    const testPrompt = 'Hello! Please respond with "Connection successful" if you receive this.';
+    const systemPrompt = 'You are testing the API connection. Respond briefly.';
+    
+    let response;
+    
+    switch (provider) {
+      case 'claude':
+        response = await testClaudeConnection(apiKey, testPrompt, systemPrompt);
+        break;
+      case 'openai':
+        response = await testOpenAIConnection(apiKey, testPrompt, systemPrompt);
+        break;
+      case 'gemini':
+        response = await testGeminiConnection(apiKey, testPrompt, systemPrompt);
+        break;
+      default:
+        return { success: false, error: `Unknown provider: ${provider}` };
+    }
+    
+    // Check if response indicates success
+    const isSuccess = response && (
+      response.toLowerCase().includes('connection') || 
+      response.toLowerCase().includes('successful') ||
+      response.length > 0
+    );
+    
+    return { success: isSuccess, response };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Individual provider test functions
+async function testClaudeConnection(apiKey, prompt, systemPrompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 50,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`Claude API error: ${response.status} - ${errorData}`);
+  }
+  
+  const data = await response.json();
+  return data.content[0]?.text || '';
+}
+
+async function testOpenAIConnection(apiKey, prompt, systemPrompt) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 50,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+  }
+  
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
+async function testGeminiConnection(apiKey, prompt, systemPrompt) {
+  const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
+  
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: fullPrompt }]
+      }],
+      generationConfig: {
+        maxOutputTokens: 50
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
+  }
+  
+  const data = await response.json();
+  return data.candidates[0]?.content?.parts[0]?.text || '';
+}
+
+// Database connection test function
+async function handleTestDatabaseConnection(projectId, apiKey) {
+  try {
+    console.log('🔍 Service Worker: Testing database connection with provided credentials');
+    
+    if (!projectId || !apiKey) {
+      return { success: false, error: 'Project ID and API key are required' };
+    }
+    
+    // Construct the Supabase URL from project ID
+    const supabaseUrl = `https://${projectId}.supabase.co`;
+    
+    // Test the database connection by making a simple request
+    const testResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!testResponse.ok) {
+      let errorMessage = `Database connection failed: ${testResponse.status} ${testResponse.statusText}`;
+      
+      try {
+        const errorData = await testResponse.text();
+        if (errorData) {
+          // Parse common Supabase error messages
+          if (testResponse.status === 401) {
+            errorMessage = 'Invalid API key or insufficient permissions';
+          } else if (testResponse.status === 404) {
+            errorMessage = 'Project not found - check your Project ID';
+          } else {
+            errorMessage = `Database error: ${errorData}`;
+          }
+        }
+      } catch (parseError) {
+        // Use the basic error message if we can't parse the response
+      }
+      
+      console.error('❌ Service Worker: Database connection test failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+    
+    // Additional test: Try to access a specific table to ensure permissions work
+    try {
+      const tableTestResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!tableTestResponse.ok) {
+        console.warn('⚠️ Service Worker: Basic connection OK, but table access failed');
+        return { 
+          success: false, 
+          error: `Connected to database but cannot access tables. Check your API key permissions.` 
+        };
+      }
+      
+      console.log('✅ Service Worker: Database connection test successful');
+      return { success: true };
+      
+    } catch (tableError) {
+      console.warn('⚠️ Service Worker: Basic connection OK, but table test failed:', tableError.message);
+      return { 
+        success: false, 
+        error: `Database connected but table access failed: ${tableError.message}` 
+      };
+    }
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Database connection test error:', error);
+    return { 
+      success: false, 
+      error: `Database connection failed: ${error.message}` 
+    };
   }
 }
 

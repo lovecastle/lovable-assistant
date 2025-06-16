@@ -162,9 +162,24 @@ class LovableDetector {
 
   async safeSendMessage(message) {
     try {
-      // Check if chrome runtime is available
+      // Enhanced extension context validation
+      if (!chrome?.runtime?.id) {
+        console.warn('⚠️ Extension context lost - runtime ID not available');
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
       if (!chrome?.runtime?.sendMessage) {
-        throw new Error('Extension context invalidated');
+        console.warn('⚠️ Extension context lost - sendMessage not available');
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      // Check if extension is being reloaded
+      try {
+        // This will throw if extension context is invalid
+        chrome.runtime.getURL('');
+      } catch (contextError) {
+        console.warn('⚠️ Extension context invalidated during runtime check');
+        return { success: false, error: 'Extension context invalidated' };
       }
       
       // Only log if verbose mode is enabled
@@ -176,7 +191,19 @@ class LovableDetector {
         });
       }
       
-      const response = await chrome.runtime.sendMessage(message);
+      // Set a timeout for the message to prevent hanging
+      const messagePromise = chrome.runtime.sendMessage(message);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Message timeout after 10 seconds')), 10000);
+      });
+      
+      const response = await Promise.race([messagePromise, timeoutPromise]);
+      
+      // Validate response structure
+      if (response === undefined) {
+        console.warn('⚠️ Received undefined response from background script');
+        return { success: false, error: 'No response from background script' };
+      }
       
       // Only log if verbose mode is enabled
       if (this.verboseLogging) {
@@ -189,18 +216,35 @@ class LovableDetector {
       
       return response;
     } catch (error) {
-      if (error.message && error.message.includes('Extension context invalidated')) {
-        console.warn('⚠️ Extension context invalidated - background communication unavailable');
+      // Handle specific Chrome extension errors
+      if (error.message?.includes('Extension context invalidated')) {
+        console.warn('⚠️ Extension context invalidated during message send');
         return { success: false, error: 'Extension context invalidated' };
       }
       
-      if (error.message && error.message.includes('receiving end does not exist')) {
-        console.warn('⚠️ Background script not available');
+      if (error.message?.includes('receiving end does not exist')) {
+        console.warn('⚠️ Background script not available - extension may be reloading');
         return { success: false, error: 'Background script not available' };
       }
       
-      console.error('❌ Chrome runtime message error:', error);
-      return { success: false, error: error.message };
+      if (error.message?.includes('message channel closed')) {
+        console.warn('⚠️ Message channel closed - extension context lost');
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      if (error.message?.includes('Message timeout')) {
+        console.warn('⚠️ Message timeout - background script may be busy');
+        return { success: false, error: 'Background script timeout' };
+      }
+      
+      // Log unexpected errors with more detail
+      console.error('❌ Unexpected Chrome runtime error:', {
+        message: error.message,
+        stack: error.stack,
+        action: message?.action
+      });
+      
+      return { success: false, error: error.message || 'Unknown communication error' };
     }
   }
 }

@@ -746,12 +746,72 @@ class SimpleConversationCapture {
 
   async safeSendMessage(message) {
     try {
-      return await chrome.runtime.sendMessage(message);
+      // Enhanced extension context validation
+      if (!chrome?.runtime?.id) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Extension context lost - runtime ID not available');
+        }
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      if (!chrome?.runtime?.sendMessage) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Extension context lost - sendMessage not available');
+        }
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      // Check if extension is being reloaded
+      try {
+        chrome.runtime.getURL('');
+      } catch (contextError) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Extension context invalidated during runtime check');
+        }
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      // Set a timeout for the message to prevent hanging
+      const messagePromise = chrome.runtime.sendMessage(message);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Message timeout after 8 seconds')), 8000);
+      });
+      
+      const response = await Promise.race([messagePromise, timeoutPromise]);
+      
+      // Validate response structure
+      if (response === undefined) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Received undefined response from background script');
+        }
+        return { success: false, error: 'No response from background script' };
+      }
+      
+      return response;
     } catch (error) {
-      if (this.verboseLogging && !error.message.includes('Extension context invalidated')) {
+      // Handle specific Chrome extension errors silently unless verbose
+      if (error.message?.includes('Extension context invalidated') || 
+          error.message?.includes('receiving end does not exist') ||
+          error.message?.includes('message channel closed')) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Extension context invalidated or background unavailable');
+        }
+        return { success: false, error: 'Extension context invalidated' };
+      }
+      
+      if (error.message?.includes('Message timeout')) {
+        if (this.verboseLogging) {
+          console.warn('⚠️ Message timeout - background script may be busy');
+        }
+        return { success: false, error: 'Background script timeout' };
+      }
+      
+      // Log unexpected errors only in verbose mode
+      if (this.verboseLogging) {
         console.warn('⚠️ Background communication failed:', error);
       }
-      return { success: false, error: error.message };
+      
+      return { success: false, error: error.message || 'Unknown communication error' };
     }
   }
 

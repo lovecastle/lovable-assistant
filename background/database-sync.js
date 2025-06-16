@@ -612,4 +612,344 @@ export class SupabaseClient {
       return { success: false, error: error.message };
     }
   }
+
+  // User Preferences Methods (Consolidated)
+  async getUserPreferences(userId = 'default') {
+    console.log('🔍 Database-sync: Getting user preferences for:', userId);
+    
+    try {
+      const result = await this.request(`user_preferences?user_id=eq.${userId}&limit=1`);
+      
+      if (result && result.length > 0) {
+        console.log('✅ Database-sync: User preferences found');
+        return { success: true, data: result[0] };
+      } else {
+        console.log('📭 Database-sync: No user preferences found, creating defaults');
+        // Create default preferences
+        const defaultPrefs = await this.createDefaultUserPreferences(userId);
+        return { success: true, data: defaultPrefs };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get user preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async createDefaultUserPreferences(userId = 'default') {
+    const defaultPreferences = {
+      user_id: userId,
+      settings: {},
+      ui_preferences: {
+        'lovable-auto-expand': false,
+        'lovable-tab-rename': false,
+        'lovable-auto-switch': false
+      },
+      ai_preferences: {
+        ai_provider: 'claude',
+        claude_model: 'claude-3-5-sonnet-20241022',
+        openai_model: 'gpt-4o',
+        gemini_model: 'gemini-1.5-pro-latest',
+        custom_instructions: ''
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = await this.request('user_preferences', {
+        method: 'POST',
+        body: JSON.stringify(defaultPreferences)
+      });
+      
+      return result[0] || defaultPreferences;
+    } catch (error) {
+      console.error('❌ Failed to create default preferences:', error);
+      return defaultPreferences;
+    }
+  }
+
+  async saveUserPreferences(userId = 'default', updates = {}) {
+    console.log('🔍 Database-sync: Saving user preferences for:', userId);
+    
+    try {
+      // First get existing preferences
+      const existing = await this.getUserPreferences(userId);
+      
+      // Merge updates with existing data
+      const mergedPreferences = {
+        user_id: userId,
+        settings: { ...(existing.data?.settings || {}), ...(updates.settings || {}) },
+        ui_preferences: { ...(existing.data?.ui_preferences || {}), ...(updates.ui_preferences || {}) },
+        ai_preferences: { ...(existing.data?.ai_preferences || {}), ...(updates.ai_preferences || {}) },
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await this.request('user_preferences', {
+        method: 'POST',
+        body: JSON.stringify(mergedPreferences),
+        headers: {
+          'Prefer': 'resolution=merge-duplicates'
+        }
+      });
+
+      console.log('✅ Database-sync: User preferences saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save user preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // UI Preferences Methods (using consolidated user_preferences)
+  async getUIPreference(userId = 'default', preferenceKey) {
+    console.log('🔍 Database-sync: Getting UI preference:', preferenceKey);
+    
+    try {
+      const userPrefs = await this.getUserPreferences(userId);
+      if (userPrefs.success && userPrefs.data) {
+        const value = userPrefs.data.ui_preferences?.[preferenceKey];
+        console.log('✅ Database-sync: UI preference found');
+        return { success: true, data: value };
+      } else {
+        console.log('📭 Database-sync: UI preference not found');
+        return { success: true, data: null };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get UI preference:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async saveUIPreference(userId = 'default', preferenceKey, preferenceValue) {
+    console.log('🔍 Database-sync: Saving UI preference:', preferenceKey);
+    
+    try {
+      const updates = {
+        ui_preferences: {
+          [preferenceKey]: preferenceValue
+        }
+      };
+      
+      const result = await this.saveUserPreferences(userId, updates);
+      console.log('✅ Database-sync: UI preference saved successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save UI preference:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAllUIPreferences(userId = 'default') {
+    console.log('🔍 Database-sync: Getting all UI preferences for user:', userId);
+    
+    try {
+      const userPrefs = await this.getUserPreferences(userId);
+      if (userPrefs.success && userPrefs.data) {
+        const preferences = userPrefs.data.ui_preferences || {};
+        console.log(`✅ Database-sync: Found ${Object.keys(preferences).length} UI preferences`);
+        return { success: true, data: preferences };
+      } else {
+        console.log('📭 Database-sync: No UI preferences found');
+        return { success: true, data: {} };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get UI preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // AI Preferences Methods (using consolidated user_preferences)
+  async getAIPreferences(userId = 'default') {
+    console.log('🔍 Database-sync: Getting AI preferences for:', userId);
+    
+    try {
+      const userPrefs = await this.getUserPreferences(userId);
+      if (userPrefs.success && userPrefs.data) {
+        const aiPrefs = userPrefs.data.ai_preferences || {};
+        console.log('✅ Database-sync: AI preferences found');
+        return { success: true, data: aiPrefs };
+      } else {
+        console.log('📭 Database-sync: No AI preferences found, will use defaults');
+        return { success: true, data: null };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get AI preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async saveAIPreferences(userId = 'default', preferences) {
+    console.log('🔍 Database-sync: Saving AI preferences for:', userId);
+    
+    try {
+      const updates = {
+        ai_preferences: preferences
+      };
+      
+      const result = await this.saveUserPreferences(userId, updates);
+      console.log('✅ Database-sync: AI preferences saved successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save AI preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Prompt Templates Methods
+  async getPromptTemplates(userId = 'default') {
+    console.log('🔍 Database-sync: Getting prompt templates for:', userId);
+    
+    try {
+      const result = await this.request(
+        `prompt_templates?user_id=eq.${userId}&is_active=eq.true&order=category,name`
+      );
+      
+      console.log(`✅ Database-sync: Found ${result?.length || 0} prompt templates`);
+      return { success: true, data: result || [] };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get prompt templates:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async savePromptTemplate(userId = 'default', templateData) {
+    console.log('🔍 Database-sync: Saving prompt template');
+    
+    const template = {
+      user_id: userId,
+      ...templateData,
+      is_custom: true,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = await this.request('prompt_templates', {
+        method: 'POST',
+        body: JSON.stringify(template)
+      });
+
+      console.log('✅ Database-sync: Prompt template saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save prompt template:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updatePromptTemplate(templateId, updateData) {
+    console.log('🔍 Database-sync: Updating prompt template:', templateId);
+    
+    const updates = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const result = await this.request(`prompt_templates?id=eq.${templateId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+
+      console.log('✅ Database-sync: Prompt template updated successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to update prompt template:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deletePromptTemplate(templateId) {
+    console.log('🔍 Database-sync: Deleting prompt template:', templateId);
+    
+    try {
+      // Soft delete by setting is_active to false
+      const result = await this.request(`prompt_templates?id=eq.${templateId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      console.log('✅ Database-sync: Prompt template deleted successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to delete prompt template:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async saveAllPromptTemplates(userId = 'default', templates) {
+    console.log('🔍 Database-sync: Saving all prompt templates');
+    
+    try {
+      // First, soft delete all existing templates for this user
+      await this.request(`prompt_templates?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      // Then save all new templates - map to correct column names
+      const templatesWithUser = templates.map((template, index) => ({
+        category: template.category,
+        name: template.name,
+        template: template.template, // Use 'template' not 'template_content'
+        shortcut: template.shortcut,
+        user_id: userId,
+        is_custom: true,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      const result = await this.request('prompt_templates', {
+        method: 'POST',
+        body: JSON.stringify(templatesWithUser)
+      });
+
+      console.log('✅ Database-sync: All prompt templates saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save all prompt templates:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Add user_id support to existing methods
+  async saveConversationWithUser(data, userId = 'default') {
+    return this.saveConversation({ ...data, user_id: userId });
+  }
+
+  async getConversationsWithUser(projectId = null, userId = 'default', limit = 50) {
+    let endpoint = `conversations?user_id=eq.${userId}&order=timestamp.desc&limit=${limit}`;
+    if (projectId) {
+      endpoint += `&project_id=eq.${projectId}`;
+    }
+    return await this.request(endpoint);
+  }
+
+  async saveProjectManagerWithUser(projectManagerData, userId = 'default') {
+    return this.saveProjectManager({ ...projectManagerData, user_id: userId });
+  }
+
+  async getProjectManagerWithUser(projectId, userId = 'default') {
+    const endpoint = `project_manager?project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`;
+    const result = await this.request(endpoint);
+    return result && result.length > 0 ? { success: true, data: result[0] } : { success: true, data: null };
+  }
+
+  async saveAssistantConversationWithUser(conversationData, userId = 'default') {
+    return this.saveAssistantConversation({ ...conversationData, user_id: userId });
+  }
+
+  async getAssistantConversationsWithUser(projectId, userId = 'default', limit = 10) {
+    const endpoint = `assistant_conversations?project_id=eq.${projectId}&user_id=eq.${userId}&order=created_at.desc&limit=${limit}`;
+    const result = await this.request(endpoint);
+    return { success: true, data: result };
+  }
 }

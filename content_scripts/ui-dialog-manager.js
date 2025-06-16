@@ -120,6 +120,9 @@ window.UIDialogManager = {
     setTimeout(() => {
       this.makeDraggable();
       this.showWelcomePage(); // Start with welcome page instead of chat
+      
+      // Ensure close button is working with a retry mechanism
+      this.ensureCloseButtonWorks();
     }, 50);
   },
 
@@ -128,26 +131,67 @@ window.UIDialogManager = {
     if (closeBtn) {
       // Remove any existing listeners first
       closeBtn.onclick = null;
+      closeBtn.removeEventListener('click', this.handleCloseClick);
       
-      // Add single close handler with debounce
-      let lastClickTime = 0;
-      closeBtn.addEventListener('click', (e) => {
+      // Create bound handler for proper context
+      this.handleCloseClick = (e) => {
+        console.log('Close button clicked'); // Debug log
         const now = Date.now();
-        if (now - lastClickTime < 300) {
+        if (this.lastCloseClickTime && now - this.lastCloseClickTime < 300) {
           return;
         }
-        lastClickTime = now;
+        this.lastCloseClickTime = now;
         
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         
-        // Add small delay to prevent race conditions
-        setTimeout(() => {
-          this.closeAssistant();
-        }, 10);
+        // Close immediately without delay
+        this.closeAssistant();
+      };
+      
+      // Add multiple event listeners for reliability
+      closeBtn.addEventListener('click', this.handleCloseClick, true);
+      closeBtn.addEventListener('mousedown', this.handleCloseClick, true);
+      
+      // Add visual feedback
+      closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.background = 'rgba(255,255,255,0.4)';
       });
+      closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.background = 'rgba(255,255,255,0.2)';
+      });
+      
+      console.log('Close button event handlers attached'); // Debug log
+    } else {
+      console.warn('Close button not found!'); // Debug log
     }
+  },
+
+  ensureCloseButtonWorks() {
+    // Retry mechanism to ensure close button is always clickable
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const checkAndSetup = () => {
+      const closeBtn = document.getElementById('close-btn');
+      if (closeBtn && retryCount < maxRetries) {
+        // Test if the button is actually clickable
+        const rect = closeBtn.getBoundingClientRect();
+        const isVisible = rect.width > 0 && rect.height > 0;
+        
+        if (isVisible) {
+          // Force setup the close button again
+          this.setupCloseButton();
+          console.log('Close button setup verified');
+        } else {
+          retryCount++;
+          setTimeout(checkAndSetup, 100);
+        }
+      }
+    };
+    
+    setTimeout(checkAndSetup, 100);
   },
 
   // Loading state management for dialog content
@@ -315,8 +359,12 @@ window.UIDialogManager = {
           <h3 id="dialog-title" style="margin: 0; font-size: 16px;">🤖 Lovable Assistant</h3>
           <button id="close-btn" style="
             background: rgba(255,255,255,0.2); border: none; color: white;
-            padding: 0px 6px; border-radius: 4px; cursor: pointer; font-size: 16px;
-          ">×</button>
+            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 16px;
+            position: relative; z-index: 10002; min-width: 24px; min-height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.2s ease;
+          " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+             onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
         </div>
         
         <div id="dialog-content" style="
@@ -652,17 +700,26 @@ window.UIDialogManager = {
     
     let bgColor = type === 'user' ? '#667eea' : type === 'error' ? '#fed7d7' : 'white';
     let textColor = type === 'user' ? 'white' : type === 'error' ? '#742a2a' : '#2d3748';
+    let lineHeight = type === 'user' ? '1.5' : '1.4'; // User messages need more spacing due to blue background
 
     const messageBubble = document.createElement('div');
     messageBubble.style.cssText = `
       background: ${bgColor}; color: ${textColor}; padding: 12px 16px; border-radius: 18px;
       max-width: 85%; border: ${type === 'assistant' ? '1px solid #c9cfd7' : 'none'};
-      line-height: 1.4; word-wrap: break-word; font-size: 14px;
+      line-height: ${lineHeight}; word-wrap: break-word; font-size: 14px;
+      white-space: pre-wrap; text-align: left; font-family: inherit;
     `;
+    
+    // Ensure markdown elements inherit proper styling
+    if (type === 'user') {
+      messageBubble.setAttribute('style', messageBubble.getAttribute('style') + `
+        --user-message: true;
+      `);
+    }
 
     // For chat messages, detect if content is HTML and format accordingly
     const isHTMLContent = this.isHTMLContent(content);
-    const formattedContent = this.formatMessage(content, isHTMLContent);
+    const formattedContent = this.formatMessage(content, isHTMLContent, type);
     
     messageBubble.innerHTML = formattedContent;
     messageDiv.appendChild(messageBubble);
@@ -943,7 +1000,10 @@ window.UIDialogManager = {
         <button id="back-to-welcome-btn" style="
           background: #667eea; color: white; border: none; padding: 12px 24px;
           border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
-        ">← Back to Welcome</button>
+          display: inline-flex; align-items: center; justify-content: center;
+          min-height: 44px; min-width: 140px; transition: all 0.2s ease;
+        " onmouseover="this.style.background='#5a67d8'" 
+           onmouseout="this.style.background='#667eea'">← Back to Welcome</button>
       </div>
     `;
     
