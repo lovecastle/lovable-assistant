@@ -2,14 +2,16 @@
 // PROJECT MANAGER - EXTRACTED MODULE
 // ===========================
 // This section handles all project management functionality including:
-// - Project detection and auto-save (NEW FEATURE)
+// - Project detection and auto-save (only for user-owned projects)
 // - Project list display and management
 // - Project settings interface
 // - Database integration for project data
 // - Debug and testing utilities
 // 
-// Key Feature: Auto-save functionality that saves project info on page load
-// without requiring user to click "Save Settings" button
+// Key Features:
+// - Auto-save functionality that saves project info on page load
+// - User ownership detection via Send button presence
+// - Only saves projects that belong to the current user
 
 // Create ProjectManager class that will be mixed into LovableDetector
 window.ProjectManager = {
@@ -235,7 +237,10 @@ window.ProjectManager = {
             text-align: center; color: #4a5568;
           ">
             <p style="margin: 0 0 12px 0; font-size: 14px;">
-              No projects found. ${currentProject ? 'Current project detected but not in database.' : 'Not on a Lovable project page or project not detected.'}
+              No user-owned projects found. ${currentProject ? 'Current project detected but not saved yet.' : 'Visit your own Lovable project page to see it here.'}
+            </p>
+            <p style="margin: 0 0 12px 0; font-size: 12px; color: #718096;">
+              Only projects you own (with chat interface) are saved here.
             </p>
             ${currentProject ? `
               <button onclick="window.lovableDetector.debugSaveCurrentProject()" style="
@@ -382,6 +387,15 @@ window.ProjectManager = {
       const projectId = urlMatch[1];
       const projectName = this.getProjectNameFromTitle();
       console.log('🔍 Detected project:', { projectId, projectName });
+      
+      // Check if this is the user's own project by detecting the Send button
+      const isUserProject = this.isUserOwnedProject();
+      console.log('🔍 Is user-owned project:', isUserProject);
+      
+      if (!isUserProject) {
+        console.log('🚫 Not a user-owned project, skipping auto-save');
+        return null;
+      }
       
       const currentProject = {
         id: projectId,
@@ -550,6 +564,76 @@ window.ProjectManager = {
     }
   },
 
+  /**
+   * CHECK IF PROJECT IS USER-OWNED
+   * 
+   * Detects if the current project belongs to the user by checking for the presence
+   * of the Send button (similar to how we detect Lovable's working status).
+   * 
+   * Only user-owned projects have the chat interface with the Send button.
+   * Public or other projects don't have this element.
+   * 
+   * Returns: Boolean indicating if this is a user-owned project
+   */
+  isUserOwnedProject() {
+    try {
+      console.log('🔍 Checking if project is user-owned...');
+      
+      // Method 1: Try the exact XPath provided
+      try {
+        const xpathResult = document.evaluate(
+          '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[2]/form/div[2]/div[2]/div[2]/button',
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        
+        if (xpathResult.singleNodeValue) {
+          console.log('✅ Found Send button via XPath - this is a user-owned project');
+          return true;
+        }
+      } catch (xpathError) {
+        console.log('⚠️ XPath evaluation failed:', xpathError.message);
+      }
+      
+      // Method 2: Look for the specific button ID
+      const sendButton = document.getElementById('chatinput-send-message-button');
+      if (sendButton) {
+        console.log('✅ Found Send button via ID - this is a user-owned project');
+        return true;
+      }
+      
+      // Method 3: Look for any button with the send message functionality
+      const sendButtons = document.querySelectorAll('button[type="submit"]');
+      for (const button of sendButtons) {
+        if ((button.id && button.id.includes('send-message')) ||
+            (button.className && button.className.includes('send')) ||
+            (button.innerHTML && button.innerHTML.includes('svg') && 
+             button.classList.contains('bg-foreground'))) {
+          console.log('✅ Found Send button via query selector - this is a user-owned project');
+          return true;
+        }
+      }
+      
+      // Method 4: Look for form elements that indicate user interaction capability
+      const chatForm = document.querySelector('form');
+      const chatInput = document.querySelector('input[type="text"], textarea');
+      
+      if (chatForm && chatInput) {
+        console.log('✅ Found chat form and input - this is a user-owned project');
+        return true;
+      }
+      
+      console.log('❌ No Send button or chat interface found - this is not a user-owned project');
+      return false;
+    } catch (error) {
+      console.error('❌ Error checking if project is user-owned:', error);
+      // Default to false for safety - don't save if we can't determine ownership
+      return false;
+    }
+  },
+
   async getSavedProjects() {
     try {
       console.log('🔍 Fetching all saved projects from database...');
@@ -669,12 +753,15 @@ window.ProjectManager = {
     const currentUrl = window.location.href;
     const urlMatch = currentUrl.match(/lovable\.dev\/projects\/([^/?]+)/);
     const projectTitle = document.title;
+    const isUserProject = this.isUserOwnedProject();
     
     const info = `
       Current URL: ${currentUrl}
       URL Match: ${urlMatch ? urlMatch[1] : 'No match'}
       Page Title: ${projectTitle}
       Project Name: ${this.getProjectNameFromTitle()}
+      Is User-Owned Project: ${isUserProject ? 'Yes' : 'No'}
+      Send Button Found: ${document.getElementById('chatinput-send-message-button') ? 'Yes' : 'No'}
     `;
     
     console.log('🔧 Debug URL Info:', info);

@@ -430,7 +430,7 @@ window.UIDialogManager = {
                   Project Manager
                 </h3>
                 <p style="margin: 0; color: #718096; font-size: 14px;">
-                  Manage your projects, settings, and knowledge base
+                  Manage your own projects, settings, and knowledge base
                 </p>
               </div>
               <div style="color: #cbd5e0; font-size: 18px;">→</div>
