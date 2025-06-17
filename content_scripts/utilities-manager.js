@@ -13,14 +13,17 @@
 
 // Create UtilitiesManager class that will be mixed into LovableDetector
 window.UtilitiesManager = {
-  showUtilitiesPage() {
+  async showUtilitiesPage() {
     // Show loading state immediately
     if (typeof this.showDialogLoading === 'function') {
       this.showDialogLoading('Utilities');
     }
     
-    // Load the actual content after a brief delay
-    setTimeout(() => {
+    try {
+      // Load settings and templates data first
+      await this.loadUtilitiesData();
+      
+      // Then render the UI with the loaded data
       const content = document.getElementById('dialog-content');
       const title = document.getElementById('dialog-title');
       
@@ -135,38 +138,23 @@ window.UtilitiesManager = {
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
             ✨ Prompt Helper
           </h3>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <label style="color: #4a5568; font-size: 14px;">Auto-expand input area on new lines</label>
-            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
-              <input type="checkbox" id="auto-expand-toggle" style="opacity: 0; width: 0; height: 0;">
-              <span class="toggle-slider" style="
-                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-                background-color: #ccc; transition: .4s; border-radius: 24px;
-              "></span>
-            </label>
+          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 13px;">
+            Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
+          </p>
+          
+          <div id="prompt-templates-container">
+            <!-- Templates will be loaded here -->
           </div>
-          <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
-            <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
-              Prompt Helper Templates (Ctrl+Enter / Cmd+Enter)
-            </h4>
-            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 13px;">
-              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
-            </p>
-            
-            <div id="prompt-templates-container">
-              <!-- Templates will be loaded here -->
-            </div>
-            
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-              <button id="create-section-btn" style="
-                background: #667eea; color: white; border: none; padding: 6px 12px;
-                border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Create Section</button>
-              <button id="reset-prompt-templates-btn" style="
-                background: #f56565; color: white; border: none; padding: 6px 12px;
-                border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Reset to Default</button>
-            </div>
+          
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button id="create-section-btn" style="
+              background: #667eea; color: white; border: none; padding: 6px 12px;
+              border-radius: 4px; cursor: pointer; font-size: 12px;
+            ">Create Section</button>
+            <button id="reset-prompt-templates-btn" style="
+              background: #f56565; color: white; border: none; padding: 6px 12px;
+              border-radius: 4px; cursor: pointer; font-size: 12px;
+            ">Reset to Default</button>
           </div>
         </div>
         
@@ -189,8 +177,41 @@ window.UtilitiesManager = {
     
       this.setupBackButton();
       this.setupUtilitiesEvents();
-      this.loadUtilitiesSettings();
-    }, 100);
+      this.renderUtilitiesSettings(); // Use pre-loaded data
+    } catch (error) {
+      console.error('❌ Error loading utilities page:', error);
+      // Show error state
+      const content = document.getElementById('dialog-content');
+      if (content) {
+        content.innerHTML = `
+          <div style="
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: #e53e3e; font-size: 14px; gap: 16px; padding: 20px;
+          ">
+            <div style="font-size: 24px;">❌</div>
+            <div>Failed to load utilities page</div>
+            <button onclick="window.lovableDetector.showUtilitiesPage()" style="
+              background: #667eea; color: white; border: none; padding: 8px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px;
+            ">Retry</button>
+          </div>
+        `;
+      }
+    }
+  },
+
+  async loadUtilitiesData() {
+    // Load both settings and templates in parallel
+    await Promise.all([
+      this.loadUtilitiesSettings(),
+      this.loadPromptTemplates()
+    ]);
+  },
+
+  renderUtilitiesSettings() {
+    // This method will render the UI with pre-loaded data
+    // The settings are already applied to the UI elements during loadUtilitiesSettings
+    // Templates are already rendered during loadPromptTemplates
   },
 
   setupBackButton() {
@@ -222,7 +243,6 @@ window.UtilitiesManager = {
     }
 
     // Toggle switches
-    this.setupToggleSwitch('auto-expand-toggle', 'lovable-auto-expand');
     this.setupToggleSwitch('tab-rename-toggle', 'lovable-tab-rename');
     this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
     this.setupToggleSwitch('notifications-toggle', 'lovable-notifications');
@@ -260,13 +280,9 @@ window.UtilitiesManager = {
       console.warn(`⚠️ Toggle element not found: ${toggleId}`);
       return;
     }
-    
-    console.log(`🔧 Setting up toggle switch: ${toggleId} for ${settingKey}`);
 
     toggle.addEventListener('change', async () => {
       const isEnabled = toggle.checked;
-      
-      console.log(`🔄 Toggle changed: ${settingKey} = ${isEnabled}`);
       
       // Save to database instead of localStorage
       try {
@@ -278,9 +294,7 @@ window.UtilitiesManager = {
           }
         };
         
-        console.log(`💾 Saving UI preference:`, message);
         const response = await this.safeSendMessage(message);
-        console.log(`📝 Save response:`, response);
         
         if (response.success) {
           console.log(`✅ ${settingKey} ${isEnabled ? 'enabled' : 'disabled'}`);
@@ -329,7 +343,6 @@ window.UtilitiesManager = {
   async loadUtilitiesSettings() {
     // Load saved settings from database
     const settings = [
-      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' },
       { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
       { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
       { id: 'notifications-toggle', key: 'lovable-notifications' }
@@ -433,45 +446,75 @@ window.UtilitiesManager = {
     // Auto-save function
     const autoSaveConfiguration = async () => {
       try {
-        if (!chrome?.storage?.sync) {
-          console.warn('Chrome storage not available');
-          return;
-        }
+        console.log('🔄 Auto-saving configuration to database...');
         
-        const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
+        // Get all form values
+        const claudeApiKey = document.getElementById('claude-api-key')?.value || '';
+        const claudeModel = document.getElementById('claude-model')?.value || '';
+        const openaiApiKey = document.getElementById('openai-api-key')?.value || '';
+        const openaiModel = document.getElementById('openai-model')?.value || '';
+        const geminiApiKey = document.getElementById('gemini-api-key')?.value || '';
+        const geminiModel = document.getElementById('gemini-model')?.value || '';
         const projectId = document.getElementById('supabase-project-id')?.value || '';
         const supabaseKey = document.getElementById('supabase-key')?.value || '';
         
+        // Save AI preferences individually to database
+        const aiPreferences = {
+          claude_api_key: claudeApiKey,
+          claude_model: claudeModel,
+          openai_api_key: openaiApiKey,
+          openai_model: openaiModel,
+          gemini_api_key: geminiApiKey,
+          gemini_model: geminiModel
+        };
+        
+        const aiResponse = await this.safeSendMessage({
+          action: 'saveAIPreferencesIndividual',
+          data: aiPreferences
+        });
+        
+        if (aiResponse.success) {
+          console.log('✅ AI preferences auto-saved to database');
+        } else {
+          console.error('❌ Failed to save AI preferences:', aiResponse.error);
+        }
+        
+        // Save Supabase settings individually to database if provided
+        if (projectId || supabaseKey) {
+          const supabaseResponse = await this.safeSendMessage({
+            action: 'saveSupabaseSettings',
+            data: { supabaseId: projectId, supabaseKey }
+          });
+          
+          if (supabaseResponse.success) {
+            console.log('✅ Supabase settings auto-saved to database');
+          } else {
+            console.error('❌ Failed to save Supabase settings:', supabaseResponse.error);
+          }
+        }
+        
+        // Also save to Chrome storage for backward compatibility
+        const provider = document.querySelector('input[name="ai-provider"]:checked')?.value || 'claude';
         const configData = {
-        aiProvider: provider,
-        supabaseProjectId: projectId,
-        supabaseUrl: projectId ? `https://${projectId}.supabase.co` : '',
-        supabaseKey: supabaseKey
-      };
-      
-      // Add provider-specific API key and model
-      switch (provider) {
-        case 'claude':
-          configData.claudeApiKey = document.getElementById('claude-api-key')?.value || '';
-          configData.claudeModel = document.getElementById('claude-model')?.value || '';
-          break;
-        case 'openai':
-          configData.openaiApiKey = document.getElementById('openai-api-key')?.value || '';
-          configData.openaiModel = document.getElementById('openai-model')?.value || '';
-          break;
-        case 'gemini':
-          configData.geminiApiKey = document.getElementById('gemini-api-key')?.value || '';
-          configData.geminiModel = document.getElementById('gemini-model')?.value || '';
-          break;
-      }
-      
-        // Save to Chrome storage
+          aiProvider: provider,
+          supabaseProjectId: projectId,
+          supabaseUrl: projectId ? `https://${projectId}.supabase.co` : '',
+          supabaseKey: supabaseKey,
+          claudeApiKey,
+          claudeModel,
+          openaiApiKey,
+          openaiModel,
+          geminiApiKey,
+          geminiModel
+        };
+        
         if (chrome?.storage?.sync) {
           await chrome.storage.sync.set(configData);
         }
-        console.log('✅ Configuration auto-saved');
+        
+        console.log('✅ Configuration auto-saved to both database and Chrome storage');
       } catch (error) {
-        console.error('Failed to auto-save configuration:', error);
+        console.error('❌ Failed to auto-save configuration:', error);
       }
     };
     

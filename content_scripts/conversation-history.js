@@ -12,14 +12,17 @@
 
 // Create ConversationHistory class that will be mixed into LovableDetector
 window.ConversationHistory = {
-  showConversationHistory() {
+  async showConversationHistory() {
     // Show loading state immediately
     if (typeof this.showDialogLoading === 'function') {
       this.showDialogLoading('Lovable\'s Chat History');
     }
     
-    // Load the actual content after a brief delay
-    setTimeout(() => {
+    try {
+      // Load the data first
+      await this.loadHistoryMessages();
+      
+      // Then render the UI with the loaded data
       const content = document.getElementById('dialog-content');
       const title = document.getElementById('dialog-title');
       
@@ -29,93 +32,112 @@ window.ConversationHistory = {
       
       if (!content) return;
     
-    content.innerHTML = `
-      <div id="chat-messages" style="
-        flex: 1; overflow-y: auto; padding: 10px; background: #f8fafc;
-        display: flex; flex-direction: column;
-      ">
-        <!-- Chat messages will be loaded here -->
-      </div>
+      content.innerHTML = `
+        <div id="chat-messages" style="
+          flex: 1; overflow-y: auto; padding: 10px; background: #f8fafc;
+          display: flex; flex-direction: column;
+        ">
+          <!-- Chat messages will be loaded here -->
+        </div>
+        
+        <div style="
+          border-top: 1px solid #c9cfd7; padding: 10px; background: white;
+          border-radius: 0 0 12px 12px;
+        ">
+          <!-- Back Button Top Right -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <button id="back-to-welcome-btn" style="
+              background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+              padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;
+              display: inline-flex; align-items: center; justify-content: center;
+              min-height: 36px; min-width: 80px; transition: all 0.2s ease;
+            " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+               onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back</button>
+            <div style="color: #718096; font-size: 12px;">
+              <span id="message-count">0</span>
+            </div>
+          </div>
+          
+          <!-- Filter Section - Single Line -->
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="color: #4a5568; font-size: 14px; font-weight: 500; white-space: nowrap;">
+              Filter by:
+            </div>
+            <select id="date-filter" style="
+              padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568; min-width: 80px;
+            ">
+              <option value="all">Date</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+            </select>
+            
+            <select id="category-filter" style="
+              padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568; min-width: 90px;
+            ">
+              <option value="all">Category</option>
+              <option value="coding">🔧 Coding</option>
+              <option value="debugging">🐛 Debugging</option>
+              <option value="design">🎨 Design</option>
+              <option value="deployment">🚀 Deployment</option>
+              <option value="planning">📋 Planning</option>
+              <option value="other">📁 Other</option>
+            </select>
+            
+            <select id="speaker-filter" style="
+              padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; background: white; color: #4a5568; min-width: 80px;
+            ">
+              <option value="all">Speaker</option>
+              <option value="user">👤 You</option>
+              <option value="lovable">🤖 Lovable</option>
+            </select>
+          </div>
+          
+          <!-- Search Section with Navigation -->
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="search-input" placeholder="Search in conversations..." style="
+              flex: 1; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-family: inherit; font-size: 14px; outline: none; background: white; color: #2d3748;
+            ">
+            <button id="search-prev-btn" style="
+              background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+              padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
+            " disabled>Back</button>
+            <button id="search-next-btn" style="
+              background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+              padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
+            " disabled>Next</button>
+          </div>
+        </div>
+      `;
       
-      <div style="
-        border-top: 1px solid #c9cfd7; padding: 10px; background: white;
-        border-radius: 0 0 12px 12px;
-      ">
-        <!-- Back Button Top Right -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <button id="back-to-welcome-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;
-            display: inline-flex; align-items: center; justify-content: center;
-            min-height: 36px; min-width: 80px; transition: all 0.2s ease;
-          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
-             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back</button>
-          <div style="color: #718096; font-size: 12px;">
-            <span id="message-count">0</span>
-          </div>
-        </div>
-        
-        <!-- Filter Section - Single Line -->
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-          <div style="color: #4a5568; font-size: 14px; font-weight: 500; white-space: nowrap;">
-            Filter by:
-          </div>
-          <select id="date-filter" style="
-            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
-            font-size: 14px; background: white; color: #4a5568; min-width: 80px;
-          ">
-            <option value="all">Date</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-          </select>
-          
-          <select id="category-filter" style="
-            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
-            font-size: 14px; background: white; color: #4a5568; min-width: 90px;
-          ">
-            <option value="all">Category</option>
-            <option value="coding">🔧 Coding</option>
-            <option value="debugging">🐛 Debugging</option>
-            <option value="design">🎨 Design</option>
-            <option value="deployment">🚀 Deployment</option>
-            <option value="planning">📋 Planning</option>
-            <option value="other">📁 Other</option>
-          </select>
-          
-          <select id="speaker-filter" style="
-            padding: 6px 8px; border: 1px solid #c9cfd7; border-radius: 6px;
-            font-size: 14px; background: white; color: #4a5568; min-width: 80px;
-          ">
-            <option value="all">Speaker</option>
-            <option value="user">👤 You</option>
-            <option value="lovable">🤖 Lovable</option>
-          </select>
-        </div>
-        
-        <!-- Search Section with Navigation -->
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="search-input" placeholder="Search in conversations..." style="
-            flex: 1; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-            font-family: inherit; font-size: 14px; outline: none; background: white; color: #2d3748;
-          ">
-          <button id="search-prev-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
-          " disabled>Back</button>
-          <button id="search-next-btn" style="
-            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; min-width: 50px;
-          " disabled>Next</button>
-        </div>
-      </div>
-    `;
-    
       this.setupBackButton();
       this.setupHistoryFilters();
-      this.loadHistoryMessages();
-    }, 100);
+      this.renderHistoryMessages(); // Render with already loaded data
+    } catch (error) {
+      console.error('❌ Error loading conversation history:', error);
+      // Show error state
+      const content = document.getElementById('dialog-content');
+      if (content) {
+        content.innerHTML = `
+          <div style="
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: #e53e3e; font-size: 14px; gap: 16px; padding: 20px;
+          ">
+            <div style="font-size: 24px;">❌</div>
+            <div>Failed to load conversation history</div>
+            <button onclick="window.lovableDetector.showConversationHistory()" style="
+              background: #667eea; color: white; border: none; padding: 8px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px;
+            ">Retry</button>
+          </div>
+        `;
+      }
+    }
   },
 
   setupHistoryFilters() {

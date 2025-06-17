@@ -13,14 +13,17 @@
 
 // Create ProjectManager class that will be mixed into LovableDetector
 window.ProjectManager = {
-  showProjectManager() {
+  async showProjectManager() {
     // Show loading state immediately
     if (typeof this.showDialogLoading === 'function') {
       this.showDialogLoading('Project Manager');
     }
     
-    // Load the actual content after a brief delay
-    setTimeout(() => {
+    try {
+      // Load the projects data first
+      await this.loadProjectsList();
+      
+      // Then render the UI with the loaded data
       const content = document.getElementById('dialog-content');
       const title = document.getElementById('dialog-title');
       
@@ -57,8 +60,27 @@ window.ProjectManager = {
       `;
       
       this.setupBackButton();
-      this.loadProjectsList();
-    }, 100);
+      this.renderProjectsList(); // Use a render method that works with pre-loaded data
+    } catch (error) {
+      console.error('❌ Error loading project manager:', error);
+      // Show error state
+      const content = document.getElementById('dialog-content');
+      if (content) {
+        content.innerHTML = `
+          <div style="
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: #e53e3e; font-size: 14px; gap: 16px; padding: 20px;
+          ">
+            <div style="font-size: 24px;">❌</div>
+            <div>Failed to load projects</div>
+            <button onclick="window.lovableDetector.showProjectManager()" style="
+              background: #667eea; color: white; border: none; padding: 8px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px;
+            ">Retry</button>
+          </div>
+        `;
+      }
+    }
   },
 
   showProjectSettings(project) {
@@ -150,15 +172,23 @@ window.ProjectManager = {
   },
 
   async loadProjectsList() {
+    console.log('🔍 Loading projects list...');
+    
+    const currentProject = await this.getCurrentProject();
+    console.log('🔍 Current project detected:', currentProject);
+    
+    const savedProjects = await this.getSavedProjects();
+    console.log('🔍 Saved projects from database:', savedProjects);
+    
+    // Store the loaded data for rendering
+    this.currentProject = currentProject;
+    this.savedProjects = savedProjects;
+    
+    return { currentProject, savedProjects };
+  },
+
+  renderProjectsList() {
     try {
-      console.log('🔍 Loading projects list...');
-      
-      const currentProject = await this.getCurrentProject();
-      console.log('🔍 Current project detected:', currentProject);
-      
-      const savedProjects = await this.getSavedProjects();
-      console.log('🔍 Saved projects from database:', savedProjects);
-      
       const projectListElement = document.getElementById('project-list');
       if (!projectListElement) {
         console.warn('❌ Project list element not found');
@@ -166,6 +196,8 @@ window.ProjectManager = {
       }
       
       projectListElement.innerHTML = '';
+      
+      const { currentProject, savedProjects } = this;
       
       // Add current project first if it exists
       if (currentProject) {
@@ -234,7 +266,7 @@ window.ProjectManager = {
         console.log(`✅ Successfully loaded ${projectListElement.children.length} projects`);
       }
     } catch (error) {
-      console.error('❌ Error loading projects list:', error);
+      console.error('❌ Error rendering projects list:', error);
       
       // Show error state
       const projectListElement = document.getElementById('project-list');
@@ -245,7 +277,7 @@ window.ProjectManager = {
             text-align: center; color: #c53030;
           ">
             <p style="margin: 0; font-size: 14px;">
-              Error loading projects: ${error.message}
+              Error rendering projects: ${error.message}
             </p>
             <button onclick="window.lovableDetector.showProjectManager()" style="
               margin-top: 8px; padding: 4px 8px; background: #c53030; color: white; 
@@ -395,28 +427,13 @@ window.ProjectManager = {
           existingProject.project_url !== currentUrl) {
         
         console.log('💾 Auto-saving project information to database...');
-        try {
-          const projectManagerData = {
-            project_id: projectId,
-            project_name: projectName,
-            project_url: currentUrl,
-            description: currentProject.description,
-            knowledge: currentProject.knowledge
-          };
-          
-          const saveResponse = await this.safeSendMessage({
-            action: 'saveProjectManager',
-            data: projectManagerData
-          });
-          
-          if (saveResponse?.success) {
-            console.log('✅ Project information auto-saved successfully');
-          } else {
-            console.warn('⚠️ Failed to auto-save project information:', saveResponse?.error);
-          }
-        } catch (error) {
-          console.warn('⚠️ Error auto-saving project information:', error);
-        }
+        await this.autoSaveProjectWithRetry({
+          project_id: projectId,
+          project_name: projectName,
+          project_url: currentUrl,
+          description: currentProject.description,
+          knowledge: currentProject.knowledge
+        });
       } else {
         console.log('ℹ️ Project information already exists and is up to date');
       }
@@ -429,6 +446,58 @@ window.ProjectManager = {
     }
   },
 
+  /**
+   * AUTO-SAVE PROJECT INFORMATION WITH RETRY
+   * 
+   * Resilient auto-save method that handles extension context invalidation
+   */
+  async autoSaveProjectWithRetry(projectManagerData, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Add a small delay for subsequent attempts to allow extension to stabilize
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for project auto-save`);
+        }
+        
+        const saveResponse = await this.safeSendMessage({
+          action: 'saveProjectManager',
+          data: projectManagerData
+        });
+        
+        if (saveResponse?.success) {
+          console.log('✅ Project information auto-saved successfully');
+          return; // Success, exit retry loop
+        } else if (saveResponse?.error?.includes('Extension context invalidated')) {
+          // Extension context issue - worth retrying
+          console.warn(`⚠️ Extension context invalidated on attempt ${attempt}/${maxRetries}`);
+          if (attempt === maxRetries) {
+            console.warn('⚠️ Failed to auto-save project information after all retries: Extension context persistently invalidated');
+          }
+          continue; // Try again
+        } else {
+          // Other error - don't retry
+          console.warn('⚠️ Failed to auto-save project information:', saveResponse?.error);
+          return;
+        }
+      } catch (error) {
+        if (error.message?.includes('Extension context invalidated') || 
+            error.message?.includes('runtime ID not available')) {
+          // Extension context issue - worth retrying
+          console.warn(`⚠️ Extension context error on attempt ${attempt}/${maxRetries}:`, error.message);
+          if (attempt === maxRetries) {
+            console.warn('⚠️ Failed to auto-save project information after all retries: Extension context persistently invalidated');
+          }
+          continue; // Try again
+        } else {
+          // Other error - don't retry
+          console.warn('⚠️ Error auto-saving project information:', error);
+          return;
+        }
+      }
+    }
+  },
+  
   /**
    * AUTO-SAVE PROJECT INFORMATION
    * 

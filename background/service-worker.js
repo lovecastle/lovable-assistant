@@ -246,6 +246,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'saveAIPreferencesIndividual':
+      handleSaveAIPreferencesIndividual(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'saveSupabaseSettings':
+      handleSaveSupabaseSettings(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     // Prompt Templates handlers
     case 'getPromptTemplates':
       handleGetPromptTemplates().then(result => {
@@ -1152,20 +1168,20 @@ function getCurrentUserId() {
 // UI Preferences handlers
 async function handleSaveUIPreference(data) {
   try {
-    console.log('🔍 Service Worker: Saving UI preference:', data.preferenceKey);
+    console.log('🔍 Service Worker: Saving UI preference (individual):', data.preferenceKey);
     
     const userId = getCurrentUserId();
-    const result = await supabase.saveUIPreference(userId, data.preferenceKey, data.preferenceValue);
+    const result = await supabase.saveUIPreferenceIndividual(userId, data.preferenceKey, data.preferenceValue);
     
     if (result.success) {
-      console.log('✅ Service Worker: UI preference saved successfully');
+      console.log('✅ Service Worker: UI preference saved successfully (individual)');
       return result;
     } else {
-      console.error('❌ Service Worker: Failed to save UI preference:', result.error);
+      console.error('❌ Service Worker: Failed to save UI preference (individual):', result.error);
       return result;
     }
   } catch (error) {
-    console.error('❌ Service Worker: Error saving UI preference:', error);
+    console.error('❌ Service Worker: Error saving UI preference (individual):', error);
     return { success: false, error: error.message };
   }
 }
@@ -1192,20 +1208,20 @@ async function handleGetUIPreference(data) {
 
 async function handleGetAllUIPreferences() {
   try {
-    console.log('🔍 Service Worker: Getting all UI preferences');
+    console.log('🔍 Service Worker: Getting all UI preferences (individual)');
     
     const userId = getCurrentUserId();
-    const result = await supabase.getAllUIPreferences(userId);
+    const result = await supabase.getAllUIPreferencesIndividual(userId);
     
     if (result.success) {
-      console.log(`✅ Service Worker: Retrieved ${Object.keys(result.data || {}).length} UI preferences`);
+      console.log(`✅ Service Worker: Retrieved ${Object.keys(result.data || {}).length} UI preferences (individual)`);
       return result;
     } else {
-      console.error('❌ Service Worker: Failed to get UI preferences:', result.error);
+      console.error('❌ Service Worker: Failed to get UI preferences (individual):', result.error);
       return result;
     }
   } catch (error) {
-    console.error('❌ Service Worker: Error getting UI preferences:', error);
+    console.error('❌ Service Worker: Error getting UI preferences (individual):', error);
     return { success: false, error: error.message };
   }
 }
@@ -1521,6 +1537,48 @@ async function handleTestDatabaseConnection(projectId, apiKey) {
       success: false, 
       error: `Database connection failed: ${error.message}` 
     };
+  }
+}
+
+// AI Preferences handlers (individual columns)
+async function handleSaveAIPreferencesIndividual(data) {
+  try {
+    console.log('🔍 Service Worker: Saving AI preferences individually');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.saveAIPreferencesIndividual(userId, data);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: AI preferences saved individually');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save AI preferences individually:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving AI preferences individually:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Supabase Settings handlers
+async function handleSaveSupabaseSettings(data) {
+  try {
+    console.log('🔍 Service Worker: Saving Supabase settings');
+    
+    const userId = getCurrentUserId();
+    const result = await supabase.saveSupabaseSettings(userId, data.supabaseId, data.supabaseKey);
+    
+    if (result.success) {
+      console.log('✅ Service Worker: Supabase settings saved successfully');
+      return result;
+    } else {
+      console.error('❌ Service Worker: Failed to save Supabase settings:', result.error);
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Service Worker: Error saving Supabase settings:', error);
+    return { success: false, error: error.message };
   }
 }
 

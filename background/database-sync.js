@@ -952,4 +952,218 @@ export class SupabaseClient {
     const result = await this.request(endpoint);
     return { success: true, data: result };
   }
+
+  // Individual Preference Column Methods
+  async saveIndividualPreference(userId = 'default', columnName, value) {
+    console.log(`🔍 Database-sync: Saving individual preference ${columnName}:`, value);
+    
+    try {
+      // First ensure user exists
+      await this.getUserPreferences(userId);
+      
+      const updates = {
+        [columnName]: value,
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+
+      console.log(`✅ Database-sync: Individual preference ${columnName} saved successfully`);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error(`❌ Database-sync: Failed to save individual preference ${columnName}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getIndividualPreference(userId = 'default', columnName) {
+    console.log(`🔍 Database-sync: Getting individual preference ${columnName}`);
+    
+    try {
+      const result = await this.request(`user_preferences?user_id=eq.${userId}&select=${columnName}&limit=1`);
+      
+      if (result && result.length > 0) {
+        const value = result[0][columnName];
+        console.log(`✅ Database-sync: Individual preference ${columnName} found:`, value);
+        return { success: true, data: value };
+      } else {
+        console.log(`📭 Database-sync: Individual preference ${columnName} not found`);
+        return { success: true, data: null };
+      }
+    } catch (error) {
+      console.error(`❌ Database-sync: Failed to get individual preference ${columnName}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAllIndividualPreferences(userId = 'default') {
+    console.log('🔍 Database-sync: Getting all individual preferences for user:', userId);
+    
+    try {
+      const columns = [
+        'desktop_notification', 'tab_rename', 'auto_switch',
+        'anthropic_api_key', 'anthropic_model', 'openai_api_key', 'openai_model',
+        'google_api_key', 'google_model', 'supabase_id', 'supabase_anon_key'
+      ];
+      
+      const selectColumns = columns.join(',');
+      const result = await this.request(`user_preferences?user_id=eq.${userId}&select=${selectColumns}&limit=1`);
+      
+      if (result && result.length > 0) {
+        console.log('✅ Database-sync: Individual preferences found');
+        return { success: true, data: result[0] };
+      } else {
+        console.log('📭 Database-sync: No individual preferences found, creating defaults');
+        // Create default preferences
+        const defaultPrefs = await this.createDefaultUserPreferences(userId);
+        return { success: true, data: defaultPrefs };
+      }
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get individual preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Convenience methods for specific preference types
+  async saveUIPreferenceIndividual(userId = 'default', preferenceKey, preferenceValue) {
+    const columnMap = {
+      'lovable-notifications': 'desktop_notification',
+      'lovable-tab-rename': 'tab_rename', 
+      'lovable-auto-switch': 'auto_switch'
+    };
+    
+    const columnName = columnMap[preferenceKey];
+    if (!columnName) {
+      console.error(`❌ Unknown UI preference key: ${preferenceKey}`);
+      return { success: false, error: `Unknown UI preference key: ${preferenceKey}` };
+    }
+    
+    return await this.saveIndividualPreference(userId, columnName, preferenceValue);
+  }
+
+  async getUIPreferenceIndividual(userId = 'default', preferenceKey) {
+    const columnMap = {
+      'lovable-notifications': 'desktop_notification',
+      'lovable-tab-rename': 'tab_rename',
+      'lovable-auto-switch': 'auto_switch'
+    };
+    
+    const columnName = columnMap[preferenceKey];
+    if (!columnName) {
+      console.error(`❌ Unknown UI preference key: ${preferenceKey}`);
+      return { success: false, error: `Unknown UI preference key: ${preferenceKey}` };
+    }
+    
+    return await this.getIndividualPreference(userId, columnName);
+  }
+
+  async getAllUIPreferencesIndividual(userId = 'default') {
+    const result = await this.getAllIndividualPreferences(userId);
+    if (result.success && result.data) {
+      const uiPrefs = {
+        'lovable-notifications': result.data.desktop_notification || false,
+        'lovable-tab-rename': result.data.tab_rename || false,
+        'lovable-auto-switch': result.data.auto_switch || false
+      };
+      return { success: true, data: uiPrefs };
+    }
+    return result;
+  }
+
+  async saveAIPreferencesIndividual(userId = 'default', preferences) {
+    console.log('🔍 Database-sync: Saving AI preferences individually');
+    
+    try {
+      const updates = {
+        updated_at: new Date().toISOString()
+      };
+      
+      // Map preference keys to column names
+      if (preferences.claude_api_key !== undefined) updates.anthropic_api_key = preferences.claude_api_key;
+      if (preferences.claude_model !== undefined) updates.anthropic_model = preferences.claude_model;
+      if (preferences.openai_api_key !== undefined) updates.openai_api_key = preferences.openai_api_key;
+      if (preferences.openai_model !== undefined) updates.openai_model = preferences.openai_model;
+      if (preferences.gemini_api_key !== undefined) updates.google_api_key = preferences.gemini_api_key;
+      if (preferences.gemini_model !== undefined) updates.google_model = preferences.gemini_model;
+      
+      // Also handle direct column names
+      if (preferences.anthropic_api_key !== undefined) updates.anthropic_api_key = preferences.anthropic_api_key;
+      if (preferences.anthropic_model !== undefined) updates.anthropic_model = preferences.anthropic_model;
+      if (preferences.google_api_key !== undefined) updates.google_api_key = preferences.google_api_key;
+      if (preferences.google_model !== undefined) updates.google_model = preferences.google_model;
+      
+      // Ensure user exists first
+      await this.getUserPreferences(userId);
+      
+      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+
+      console.log('✅ Database-sync: AI preferences saved individually');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save AI preferences individually:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAIPreferencesIndividual(userId = 'default') {
+    const result = await this.getAllIndividualPreferences(userId);
+    if (result.success && result.data) {
+      const aiPrefs = {
+        claude_api_key: result.data.anthropic_api_key || '',
+        claude_model: result.data.anthropic_model || 'claude-3-5-sonnet-20241022',
+        openai_api_key: result.data.openai_api_key || '',
+        openai_model: result.data.openai_model || 'gpt-4o',
+        gemini_api_key: result.data.google_api_key || '',
+        gemini_model: result.data.google_model || 'gemini-1.5-pro-latest'
+      };
+      return { success: true, data: aiPrefs };
+    }
+    return result;
+  }
+
+  async saveSupabaseSettings(userId = 'default', supabaseId, supabaseKey) {
+    console.log('🔍 Database-sync: Saving Supabase settings');
+    
+    try {
+      const updates = {
+        supabase_id: supabaseId,
+        supabase_anon_key: supabaseKey,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Ensure user exists first  
+      await this.getUserPreferences(userId);
+      
+      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+
+      console.log('✅ Database-sync: Supabase settings saved successfully');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save Supabase settings:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getSupabaseSettings(userId = 'default') {
+    const result = await this.getAllIndividualPreferences(userId);
+    if (result.success && result.data) {
+      return { 
+        success: true, 
+        data: {
+          supabaseId: result.data.supabase_id || '',
+          supabaseKey: result.data.supabase_anon_key || ''
+        }
+      };
+    }
+    return result;
+  }
 }

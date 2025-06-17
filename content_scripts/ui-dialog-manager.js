@@ -928,15 +928,15 @@ window.UIDialogManager = {
       });
       
       // Click handlers
-      card.addEventListener('click', () => {
-        this.handleFeatureSelection(feature);
+      card.addEventListener('click', async () => {
+        await this.handleFeatureSelection(feature);
       });
     });
     
     // Note: Close button is handled centrally in setupCloseButton()
   },
 
-  handleFeatureSelection(feature) {
+  async handleFeatureSelection(feature) {
     switch (feature) {
       case 'chat':
         if (typeof this.showChatInterface === 'function') {
@@ -947,21 +947,21 @@ window.UIDialogManager = {
         break;
       case 'history':
         if (typeof this.showConversationHistory === 'function') {
-          this.showConversationHistory();
+          await this.showConversationHistory();
         } else {
           console.error('showConversationHistory method not available');
         }
         break;
       case 'utilities':
         if (typeof this.showUtilitiesPage === 'function') {
-          this.showUtilitiesPage();
+          await this.showUtilitiesPage();
         } else {
           console.error('showUtilitiesPage method not available');
         }
         break;
       case 'knowledge':
         if (typeof this.showProjectManager === 'function') {
-          this.showProjectManager();
+          await this.showProjectManager();
         } else {
           console.error('showProjectManager method not available');
         }
