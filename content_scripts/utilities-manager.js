@@ -614,7 +614,7 @@ window.UtilitiesManager = {
           }
           
           // Test connection with specific provider
-          const response = await this.safeSendMessage({ 
+          const response = await this.safeSendMessageWithRetry({ 
             action: 'testSpecificConnection',
             provider: 'claude',
             apiKey: apiKey

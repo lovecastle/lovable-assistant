@@ -65,20 +65,30 @@ window.ProjectManager = {
       this.renderProjectsList(); // Use a render method that works with pre-loaded data
     } catch (error) {
       console.error('❌ Error loading project manager:', error);
+      
+      // Check if this is an extension context error
+      if (error.message?.includes('Extension context invalidated') || 
+          error.message?.includes('runtime ID not available')) {
+        this.showExtensionContextError();
+      }
+      
       // Show error state
       const content = document.getElementById('dialog-content');
       if (content) {
+        const isContextError = error.message?.includes('Extension context invalidated') || 
+                              error.message?.includes('runtime ID not available');
+        
         content.innerHTML = `
           <div style="
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             height: 100%; color: #e53e3e; font-size: 14px; gap: 16px; padding: 20px;
           ">
-            <div style="font-size: 24px;">❌</div>
-            <div>Failed to load projects</div>
-            <button onclick="window.lovableDetector.showProjectManager()" style="
-              background: #667eea; color: white; border: none; padding: 8px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">Retry</button>
+            <div style="font-size: 24px;">${isContextError ? '⚠️' : '❌'}</div>
+            <div>${isContextError ? 'Extension connection lost' : 'Failed to load projects'}</div>
+            ${isContextError ? 
+              '<button onclick="window.location.reload()" style="background: #f56565; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;">Reload Page</button>' :
+              '<button onclick="window.lovableDetector.showProjectManager()" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;">Retry</button>'
+            }
           </div>
         `;
       }
@@ -311,7 +321,13 @@ window.ProjectManager = {
         <div style="font-weight: 600; color: #1a202c; font-size: 14px; flex: 1;">
           ${project.name}
         </div>
-        ${isCurrent ? '<div style="background: #48bb78; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 500;">Current</div>' : ''}
+        <div style="display: flex; align-items: center; gap: 4px;">
+          ${isCurrent ? '<div style="background: #48bb78; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 500;">Current</div>' : ''}
+          <button class="delete-project-btn" data-project-id="${project.id}" style="
+            background: #f56565; color: white; border: none; padding: 4px 8px;
+            border-radius: 4px; cursor: pointer; font-size: 10px;
+          " onclick="event.stopPropagation();">Delete</button>
+        </div>
       </div>
       <div style="font-size: 11px; color: #667eea; margin-bottom: 4px;">
         ${project.url}
@@ -347,6 +363,15 @@ window.ProjectManager = {
         projectDiv.style.boxShadow = 'none';
       }
     });
+    
+    // Add delete button event listener
+    const deleteBtn = projectDiv.querySelector('.delete-project-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Prevent triggering the project click
+        await this.deleteProject(project);
+      });
+    }
     
     return projectDiv;
   },
@@ -409,7 +434,7 @@ window.ProjectManager = {
       let existingProject = null;
       try {
         console.log('🔍 Fetching project data from database...');
-        const response = await this.safeSendMessage({
+        const response = await this.safeSendMessageWithRetry({
           action: 'getProjectManager',
           projectId: projectId
         });
@@ -474,7 +499,7 @@ window.ProjectManager = {
           console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for project auto-save`);
         }
         
-        const saveResponse = await this.safeSendMessage({
+        const saveResponse = await this.safeSendMessageWithRetry({
           action: 'saveProjectManager',
           data: projectManagerData
         });
@@ -487,6 +512,7 @@ window.ProjectManager = {
           console.warn(`⚠️ Extension context invalidated on attempt ${attempt}/${maxRetries}`);
           if (attempt === maxRetries) {
             console.warn('⚠️ Failed to auto-save project information after all retries: Extension context persistently invalidated');
+            this.showExtensionContextError();
           }
           continue; // Try again
         } else {
@@ -501,6 +527,7 @@ window.ProjectManager = {
           console.warn(`⚠️ Extension context error on attempt ${attempt}/${maxRetries}:`, error.message);
           if (attempt === maxRetries) {
             console.warn('⚠️ Failed to auto-save project information after all retries: Extension context persistently invalidated');
+            this.showExtensionContextError();
           }
           continue; // Try again
         } else {
@@ -637,7 +664,7 @@ window.ProjectManager = {
   async getSavedProjects() {
     try {
       console.log('🔍 Fetching all saved projects from database...');
-      const response = await this.safeSendMessage({
+      const response = await this.safeSendMessageWithRetry({
         action: 'getAllProjectManagers'
       });
       
@@ -670,7 +697,7 @@ window.ProjectManager = {
         knowledge: knowledge
       };
       
-      const response = await this.safeSendMessage({
+      const response = await this.safeSendMessageWithRetry({
         action: 'saveProjectManager',
         data: projectManagerData
       });
@@ -711,6 +738,131 @@ window.ProjectManager = {
     }
   },
 
+  /**
+   * DELETE PROJECT
+   * 
+   * Removes a project from the database with user confirmation.
+   * Provides visual feedback during the deletion process.
+   */
+  async deleteProject(project) {
+    try {
+      // Extra confirmation for current project
+      const currentUrl = window.location.href;
+      const isCurrentProject = currentUrl.includes(project.id);
+      
+      let confirmMessage = `Are you sure you want to delete the project "${project.name}"?\n\nThis action cannot be undone.`;
+      
+      if (isCurrentProject) {
+        confirmMessage += '\n\n⚠️ Note: This is the project you are currently viewing.';
+      }
+      
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+      
+      console.log('🗑️ Deleting project:', project.id);
+      
+      // Send delete request to background script
+      const response = await this.safeSendMessageWithRetry({
+        action: 'deleteProjectManager',
+        projectId: project.id
+      });
+      
+      if (response?.success) {
+        console.log('✅ Project deleted successfully');
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+          <div style="
+            position: fixed; top: 20px; right: 20px; z-index: 10002;
+            background: #48bb78; color: white; padding: 12px 16px;
+            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 14px; animation: slideIn 0.3s ease-out;
+          ">
+            ✅ Project "${project.name}" deleted successfully
+          </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          notification.style.opacity = '0';
+          setTimeout(() => notification.remove(), 300);
+        }, 3000);
+        
+        // Refresh the project list to reflect changes
+        await this.loadProjectsList();
+        this.renderProjectsList();
+      } else {
+        throw new Error(response?.error || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting project:', error);
+      
+      // Show error notification
+      const errorNotification = document.createElement('div');
+      errorNotification.innerHTML = `
+        <div style="
+          position: fixed; top: 20px; right: 20px; z-index: 10002;
+          background: #f56565; color: white; padding: 12px 16px;
+          border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          font-size: 14px;
+        ">
+          ❌ Failed to delete project: ${error.message}
+        </div>
+      `;
+      
+      document.body.appendChild(errorNotification);
+      
+      // Remove error notification after 5 seconds
+      setTimeout(() => {
+        errorNotification.style.opacity = '0';
+        setTimeout(() => errorNotification.remove(), 300);
+      }, 5000);
+    }
+  },
+
+  /**
+   * SHOW EXTENSION CONTEXT ERROR
+   * 
+   * Shows user-friendly notification when extension context is persistently invalidated.
+   */
+  showExtensionContextError() {
+    // Don't show multiple notifications
+    if (document.querySelector('.extension-context-error')) {
+      return;
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'extension-context-error';
+    notification.innerHTML = `
+      <div style="
+        position: fixed; top: 20px; right: 20px; z-index: 10002;
+        background: #f56565; color: white; padding: 12px 16px;
+        border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        font-size: 14px; max-width: 300px;
+      ">
+        ⚠️ Extension connection lost. Please reload the page to restore functionality.
+        <div style="margin-top: 8px;">
+          <button onclick="window.location.reload()" style="
+            background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);
+            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
+          ">Reload Page</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 15 seconds
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => notification.remove(), 300);
+    }, 15000);
+  },
+
   // Debug methods for Project Manager
   async debugSaveCurrentProject() {
     try {
@@ -730,7 +882,7 @@ window.ProjectManager = {
       
       console.log('🔧 Debug: Saving current project:', projectManagerData);
       
-      const response = await this.safeSendMessage({
+      const response = await this.safeSendMessageWithRetry({
         action: 'saveProjectManager',
         data: projectManagerData
       });
@@ -773,7 +925,7 @@ window.ProjectManager = {
       console.log('🔧 Testing database table access...');
       
       // Test getAllProjectManagers
-      const response = await this.safeSendMessage({
+      const response = await this.safeSendMessageWithRetry({
         action: 'getAllProjectManagers'
       });
       

@@ -247,6 +247,85 @@ class LovableDetector {
       return { success: false, error: error.message || 'Unknown communication error' };
     }
   }
+
+  /**
+   * SAFE SEND MESSAGE WITH RETRY
+   * 
+   * Enhanced version of safeSendMessage with automatic retry for extension context errors.
+   * Provides better reliability for database operations that might fail due to extension reloads.
+   */
+  async safeSendMessageWithRetry(message, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Add progressive delay for retries
+        if (attempt > 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 2), 5000); // Exponential backoff, max 5s
+          await new Promise(resolve => setTimeout(resolve, delay));
+          console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for message: ${message.action}`);
+        }
+        
+        const response = await this.safeSendMessage(message);
+        
+        // If successful, return immediately
+        if (response?.success) {
+          if (attempt > 1) {
+            console.log(`✅ Message succeeded on retry attempt ${attempt}/${maxRetries}`);
+          }
+          return response;
+        }
+        
+        // Check if error is worth retrying
+        const isRetryableError = response?.error?.includes('Extension context invalidated') ||
+                                response?.error?.includes('Background script not available') ||
+                                response?.error?.includes('runtime ID not available') ||
+                                response?.error?.includes('Message timeout') ||
+                                response?.error?.includes('message channel closed');
+        
+        if (!isRetryableError) {
+          // Not a retry-worthy error, return immediately
+          console.warn(`⚠️ Non-retryable error for ${message.action}:`, response?.error);
+          return response;
+        }
+        
+        if (attempt === maxRetries) {
+          console.warn(`⚠️ Failed ${message.action} after ${maxRetries} attempts: ${response?.error}`);
+          
+          // Show user notification for persistent extension context issues
+          if (typeof this.showExtensionContextError === 'function') {
+            this.showExtensionContextError();
+          }
+          
+          return {
+            ...response,
+            error: `${response?.error} (after ${maxRetries} retries)`
+          };
+        }
+        
+        // Log retry reason
+        console.warn(`⚠️ Retrying ${message.action} (attempt ${attempt}/${maxRetries}): ${response?.error}`);
+        
+      } catch (error) {
+        const isRetryableError = error.message?.includes('Extension context invalidated') ||
+                                error.message?.includes('Background script not available') ||
+                                error.message?.includes('runtime ID not available') ||
+                                error.message?.includes('Message timeout') ||
+                                error.message?.includes('message channel closed');
+        
+        if (!isRetryableError || attempt === maxRetries) {
+          console.error(`❌ Final error for ${message.action} after ${attempt}/${maxRetries} attempts:`, error);
+          
+          // Show user notification for persistent extension context issues
+          if (isRetryableError && attempt === maxRetries && typeof this.showExtensionContextError === 'function') {
+            this.showExtensionContextError();
+          }
+          
+          return { success: false, error: error.message || 'Unknown error' };
+        }
+        
+        console.warn(`⚠️ Exception on attempt ${attempt}/${maxRetries} for ${message.action}:`, error.message);
+      }
+    }
+  }
 }
 
 // ===========================

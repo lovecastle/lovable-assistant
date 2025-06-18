@@ -339,6 +339,7 @@ window.UIDialogManager = {
         }
         
         @keyframes pulse { 0%, 60%, 100% { opacity: 0.4; transform: scale(1); } 30% { opacity: 1; transform: scale(1.2); } }
+        @keyframes slideIn { 0% { transform: translateX(100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
       `;
       document.head.appendChild(style);
     }

@@ -113,12 +113,157 @@
     <p>Enhance your Lovable.dev experience</p>
   </div>
 
+  <!-- Authentication Section -->
+  <div id="auth-section" style="display: none;">
+    <div class="info-box">
+      <h3>🔐 Sign In</h3>
+      <p style="margin-bottom: 12px;">Sign in to access premium features and sync your data.</p>
+      
+      <div id="auth-forms">
+        <!-- Login Form -->
+        <div id="login-form">
+          <input type="email" id="login-email" placeholder="Email" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #c9cfd7; border-radius: 4px; font-size: 13px;">
+          <input type="password" id="login-password" placeholder="Password" style="width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #c9cfd7; border-radius: 4px; font-size: 13px;">
+          
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button id="login-btn" class="btn" style="flex: 1;">Sign In</button>
+            <button id="show-register" class="btn btn-secondary" style="flex: 1;">Register</button>
+          </div>
+        </div>
+        
+        <!-- Register Form -->
+        <div id="register-form" style="display: none;">
+          <input type="text" id="register-name" placeholder="Display Name (optional)" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #c9cfd7; border-radius: 4px; font-size: 13px;">
+          <input type="email" id="register-email" placeholder="Email" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #c9cfd7; border-radius: 4px; font-size: 13px;">
+          <input type="password" id="register-password" placeholder="Password" style="width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #c9cfd7; border-radius: 4px; font-size: 13px;">
+          
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button id="register-btn" class="btn" style="flex: 1;">Register</button>
+            <button id="show-login" class="btn btn-secondary" style="flex: 1;">Sign In</button>
+          </div>
+        </div>
+      </div>
+      
+      <div id="auth-error" style="display: none; background: #fed7d7; color: #c53030; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-top: 8px;"></div>
+      <div id="auth-success" style="display: none; background: #c6f6d5; color: #22543d; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-top: 8px;"></div>
+    </div>
+  </div>
+
+  <!-- User Dashboard Section -->
+  <div id="user-dashboard" style="display: none;">
+    <div class="info-box">
+      <h3>👤 Welcome back!</h3>
+      <div id="user-info">
+        <p style="margin-bottom: 8px;"><strong id="user-email"></strong></p>
+        <p style="margin-bottom: 8px; font-size: 12px; color: #4a5568;">
+          Role: <span id="user-role"></span> | 
+          Plan: <span id="user-plan"></span>
+        </p>
+      </div>
+      
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button id="setup-personal-db" class="btn" style="flex: 1; font-size: 12px;">
+          🗄️ Setup Personal DB
+        </button>
+        <button id="logout-btn" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
+          🚪 Sign Out
+        </button>
+      </div>
+      
+      <div id="database-status" style="font-size: 12px; color: #4a5568;">
+        <span id="db-status-text">Personal database: Not configured</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Database Setup Section -->
+  <div id="database-setup" style="display: none;">
+    <div class="info-box">
+      <h3>🏗️ Database Setup</h3>
+      <p style="font-size: 13px; color: #4a5568; margin-bottom: 12px;">
+        Lovable Assistant stores your data in your own private Supabase database. This ensures complete privacy and data ownership.
+      </p>
+      
+      <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #0369a1;">
+        <strong>✨ Why your own database?</strong><br>
+        • Complete data privacy and ownership<br>
+        • No central data collection<br>
+        • Free Supabase tier (up to 500MB)<br>
+        • Full control over your information
+      </div>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+          Supabase Project URL
+        </label>
+        <input type="url" id="supabase-url" placeholder="https://your-project.supabase.co" style="
+          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+          font-size: 14px; box-sizing: border-box;
+        ">
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
+          API Key (anon/public)
+        </label>
+        <input type="password" id="supabase-key" placeholder="Your anon key" style="
+          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
+          font-size: 14px; box-sizing: border-box;
+        ">
+      </div>
+      
+      <div style="display: flex; gap: 8px;">
+        <button id="setup-database" class="btn" style="flex: 1;">
+          🔗 Connect Database
+        </button>
+        <button id="show-setup-guide" class="btn btn-secondary" style="flex: 1;">
+          📖 Setup Guide
+        </button>
+      </div>
+      
+      <div id="database-error" style="display: none; background: #fed7d7; color: #c53030; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-top: 8px;"></div>
+    </div>
+    
+    <div id="setup-guide" style="display: none; margin-top: 16px;" class="info-box">
+      <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px;">📖 Quick Setup Guide</h4>
+      <ol style="margin: 0; padding-left: 20px; font-size: 12px; color: #4a5568; line-height: 1.6;">
+        <li>Go to <a href="https://supabase.com" target="_blank" style="color: #667eea;">supabase.com</a> and create account</li>
+        <li>Create a new project (free tier works perfectly)</li>
+        <li>Go to Settings → API in your project</li>
+        <li>Copy the "Project URL" and "anon public" key</li>
+        <li>Paste them above and click "Connect Database"</li>
+        <li>Extension will automatically set up the required tables</li>
+      </ol>
+      <div style="margin-top: 12px; padding: 8px; background: #f0f9ff; border-radius: 4px; font-size: 11px; color: #0369a1;">
+        💡 Your database credentials are stored locally and never shared
+      </div>
+    </div>
+  </div>
+
+  <!-- User Status Section -->
+  <div id="user-status" style="display: none;">
+    <div class="info-box">
+      <h3>👤 Your Database</h3>
+      <p style="font-size: 13px; color: #4a5568; margin-bottom: 8px;">
+        <span id="database-url-display" style="font-weight: 500;"></span>
+      </p>
+      <div style="display: flex; gap: 8px;">
+        <button id="change-database" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
+          🔄 Change Database
+        </button>
+        <button id="reset-extension" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
+          🗑️ Reset Extension
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="status-indicator">
     <div class="status-dot" id="status-dot"></div>
     <div class="status-text" id="status-text">Checking connection...</div>
   </div>
 
-  <div class="info-box">
+  <div class="info-box" id="quick-access-info">
     <h3>📍 Quick Access</h3>
     <p>Open Lovable Assistant on any Lovable.dev project page by clicking the floating button in the bottom-right corner.</p>
   </div>

@@ -269,7 +269,7 @@ window.ConversationHistory = {
         return;
       }
 
-      const response = await this.safeSendMessage({
+      const response = await this.safeSendMessageWithRetry({
         action: 'getConversations',
         filters: {
           projectId: projectId,
@@ -507,7 +507,7 @@ window.ConversationHistory = {
       if (conversationIds.size > 0) {
         console.log(`🗑️ Bulk deleting ${conversationIds.size} conversations from database...`);
         
-        const response = await this.safeSendMessage({
+        const response = await this.safeSendMessageWithRetry({
           action: 'deleteConversations',
           filters: { ids: Array.from(conversationIds) } // Send all IDs in single request
         });
