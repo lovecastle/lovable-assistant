@@ -606,7 +606,31 @@ window.ProjectManager = {
     try {
       console.log('🔍 Checking if project is user-owned...');
       
-      // Method 1: Try the exact XPath provided
+      // Method 1: Check for lock icon (indicates non-owned project)
+      try {
+        // Check for lock icon using the provided XPath
+        const lockIconXPath = '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]';
+        const lockResult = document.evaluate(
+          lockIconXPath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        
+        if (lockResult.singleNodeValue) {
+          // Also check if it's the lock icon by path data
+          const svgPath = lockResult.singleNodeValue.querySelector('path');
+          if (svgPath && svgPath.getAttribute('d')?.includes('M220-80q-24.75')) {
+            console.log('🔒 Found lock icon - this is NOT a user-owned project');
+            return false;
+          }
+        }
+      } catch (e) {
+        // Continue checking other methods
+      }
+      
+      // Method 2: Try the exact XPath for Send button
       try {
         const xpathResult = document.evaluate(
           '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[2]/form/div[2]/div[2]/div[2]/button',
@@ -621,17 +645,17 @@ window.ProjectManager = {
           return true;
         }
       } catch (xpathError) {
-        console.log('⚠️ XPath evaluation failed:', xpathError.message);
+        // XPath evaluation failed
       }
       
-      // Method 2: Look for the specific button ID
+      // Method 3: Look for the specific button ID
       const sendButton = document.getElementById('chatinput-send-message-button');
       if (sendButton) {
         console.log('✅ Found Send button via ID - this is a user-owned project');
         return true;
       }
       
-      // Method 3: Look for any button with the send message functionality
+      // Method 4: Look for any button with the send message functionality
       const sendButtons = document.querySelectorAll('button[type="submit"]');
       for (const button of sendButtons) {
         if ((button.id && button.id.includes('send-message')) ||
@@ -643,7 +667,7 @@ window.ProjectManager = {
         }
       }
       
-      // Method 4: Look for form elements that indicate user interaction capability
+      // Method 5: Look for form elements that indicate user interaction capability
       const chatForm = document.querySelector('form');
       const chatInput = document.querySelector('input[type="text"], textarea');
       

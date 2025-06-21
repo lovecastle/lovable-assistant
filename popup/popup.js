@@ -88,10 +88,12 @@ async function handleLogin() {
   }
   
   try {
+    clearMessages(); // Clear any existing messages
     showLoading('Signing in...');
     const result = await sendToBackground('masterAuth_login', { email, password });
     
     if (result.success) {
+      clearMessages(); // Clear loading message
       showSuccess('Successfully signed in!');
       setTimeout(() => {
         showUserDashboard(result.user);
@@ -121,6 +123,7 @@ async function handleRegister() {
   }
   
   try {
+    clearMessages(); // Clear any existing messages
     showLoading('Creating account...');
     const result = await sendToBackground('masterAuth_register', { 
       email, 
@@ -129,9 +132,11 @@ async function handleRegister() {
     });
     
     if (result.success) {
+      clearMessages(); // Clear loading message
       showSuccess(result.message || 'Account created successfully!');
       // Switch to login form
       setTimeout(() => {
+        clearMessages();
         document.getElementById('register-form').style.display = 'none';
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('login-email').value = email;

@@ -36,10 +36,23 @@ export class MasterAuthService {
       if (!authResponse.ok) {
         const errorData = await authResponse.json().catch(() => ({ msg: 'Unknown error' }));
         console.error('❌ Auth registration failed:', errorData);
+        console.error('Status:', authResponse.status);
+        console.error('Full error:', JSON.stringify(errorData));
         
         // Handle specific auth errors
-        if (authResponse.status === 500 && errorData.msg?.includes('Database error')) {
-          throw new Error('Supabase Authentication needs configuration: 1) Disable email confirmation 2) Set signup URL 3) Configure templates. Please set up Auth in your Supabase dashboard.');
+        if (authResponse.status === 500 || authResponse.status === 400 || authResponse.status === 422) {
+          const errorMessage = errorData.msg || errorData.message || '';
+          console.log('Auth error details:', errorMessage);
+          
+          // Check for specific error types
+          if (errorMessage.includes('Database error saving new user')) {
+            // This happens when the trigger fails - likely RLS issue
+            throw new Error('User registration failed. Please check database policies.');
+          }
+          
+          if (errorMessage.includes('email') && errorMessage.includes('confirm')) {
+            throw new Error('Email confirmation is required. Please check your Supabase Auth settings.');
+          }
         }
         
         throw new Error(errorData.msg || `Registration failed: ${authResponse.status}`);
@@ -49,21 +62,34 @@ export class MasterAuthService {
       console.log('✅ Auth user created:', authData);
 
       if (authData.user) {
-        // Create user profile
-        const profileResponse = await fetch(`${this.masterDbUrl}/rest/v1/user_profiles`, {
-          method: 'POST',
-          headers: this.getSupabaseHeaders(false, true),
-          body: JSON.stringify({
-            auth_user_id: authData.user.id,
-            role: 'user'
-          })
-        });
+        // Create user profile manually (trigger was disabled due to RLS issues)
+        try {
+          const profileResponse = await fetch(`${this.masterDbUrl}/rest/v1/user_profiles`, {
+            method: 'POST',
+            headers: {
+              'apikey': this.masterDbKey,
+              'Authorization': `Bearer ${this.masterDbKey}`, // Use service role
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              auth_user_id: authData.user.id,
+              role: 'user'
+            })
+          });
 
-        if (!profileResponse.ok) {
-          console.error('❌ Profile creation failed, but user was created in Auth');
-          // Don't fail the registration since the user was created in Auth
+          if (!profileResponse.ok) {
+            const profileError = await profileResponse.text();
+            console.error('❌ Profile creation failed:', profileError);
+            throw new Error('User created but profile setup failed');
+          }
+
+          console.log('✅ User profile created successfully');
+        } catch (profileError) {
+          console.error('❌ Profile creation error:', profileError);
+          // Don't fail the entire registration if profile creation fails
         }
-
+        
         return {
           success: true,
           user: authData.user,
@@ -118,6 +144,18 @@ export class MasterAuthService {
       this.currentUser = authData.user;
       this.sessionToken = authData.access_token;
 
+      // Store session in chrome storage for persistence
+      await chrome.storage.local.set({
+        masterAuthSession: {
+          user: authData.user,
+          access_token: authData.access_token,
+          refresh_token: authData.refresh_token,
+          expires_at: authData.expires_at,
+          expires_in: authData.expires_in,
+          timestamp: Date.now()
+        }
+      });
+
       // Fetch user profile
       await this.fetchUserProfile();
       
@@ -164,6 +202,9 @@ export class MasterAuthService {
       this.userProfile = null;
       this.sessionToken = null;
 
+      // Clear stored session
+      await chrome.storage.local.remove(['masterAuthSession']);
+
       console.log('✅ User logged out successfully');
       return { success: true };
 
@@ -209,6 +250,48 @@ export class MasterAuthService {
     } catch (error) {
       console.error('❌ Failed to get session:', error);
       return null;
+    }
+  }
+
+  // Restore session from storage
+  async restoreSession() {
+    try {
+      const { masterAuthSession } = await chrome.storage.local.get(['masterAuthSession']);
+      
+      if (!masterAuthSession) {
+        console.log('ℹ️ No stored session found');
+        return false;
+      }
+
+      // Check if session is expired (if expires_in exists)
+      if (masterAuthSession.expires_in) {
+        const sessionAge = Date.now() - masterAuthSession.timestamp;
+        const sessionExpired = sessionAge > (masterAuthSession.expires_in * 1000);
+        
+        if (sessionExpired) {
+          console.log('⚠️ Stored session is expired');
+          await chrome.storage.local.remove(['masterAuthSession']);
+          return false;
+        }
+      }
+
+      // Restore session
+      this.currentUser = masterAuthSession.user;
+      this.sessionToken = masterAuthSession.access_token;
+      
+      // Try to fetch user profile
+      try {
+        await this.fetchUserProfile();
+      } catch (error) {
+        console.warn('⚠️ Could not fetch user profile during session restore:', error);
+      }
+      
+      console.log('✅ Session restored for user:', masterAuthSession.user.email);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to restore session:', error);
+      await chrome.storage.local.remove(['masterAuthSession']);
+      return false;
     }
   }
 

@@ -1877,6 +1877,12 @@ async function handleMasterAuthGetCurrentUser() {
   try {
     console.log('🔐 Service Worker: Getting current user from master auth');
     
+    // First try to restore session if not already loaded
+    if (!masterAuth.currentUser) {
+      console.log('⚡ Attempting to restore session...');
+      await masterAuth.restoreSession();
+    }
+    
     // Check current session
     const session = await masterAuth.getCurrentSession();
     

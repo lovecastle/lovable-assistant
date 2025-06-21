@@ -33,6 +33,15 @@ window.UIDialogManager = {
       this.closeAssistant();
     } else {
       this.showAssistant();
+      
+      // Check and save project info when dialog is opened
+      // This avoids unnecessary checks on page load
+      setTimeout(() => {
+        if (typeof this.autoSaveProjectInfo === 'function') {
+          console.log('📝 Checking project information...');
+          this.autoSaveProjectInfo();
+        }
+      }, 100);
     }
   },
 
