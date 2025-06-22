@@ -1526,16 +1526,28 @@ async function testGeminiConnection(apiKey, prompt, systemPrompt) {
 }
 
 // Database connection test function
-async function handleTestDatabaseConnection(projectId, apiKey) {
+async function handleTestDatabaseConnection(projectIdOrUrl, apiKey) {
   try {
     console.log('🔍 Service Worker: Testing database connection with provided credentials');
     
-    if (!projectId || !apiKey) {
-      return { success: false, error: 'Project ID and API key are required' };
+    if (!projectIdOrUrl || !apiKey) {
+      return { success: false, error: 'Project ID/URL and API key are required' };
     }
     
-    // Construct the Supabase URL from project ID
-    const supabaseUrl = `https://${projectId}.supabase.co`;
+    // Extract project ID and construct proper Supabase URL
+    let supabaseUrl;
+    if (projectIdOrUrl.startsWith('https://')) {
+      // Full URL provided
+      supabaseUrl = projectIdOrUrl.replace(/\/$/, ''); // Remove trailing slash
+    } else if (projectIdOrUrl.includes('.supabase.co')) {
+      // URL without protocol
+      supabaseUrl = `https://${projectIdOrUrl}`;
+    } else {
+      // Just project ID provided
+      supabaseUrl = `https://${projectIdOrUrl}.supabase.co`;
+    }
+    
+    console.log('🔍 Service Worker: Using Supabase URL:', supabaseUrl);
     
     // Test the database connection by making a simple request
     const testResponse = await fetch(`${supabaseUrl}/rest/v1/`, {
@@ -1570,33 +1582,27 @@ async function handleTestDatabaseConnection(projectId, apiKey) {
       return { success: false, error: errorMessage };
     }
     
-    // Additional test: Try to access a specific table to ensure permissions work
+    // Test if required tables exist, and create them if not
     try {
-      const tableTestResponse = await fetch(`${supabaseUrl}/rest/v1/conversations?limit=1`, {
-        method: 'GET',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      console.log('🔍 Service Worker: Checking database schema...');
+      const schemaResult = await setupDatabaseSchema(supabaseUrl, apiKey);
       
-      if (!tableTestResponse.ok) {
-        console.warn('⚠️ Service Worker: Basic connection OK, but table access failed');
-        return { 
-          success: false, 
-          error: `Connected to database but cannot access tables. Check your API key permissions.` 
-        };
+      if (!schemaResult.success) {
+        console.error('❌ Service Worker: Schema setup failed:', schemaResult.error);
+        return schemaResult;
       }
       
-      console.log('✅ Service Worker: Database connection test successful');
-      return { success: true };
+      console.log('✅ Service Worker: Database schema verified/created successfully');
+      
+      // Return the actual result from schema setup (which includes RLS handling)
+      console.log('✅ Service Worker: Database connection and schema setup completed');
+      return schemaResult;
       
     } catch (tableError) {
-      console.warn('⚠️ Service Worker: Basic connection OK, but table test failed:', tableError.message);
+      console.warn('⚠️ Service Worker: Schema setup or table test failed:', tableError.message);
       return { 
         success: false, 
-        error: `Database connected but table access failed: ${tableError.message}` 
+        error: `Database connected but schema setup failed: ${tableError.message}` 
       };
     }
     
@@ -1606,6 +1612,550 @@ async function handleTestDatabaseConnection(projectId, apiKey) {
       success: false, 
       error: `Database connection failed: ${error.message}` 
     };
+  }
+}
+
+// Database Schema Setup Function
+async function setupDatabaseSchema(supabaseUrl, apiKey) {
+  try {
+    console.log('🏗️ Service Worker: Setting up database schema...');
+    
+    // Check if tables already exist by trying to query one
+    try {
+      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/prompt_templates?limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (checkResponse.ok) {
+        console.log('✅ Service Worker: Database schema already exists');
+        return { success: true, message: 'Schema already exists' };
+      }
+    } catch (checkError) {
+      // Tables don't exist or other error, proceed with creation
+      console.log('🔧 Service Worker: Tables not found, creating schema...');
+    }
+    
+    // Personal database migration SQL from user-personal-db-migration.sql
+    const migrationSQL = `
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- Create prompt_templates table
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  template TEXT NOT NULL,
+  shortcut TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id TEXT NOT NULL DEFAULT 'default',
+  is_custom BOOLEAN DEFAULT TRUE,
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Create user_preferences table
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL DEFAULT 'default',
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  email TEXT,
+  subscription_tier TEXT DEFAULT 'free',
+  subscription_status TEXT DEFAULT 'active',
+  subscription_expires_at TIMESTAMP WITH TIME ZONE,
+  desktop_notification BOOLEAN DEFAULT FALSE,
+  tab_rename BOOLEAN DEFAULT FALSE,
+  auto_switch BOOLEAN DEFAULT FALSE,
+  anthropic_api_key TEXT,
+  anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
+  openai_api_key TEXT,
+  openai_model TEXT DEFAULT 'gpt-4o',
+  google_api_key TEXT,
+  google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
+  supabase_id TEXT,
+  supabase_anon_key TEXT
+);
+
+-- Create project_manager table
+CREATE TABLE IF NOT EXISTS project_manager (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id TEXT NOT NULL UNIQUE,
+  project_name TEXT NOT NULL,
+  project_url TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  knowledge TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id TEXT NOT NULL DEFAULT 'default',
+  CONSTRAINT project_manager_description_length CHECK (char_length(description) <= 150)
+);
+
+-- Create conversations table
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id TEXT,
+  user_message TEXT NOT NULL,
+  lovable_response TEXT,
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  project_context JSONB DEFAULT '{}',
+  tags TEXT[] DEFAULT '{}',
+  effectiveness_score INTEGER CHECK (effectiveness_score >= 1 AND effectiveness_score <= 10),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_message_id TEXT,
+  lovable_message_id TEXT,
+  message_group_id TEXT,
+  auto_capture BOOLEAN DEFAULT FALSE,
+  user_id TEXT NOT NULL DEFAULT 'default'
+);
+
+-- Create assistant_conversations table
+CREATE TABLE IF NOT EXISTS assistant_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL,
+  user_message TEXT NOT NULL,
+  assistant_response TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  metadata JSONB DEFAULT '{}',
+  user_id TEXT NOT NULL DEFAULT 'default'
+);
+`;
+
+    // Create indexes SQL
+    const indexesSQL = `
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_conversations_project_id ON conversations(project_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_lovable_message_id ON conversations(lovable_message_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at);
+CREATE INDEX IF NOT EXISTS idx_conversations_tags ON conversations USING gin(tags);
+
+CREATE INDEX IF NOT EXISTS idx_assistant_conversations_project_id ON assistant_conversations(project_id);
+CREATE INDEX IF NOT EXISTS idx_assistant_conversations_created_at ON assistant_conversations(created_at);
+CREATE INDEX IF NOT EXISTS idx_assistant_conversations_user_id ON assistant_conversations(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_project_manager_project_id ON project_manager(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_manager_user_id ON project_manager(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_user_id ON prompt_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_is_active ON prompt_templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_shortcut ON prompt_templates(shortcut);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+`;
+
+    // Triggers and functions SQL
+    const functionsSQL = `
+-- Updated timestamp function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create triggers
+DROP TRIGGER IF EXISTS update_prompt_templates_updated_at ON prompt_templates;
+CREATE TRIGGER update_prompt_templates_updated_at 
+    BEFORE UPDATE ON prompt_templates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_user_preferences_updated_at ON user_preferences;
+CREATE TRIGGER update_user_preferences_updated_at 
+    BEFORE UPDATE ON user_preferences
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_project_manager_updated_at ON project_manager;
+CREATE TRIGGER update_project_manager_updated_at 
+    BEFORE UPDATE ON project_manager
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_conversations_updated_at ON conversations;
+CREATE TRIGGER update_conversations_updated_at 
+    BEFORE UPDATE ON conversations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_assistant_conversations_updated_at ON assistant_conversations;
+CREATE TRIGGER update_assistant_conversations_updated_at 
+    BEFORE UPDATE ON assistant_conversations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+`;
+
+    // RLS and policies SQL
+    const securitySQL = `
+-- Enable RLS
+ALTER TABLE prompt_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_manager ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assistant_conversations ENABLE ROW LEVEL SECURITY;
+
+-- Create permissive policies for personal database
+DROP POLICY IF EXISTS "Personal access to prompt_templates" ON prompt_templates;
+CREATE POLICY "Personal access to prompt_templates" ON prompt_templates FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Personal access to user_preferences" ON user_preferences;
+CREATE POLICY "Personal access to user_preferences" ON user_preferences FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Personal access to project_manager" ON project_manager;
+CREATE POLICY "Personal access to project_manager" ON project_manager FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Personal access to conversations" ON conversations;
+CREATE POLICY "Personal access to conversations" ON conversations FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Personal access to assistant_conversations" ON assistant_conversations;
+CREATE POLICY "Personal access to assistant_conversations" ON assistant_conversations FOR ALL USING (true);
+`;
+
+    // Try automatic setup using REST API calls
+    try {
+      console.log('🔧 Service Worker: Setting up database schema automatically...');
+      
+      // Create tables using direct REST API calls
+      const setupResult = await createTablesViaRestAPI(supabaseUrl, apiKey);
+      
+      if (setupResult.success) {
+        console.log('✅ Service Worker: Automated database schema setup completed');
+        return { success: true, message: 'Database connected and schema ready' };
+      } else {
+        throw new Error(setupResult.error);
+      }
+      
+    } catch (setupError) {
+      console.warn('⚠️ Service Worker: Automated setup failed:', setupError.message);
+      
+      // Check if tables exist (might have been created manually)
+      try {
+        const testTables = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/conversations?limit=1`, {
+            headers: { 'apikey': apiKey, 'Authorization': `Bearer ${apiKey}` }
+          }),
+          fetch(`${supabaseUrl}/rest/v1/prompt_templates?limit=1`, {
+            headers: { 'apikey': apiKey, 'Authorization': `Bearer ${apiKey}` }
+          })
+        ]);
+        
+        if (testTables.every(response => response.ok)) {
+          console.log('✅ Service Worker: Tables exist, database is ready');
+          return { success: true, message: 'Database connected and ready' };
+        } else {
+          console.log('⚠️ Service Worker: Tables do not exist, manual setup required');
+          return { 
+            success: false, 
+            error: 'Database connected but tables need to be created. Please run the setup SQL in your Supabase SQL Editor or deploy the setup edge function.',
+            needsManualSetup: true,
+            setupInstructions: 'Go to your Supabase dashboard → SQL Editor → Paste the contents of simple-db-setup.sql → Run'
+          };
+        }
+      } catch (testError) {
+        console.error('❌ Service Worker: Failed to test table existence:', testError.message);
+        return { 
+          success: false, 
+          error: 'Database connected but unable to verify table setup. Please run the migration SQL manually in your Supabase SQL Editor.',
+          needsManualSetup: true
+        };
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Schema setup failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create database setup function
+async function createDatabaseSetupFunction(supabaseUrl, apiKey) {
+  console.log('🔧 Service Worker: Creating database setup function...');
+  
+  try {
+    // Create an Edge Function to handle the database setup
+    const setupFunctionCode = `
+      import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+      
+      Deno.serve(async (req) => {
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+          
+          const supabase = createClient(supabaseUrl, supabaseKey)
+          
+          // Execute the migration SQL
+          const migrationSQL = \`
+            -- Enable required extensions
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+            
+            -- Create tables with proper structure
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              category TEXT NOT NULL,
+              name TEXT NOT NULL,
+              template TEXT NOT NULL,
+              shortcut TEXT,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              user_id TEXT NOT NULL DEFAULT 'default',
+              is_custom BOOLEAN DEFAULT TRUE,
+              is_active BOOLEAN DEFAULT TRUE
+            );
+            
+            CREATE TABLE IF NOT EXISTS user_preferences (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              user_id TEXT NOT NULL DEFAULT 'default',
+              settings JSONB DEFAULT '{}',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              email TEXT,
+              subscription_tier TEXT DEFAULT 'free',
+              subscription_status TEXT DEFAULT 'active',
+              subscription_expires_at TIMESTAMP WITH TIME ZONE,
+              desktop_notification BOOLEAN DEFAULT FALSE,
+              tab_rename BOOLEAN DEFAULT FALSE,
+              auto_switch BOOLEAN DEFAULT FALSE,
+              anthropic_api_key TEXT,
+              anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
+              openai_api_key TEXT,
+              openai_model TEXT DEFAULT 'gpt-4o',
+              google_api_key TEXT,
+              google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
+              supabase_id TEXT,
+              supabase_anon_key TEXT
+            );
+            
+            CREATE TABLE IF NOT EXISTS project_manager (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              project_id TEXT NOT NULL UNIQUE,
+              project_name TEXT NOT NULL,
+              project_url TEXT NOT NULL,
+              description TEXT DEFAULT '',
+              knowledge TEXT DEFAULT '',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              user_id TEXT NOT NULL DEFAULT 'default',
+              CONSTRAINT project_manager_description_length CHECK (char_length(description) <= 150)
+            );
+            
+            CREATE TABLE IF NOT EXISTS conversations (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              project_id TEXT,
+              user_message TEXT NOT NULL,
+              lovable_response TEXT,
+              timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              project_context JSONB DEFAULT '{}',
+              tags TEXT[] DEFAULT '{}',
+              effectiveness_score INTEGER CHECK (effectiveness_score >= 1 AND effectiveness_score <= 10),
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              user_message_id TEXT,
+              lovable_message_id TEXT,
+              message_group_id TEXT,
+              auto_capture BOOLEAN DEFAULT FALSE,
+              user_id TEXT NOT NULL DEFAULT 'default'
+            );
+            
+            CREATE TABLE IF NOT EXISTS assistant_conversations (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              project_id TEXT NOT NULL,
+              user_message TEXT NOT NULL,
+              assistant_response TEXT NOT NULL,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+              metadata JSONB DEFAULT '{}',
+              user_id TEXT NOT NULL DEFAULT 'default'
+            );
+            
+            -- Disable RLS for personal database
+            ALTER TABLE prompt_templates DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE user_preferences DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE project_manager DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE conversations DISABLE ROW LEVEL SECURITY;
+            ALTER TABLE assistant_conversations DISABLE ROW LEVEL SECURITY;
+          \`
+          
+          const { error } = await supabase.rpc('exec', { sql: migrationSQL })
+          
+          if (error) {
+            throw error
+          }
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+          })
+          
+        } catch (error) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        }
+      })
+    `;
+    
+    // Try to deploy this as an edge function
+    const deployResponse = await fetch(`${supabaseUrl}/functions/v1/setup-database`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        code: setupFunctionCode
+      })
+    });
+    
+    if (deployResponse.ok) {
+      console.log('✅ Service Worker: Setup function created successfully');
+      return { success: true };
+    } else {
+      console.log('⚠️ Service Worker: Could not create edge function, using fallback method');
+      return { success: false, error: 'Edge function deployment not available' };
+    }
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to create setup function:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Execute database setup
+async function executeDatabaseSetup(supabaseUrl, apiKey) {
+  console.log('🔧 Service Worker: Executing database setup...');
+  
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/setup-database`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Service Worker: Database setup executed successfully');
+      return { success: true, result };
+    } else {
+      const error = await response.text();
+      console.error('❌ Service Worker: Database setup execution failed:', error);
+      return { success: false, error };
+    }
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to execute database setup:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create schema via edge function (alternative method)
+async function createSchemaViaEdgeFunction(supabaseUrl, apiKey) {
+  console.log('🔧 Service Worker: Creating schema via edge function...');
+  
+  // This is a fallback method that tries to use built-in capabilities
+  // If automatic setup fails, we recommend manual setup
+  return { success: false, error: 'Automatic schema creation not available' };
+}
+
+// Insert default prompt templates and user preferences
+async function insertDefaultData(supabaseUrl, apiKey) {
+  try {
+    // Insert default user preferences
+    const userPrefsResponse = await fetch(`${supabaseUrl}/rest/v1/user_preferences`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates'
+      },
+      body: JSON.stringify({
+        user_id: 'default',
+        settings: {
+          auto_capture: true,
+          notification_enabled: false,
+          theme: 'light',
+          language: 'en',
+          max_conversations: 1000,
+          sync_interval: 300000,
+          debug_mode: false
+        }
+      })
+    });
+
+    // Insert default prompt templates
+    const defaultTemplates = [
+      {
+        category: 'Error Debugging',
+        name: 'Minor Errors',
+        template: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+        shortcut: 'minor_errors',
+        is_custom: true,
+        is_active: true
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Major Errors',
+        template: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+        shortcut: 'major_errors',
+        is_custom: true,
+        is_active: true
+      },
+      {
+        category: 'Design',
+        name: 'UI Change',
+        template: 'Make only visual updates—do not impact functionality or logic in any way. Fully understand how the current UI integrates with the app, ensuring logic, state management, and APIs remain untouched. Test thoroughly to confirm the app behaves exactly as before. Stop if there\'s any doubt about unintended effects.',
+        shortcut: 'ui_change',
+        is_custom: true,
+        is_active: true
+      },
+      {
+        category: 'Editing Features',
+        name: 'Fragile Update',
+        template: 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.',
+        shortcut: 'fragile_update',
+        is_custom: true,
+        is_active: true
+      }
+    ];
+
+    for (const template of defaultTemplates) {
+      try {
+        await fetch(`${supabaseUrl}/rest/v1/prompt_templates`, {
+          method: 'POST',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=ignore-duplicates'
+          },
+          body: JSON.stringify(template)
+        });
+      } catch (templateError) {
+        console.warn(`⚠️ Failed to insert template ${template.name}:`, templateError.message);
+      }
+    }
+
+    console.log('✅ Service Worker: Default data inserted successfully');
+    
+  } catch (error) {
+    console.warn('⚠️ Service Worker: Failed to insert some default data:', error.message);
+    // Don't fail the entire setup for default data issues
   }
 }
 
@@ -1762,7 +2312,7 @@ async function handleInitializeUserDatabase() {
       headers: {
         'apikey': userSupabaseKey,
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
+        'Prefer': 'return=minimal,resolution=ignore-duplicates'
       },
       body: JSON.stringify({ 
         sql: schemaSQL.trim()
@@ -1826,8 +2376,7 @@ async function handleMasterAuthRegister(email, password, displayName) {
     const result = await masterAuth.register(email, password, displayName);
     
     if (result.success) {
-      // Track registration event
-      await masterAuth.trackUsage('user_registered', { email });
+      // Registration successful - no tracking needed
     }
     
     return result;
@@ -1843,9 +2392,6 @@ async function handleMasterAuthLogin(email, password) {
     const result = await masterAuth.login(email, password);
     
     if (result.success) {
-      // Track login event
-      await masterAuth.trackUsage('user_logged_in', { email });
-      
       // Log audit event
       await masterAuth.logUserAction('login', 'authentication', null, { email });
     }
@@ -1861,8 +2407,7 @@ async function handleMasterAuthLogout() {
   try {
     console.log('🔐 Service Worker: Handling master auth logout');
     
-    // Track logout before clearing session
-    await masterAuth.trackUsage('user_logged_out');
+    // Log audit event before clearing session
     await masterAuth.logUserAction('logout', 'authentication');
     
     const result = await masterAuth.logout();
@@ -1912,11 +2457,6 @@ async function handleMasterAuthGetSystemTemplates() {
     
     const templates = await masterAuth.getSystemTemplates();
     
-    // Track template access
-    await masterAuth.trackUsage('system_templates_accessed', { 
-      templateCount: templates.length 
-    });
-    
     return { 
       success: true, 
       templates: templates 
@@ -1934,8 +2474,7 @@ async function handleMasterAuthUpdateUserDatabase(databaseUrl, databaseKey) {
     const result = await masterAuth.updateUserDatabaseConfig(databaseUrl, databaseKey);
     
     if (result.success) {
-      // Track database configuration
-      await masterAuth.trackUsage('user_database_configured');
+      // Log audit event
       await masterAuth.logUserAction('update_database_config', 'user_database');
     }
     
@@ -1945,4 +2484,521 @@ async function handleMasterAuthUpdateUserDatabase(databaseUrl, databaseKey) {
     return { success: false, error: error.message };
   }
 }
+
+// Create database tables by inserting data and letting Supabase auto-create schema
+async function createTablesViaRestAPI(supabaseUrl, apiKey) {
+  try {
+    console.log('🔧 Service Worker: Checking database schema...');
+    
+    // First, check if tables already exist
+    const tablesExist = await checkTablesExist(supabaseUrl, apiKey);
+    console.log('🔍 Service Worker: Tables exist check:', tablesExist);
+    
+    if (tablesExist.tablesFound >= 3) {
+      // Tables exist, test access
+      console.log('✅ Service Worker: Tables exist, testing access...');
+      const accessTest = await testTableAccess(supabaseUrl, apiKey);
+      
+      if (accessTest.success) {
+        return { 
+          success: true, 
+          message: 'Database connected and tables are ready!' 
+        };
+      } else {
+        console.warn('⚠️ Service Worker: Tables exist but access is limited due to RLS policies');
+        
+        // Provide detailed RLS fix instructions
+        return { 
+          success: false, 
+          error: 'Database connected and tables exist, but Row Level Security is blocking access. Please run this SQL in your Supabase SQL Editor to fix access:\n\nALTER TABLE user_preferences DISABLE ROW LEVEL SECURITY;\nALTER TABLE prompt_templates DISABLE ROW LEVEL SECURITY;\nALTER TABLE conversations DISABLE ROW LEVEL SECURITY;\nALTER TABLE project_manager DISABLE ROW LEVEL SECURITY;\nALTER TABLE assistant_conversations DISABLE ROW LEVEL SECURITY;\n\nThen click "Connect Database" again.',
+          needsManualRLS: true
+        };
+      }
+    } else {
+      console.log('⚠️ Service Worker: Tables do not exist, providing setup SQL...');
+      
+      // Tables don't exist - need manual SQL setup
+      const sqlContent = await getTableCreationSQL();
+      return { 
+        success: false, 
+        error: 'Database connected, but tables need to be created. Please run the setup SQL in your Supabase SQL Editor.',
+        needsManualSetup: true,
+        sqlContent: sqlContent
+      };
+    }
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Automatic table creation failed:', error);
+    return { 
+      success: false, 
+      error: `Failed to create database tables automatically: ${error.message}`
+    };
+  }
+}
+
+// Create user_preferences table by inserting default data
+async function createUserPreferencesTable(supabaseUrl, apiKey) {
+  try {
+    console.log('📊 Service Worker: Creating user_preferences table...');
+    
+    const defaultPreferences = {
+      user_id: 'default',
+      settings: {
+        auto_capture: true,
+        notification_enabled: false,
+        theme: 'light',
+        language: 'en',
+        max_conversations: 1000,
+        sync_interval: 300000,
+        debug_mode: false
+      },
+      email: null,
+      subscription_tier: 'free',
+      subscription_status: 'active',
+      desktop_notification: false,
+      tab_rename: false,
+      auto_switch: false,
+      anthropic_api_key: null,
+      anthropic_model: 'claude-3-5-sonnet-20241022',
+      openai_api_key: null,
+      openai_model: 'gpt-4o',
+      google_api_key: null,
+      google_model: 'gemini-1.5-pro-latest',
+      supabase_id: null,
+      supabase_anon_key: null
+    };
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/user_preferences`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal,resolution=ignore-duplicates'
+      },
+      body: JSON.stringify(defaultPreferences)
+    });
+
+    console.log(`📊 Service Worker: user_preferences insert response status: ${response.status}`);
+    
+    if (response.ok || response.status === 409) { // 409 = conflict (already exists)
+      console.log('✅ Service Worker: user_preferences table created/verified');
+      return { success: true };
+    } else {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = response.statusText || 'Unknown error';
+      }
+      console.error('❌ Service Worker: user_preferences table creation failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      return { success: false, error: `Status ${response.status}: ${errorText}` };
+    }
+  } catch (error) {
+    console.warn('⚠️ Service Worker: user_preferences table creation error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create prompt_templates table by inserting default templates
+async function createPromptTemplatesTable(supabaseUrl, apiKey) {
+  try {
+    console.log('📝 Service Worker: Creating prompt_templates table...');
+    
+    const defaultTemplates = [
+      {
+        category: 'Error Debugging',
+        name: 'Minor Errors',
+        template: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+        shortcut: 'minor_errors',
+        user_id: 'default',
+        is_custom: true,
+        is_active: true
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Major Errors',
+        template: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+        shortcut: 'major_errors',
+        user_id: 'default',
+        is_custom: true,
+        is_active: true
+      },
+      {
+        category: 'Design',
+        name: 'UI Change',
+        template: 'Make only visual updates—do not impact functionality or logic in any way. Fully understand how the current UI integrates with the app, ensuring logic, state management, and APIs remain untouched. Test thoroughly to confirm the app behaves exactly as before.',
+        shortcut: 'ui_change',
+        user_id: 'default',
+        is_custom: true,
+        is_active: true
+      }
+    ];
+
+    let successCount = 0;
+    for (const template of defaultTemplates) {
+      const response = await fetch(`${supabaseUrl}/rest/v1/prompt_templates`, {
+        method: 'POST',
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal,resolution=ignore-duplicates'
+        },
+        body: JSON.stringify(template)
+      });
+
+      if (response.ok || response.status === 409) {
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      console.log(`✅ Service Worker: prompt_templates table created (${successCount}/${defaultTemplates.length} templates)`);
+      return { success: true };
+    } else {
+      return { success: false, error: 'No templates could be inserted' };
+    }
+  } catch (error) {
+    console.warn('⚠️ Service Worker: prompt_templates table creation error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create project_manager table by inserting a sample project
+async function createProjectManagerTable(supabaseUrl, apiKey) {
+  try {
+    console.log('🚀 Service Worker: Creating project_manager table...');
+    
+    const sampleProject = {
+      project_id: 'lovable-assistant-sample',
+      project_name: 'Lovable Assistant Sample Project',
+      project_url: 'https://lovable.dev/projects/sample',
+      description: 'Sample project created during database setup',
+      knowledge: 'This is a sample project created by Lovable Assistant during initial database setup.',
+      user_id: 'default'
+    };
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/project_manager`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal,resolution=ignore-duplicates'
+      },
+      body: JSON.stringify(sampleProject)
+    });
+
+    if (response.ok || response.status === 409) {
+      console.log('✅ Service Worker: project_manager table created/verified');
+      return { success: true };
+    } else {
+      const error = await response.text();
+      console.warn('⚠️ Service Worker: project_manager table creation failed:', error);
+      return { success: false, error };
+    }
+  } catch (error) {
+    console.warn('⚠️ Service Worker: project_manager table creation error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create conversations table by inserting a sample conversation
+async function createConversationsTable(supabaseUrl, apiKey) {
+  try {
+    console.log('💬 Service Worker: Creating conversations table...');
+    
+    const sampleConversation = {
+      project_id: 'lovable-assistant-sample',
+      user_message: 'Welcome to Lovable Assistant!',
+      lovable_response: 'Hello! Your database has been set up successfully.',
+      project_context: { setup: true },
+      tags: ['setup', 'welcome'],
+      user_id: 'default',
+      auto_capture: false
+    };
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/conversations`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal,resolution=ignore-duplicates'
+      },
+      body: JSON.stringify(sampleConversation)
+    });
+
+    if (response.ok || response.status === 409) {
+      console.log('✅ Service Worker: conversations table created/verified');
+      return { success: true };
+    } else {
+      const error = await response.text();
+      console.warn('⚠️ Service Worker: conversations table creation failed:', error);
+      return { success: false, error };
+    }
+  } catch (error) {
+    console.warn('⚠️ Service Worker: conversations table creation error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Create assistant_conversations table by inserting a sample conversation
+async function createAssistantConversationsTable(supabaseUrl, apiKey) {
+  try {
+    console.log('🤖 Service Worker: Creating assistant_conversations table...');
+    
+    const sampleAssistantConversation = {
+      project_id: 'lovable-assistant-sample',
+      user_message: 'How do I use Lovable Assistant?',
+      assistant_response: 'Lovable Assistant helps you capture conversations, manage projects, and enhance your development workflow. Your database is now ready to use!',
+      metadata: { setup: true, version: '1.0' },
+      user_id: 'default'
+    };
+
+    const response = await fetch(`${supabaseUrl}/rest/v1/assistant_conversations`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal,resolution=ignore-duplicates'
+      },
+      body: JSON.stringify(sampleAssistantConversation)
+    });
+
+    if (response.ok || response.status === 409) {
+      console.log('✅ Service Worker: assistant_conversations table created/verified');
+      return { success: true };
+    } else {
+      const error = await response.text();
+      console.warn('⚠️ Service Worker: assistant_conversations table creation failed:', error);
+      return { success: false, error };
+    }
+  } catch (error) {
+    console.warn('⚠️ Service Worker: assistant_conversations table creation error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+
+// Test table access after RLS configuration
+async function testTableAccess(supabaseUrl, apiKey) {
+  try {
+    console.log('🧪 Service Worker: Testing table access...');
+    
+    // Test basic read access to each table
+    const testPromises = [
+      fetch(`${supabaseUrl}/rest/v1/user_preferences?limit=1`, {
+        headers: { 'apikey': apiKey, 'Authorization': `Bearer ${apiKey}` }
+      }),
+      fetch(`${supabaseUrl}/rest/v1/prompt_templates?limit=1`, {
+        headers: { 'apikey': apiKey, 'Authorization': `Bearer ${apiKey}` }
+      }),
+      fetch(`${supabaseUrl}/rest/v1/conversations?limit=1`, {
+        headers: { 'apikey': apiKey, 'Authorization': `Bearer ${apiKey}` }
+      })
+    ];
+    
+    const results = await Promise.allSettled(testPromises);
+    const successCount = results.filter(result => 
+      result.status === 'fulfilled' && result.value.ok
+    ).length;
+    
+    console.log(`🧪 Service Worker: Table access test: ${successCount}/3 tables accessible`);
+    
+    return { 
+      success: successCount >= 2, // At least 2 out of 3 tables should be accessible
+      accessibleTables: successCount 
+    };
+    
+  } catch (error) {
+    console.warn('⚠️ Service Worker: Table access test error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Check if required tables exist in the database
+async function checkTablesExist(supabaseUrl, apiKey) {
+  try {
+    console.log('🔍 Service Worker: Checking if tables exist...');
+    
+    const tableNames = [
+      'user_preferences',
+      'prompt_templates', 
+      'project_manager',
+      'conversations',
+      'assistant_conversations'
+    ];
+    
+    let tablesFound = 0;
+    const tableStatus = {};
+    
+    for (const tableName of tableNames) {
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}?limit=1`, {
+          method: 'GET',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        // If we get any response that isn't 404, the table likely exists
+        if (response.status !== 404) {
+          tablesFound++;
+          tableStatus[tableName] = {
+            exists: true,
+            status: response.status,
+            accessible: response.ok
+          };
+          console.log(`✅ Service Worker: Table ${tableName} exists (status: ${response.status})`);
+        } else {
+          tableStatus[tableName] = {
+            exists: false,
+            status: 404,
+            accessible: false
+          };
+          console.log(`❌ Service Worker: Table ${tableName} does not exist`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Service Worker: Error checking table ${tableName}:`, error.message);
+        tableStatus[tableName] = {
+          exists: false,
+          status: 'error',
+          accessible: false,
+          error: error.message
+        };
+      }
+    }
+    
+    return {
+      tablesFound,
+      totalTables: tableNames.length,
+      tableStatus
+    };
+    
+  } catch (error) {
+    console.error('❌ Service Worker: Error checking table existence:', error);
+    return { tablesFound: 0, totalTables: 5, error: error.message };
+  }
+}
+
+// Get table creation SQL for manual setup
+async function getTableCreationSQL() {
+  return `-- Lovable Assistant Database Setup
+-- Copy and paste this into your Supabase SQL Editor, then click "Connect Database" in the extension
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create user_preferences table
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL DEFAULT 'default',
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  email TEXT,
+  subscription_tier TEXT DEFAULT 'free',
+  subscription_status TEXT DEFAULT 'active',
+  subscription_expires_at TIMESTAMP WITH TIME ZONE,
+  desktop_notification BOOLEAN DEFAULT FALSE,
+  tab_rename BOOLEAN DEFAULT FALSE,
+  auto_switch BOOLEAN DEFAULT FALSE,
+  anthropic_api_key TEXT,
+  anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
+  openai_api_key TEXT,
+  openai_model TEXT DEFAULT 'gpt-4o',
+  google_api_key TEXT,
+  google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
+  supabase_id TEXT,
+  supabase_anon_key TEXT
+);
+
+-- Create prompt_templates table
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  template TEXT NOT NULL,
+  shortcut TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id TEXT NOT NULL DEFAULT 'default',
+  is_custom BOOLEAN DEFAULT TRUE,
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Create project_manager table
+CREATE TABLE IF NOT EXISTS project_manager (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id TEXT NOT NULL UNIQUE,
+  project_name TEXT NOT NULL,
+  project_url TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  knowledge TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id TEXT NOT NULL DEFAULT 'default'
+);
+
+-- Create conversations table
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id TEXT,
+  user_message TEXT NOT NULL,
+  lovable_response TEXT,
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  project_context JSONB DEFAULT '{}',
+  tags TEXT[] DEFAULT '{}',
+  effectiveness_score INTEGER CHECK (effectiveness_score >= 1 AND effectiveness_score <= 10),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_message_id TEXT,
+  lovable_message_id TEXT,
+  message_group_id TEXT,
+  auto_capture BOOLEAN DEFAULT FALSE,
+  user_id TEXT NOT NULL DEFAULT 'default'
+);
+
+-- Create assistant_conversations table
+CREATE TABLE IF NOT EXISTS assistant_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL,
+  user_message TEXT NOT NULL,
+  assistant_response TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  metadata JSONB DEFAULT '{}',
+  user_id TEXT NOT NULL DEFAULT 'default'
+);
+
+-- Disable RLS for easier personal database access
+ALTER TABLE user_preferences DISABLE ROW LEVEL SECURITY;
+ALTER TABLE prompt_templates DISABLE ROW LEVEL SECURITY;
+ALTER TABLE project_manager DISABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE assistant_conversations DISABLE ROW LEVEL SECURITY;
+
+-- Insert default data
+INSERT INTO user_preferences (user_id, settings) VALUES 
+('default', '{"auto_capture": true, "theme": "light"}')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO prompt_templates (category, name, template, shortcut, is_custom, is_active) VALUES
+('Error Debugging', 'Minor Errors', 'Investigate thoroughly to find the exact root cause before making changes.', 'minor_errors', true, true),
+('Error Debugging', 'Major Errors', 'Stop and methodically re-examine the entire flow from the ground up.', 'major_errors', true, true)
+ON CONFLICT DO NOTHING;
+
+-- Success message
+SELECT 'Lovable Assistant database setup complete!' as message;`;
+}
+
 

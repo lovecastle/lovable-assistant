@@ -468,35 +468,6 @@ export class MasterAuthService {
     }
   }
 
-  // Track usage analytics
-  async trackUsage(eventType, eventData = {}) {
-    try {
-      if (!this.userProfile) return;
-
-      const response = await fetch(`${this.masterDbUrl}/rest/v1/usage_analytics`, {
-        method: 'POST',
-        headers: {
-          'apikey': this.masterDbKey,
-          'Authorization': `Bearer ${this.sessionToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: this.userProfile.id,
-          event_type: eventType,
-          event_data: eventData,
-          timestamp: new Date().toISOString(),
-          extension_version: chrome.runtime.getManifest().version
-        })
-      });
-
-      if (!response.ok) {
-        console.error('❌ Failed to track usage:', response.status);
-      }
-
-    } catch (error) {
-      console.error('❌ Error tracking usage:', error);
-    }
-  }
 
   // Check if user is administrator
   isAdmin() {

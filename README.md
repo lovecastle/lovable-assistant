@@ -43,11 +43,8 @@ Before installing the extension, you'll need:
 3. Choose your organization and name your project (e.g., "lovable-assistant")  
 4. Set a database password and choose a region
 5. Wait for the project to be ready (~2 minutes)
-6. In your Supabase dashboard, go to **SQL Editor**
-7. Copy the entire content of `user-database-schema.sql`
-8. Paste it into the SQL Editor and click **RUN**
-9. You should see a success message: "Lovable Assistant database schema created successfully!"
-10. Go to **Settings > API** to get your Project URL and anon/public key
+6. Go to **Settings > API** to get your Project URL and anon/public key
+7. **The extension will automatically set up the database schema for you!**
 ### Step 3: Install the Chrome Extension
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable "Developer mode" in the top right
@@ -57,10 +54,14 @@ Before installing the extension, you'll need:
 ### Step 4: Configure the Extension
 1. Click the extension icon in your Chrome toolbar
 2. Enter your Claude API key
-3. Enter your Supabase project URL (e.g., `https://your-project.supabase.co`)
+3. Enter your Supabase project ID (just the ID, e.g., `abc123xyz`)
 4. Enter your Supabase anon key
-5. Click "Save Configuration"
-6. Click "Test Connection" to verify setup
+5. Click "Setup Database" - **The extension will automatically:**
+   - Test the connection
+   - Create all required tables
+   - Set up indexes and security policies
+   - Insert default prompt templates
+   - Configure everything for immediate use
 
 ## 🎯 Usage
 

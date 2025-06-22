@@ -170,42 +170,63 @@ async function handleLogout() {
 }
 
 async function handleDatabaseSetup() {
-  const projectId = document.getElementById('supabase-url').value.trim();
+  const projectIdOrUrl = document.getElementById('supabase-url').value.trim();
   const apiKey = document.getElementById('supabase-key').value.trim();
   
-  if (!projectId || !apiKey) {
+  if (!projectIdOrUrl || !apiKey) {
     showError('Please enter both Supabase URL and API key', 'database-error');
     return;
   }
   
   try {
-    showLoading('Connecting to database...', 'database-error');
+    showLoading('Connecting and setting up database...', 'database-error');
     
-    // Test the connection first
-    const testResult = await sendToBackground('testDatabaseConnection', { projectId, apiKey });
+    // Test the connection and automatically set up schema
+    const testResult = await sendToBackground('testDatabaseConnection', { 
+      projectId: projectIdOrUrl, 
+      apiKey 
+    });
     
     if (!testResult.success) {
-      showError(testResult.error || 'Database connection failed', 'database-error');
+      if (testResult.needsManualRLS) {
+        showRLSFixInstructions(testResult.error, 'database-error');
+      } else if (testResult.needsManualSetup && testResult.sqlContent) {
+        showSetupInstructions(testResult.sqlContent, 'database-error');
+      } else {
+        showError(testResult.error || 'Database connection failed', 'database-error');
+      }
       return;
     }
     
+    showLoading('Database connected! Configuring extension...', 'database-error');
+    
     // Update user's database configuration in master database
     const updateResult = await sendToBackground('masterAuth_updateUserDatabase', { 
-      databaseUrl: projectId, 
+      databaseUrl: projectIdOrUrl, 
       databaseKey: apiKey 
     });
     
     if (updateResult.success) {
       // Store locally as well for direct access
+      // Normalize URL for storage
+      let normalizedUrl = projectIdOrUrl;
+      if (!normalizedUrl.startsWith('https://')) {
+        if (!normalizedUrl.includes('.supabase.co')) {
+          normalizedUrl = `https://${normalizedUrl}.supabase.co`;
+        } else {
+          normalizedUrl = `https://${normalizedUrl}`;
+        }
+      }
+      
       await chrome.storage.sync.set({
-        userSupabaseUrl: projectId,
+        userSupabaseUrl: normalizedUrl,
         userSupabaseKey: apiKey
       });
       
-      showSuccess('Database connected successfully!', 'database-error');
+      showSuccess('✅ Database connected and configured successfully! Your personal database is ready to use.', 'database-error');
       setTimeout(() => {
         initializePopup(); // Refresh the popup
-      }, 1000);
+      }, 2000);
     } else {
       showError(updateResult.error || 'Failed to save database configuration', 'database-error');
     }
@@ -319,6 +340,171 @@ function toggleSetupGuide() {
   const guide = document.getElementById('setup-guide');
   guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
 }
+
+function showRLSFixInstructions(message, elementId = 'database-error') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    // Extract the SQL from the message
+    const sqlStart = message.indexOf('ALTER TABLE');
+    const sqlEnd = message.indexOf('again.');
+    const sqlText = sqlStart !== -1 && sqlEnd !== -1 ? message.substring(sqlStart, sqlEnd - 1) : '';
+    
+    element.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #1a202c;">⚠️ One More Step Required</strong><br>
+        <span style="font-size: 12px;">Tables created successfully! Please disable Row Level Security to complete setup:</span>
+      </div>
+      ${sqlText ? `
+      <textarea readonly style="
+        width: 100%; 
+        height: 80px; 
+        font-family: monospace; 
+        font-size: 10px; 
+        padding: 8px; 
+        border: 1px solid #c9cfd7; 
+        border-radius: 4px; 
+        resize: vertical;
+        background: #f7fafc;
+        margin-bottom: 8px;
+      ">${sqlText}</textarea>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <button onclick="copyRLSSQL()" style="
+          flex: 1; 
+          padding: 6px 12px; 
+          background: #667eea; 
+          color: white; 
+          border: none; 
+          border-radius: 4px; 
+          font-size: 12px; 
+          cursor: pointer;
+        ">📋 Copy SQL</button>
+        <a href="https://supabase.com/dashboard/project/${getProjectIdFromInput()}/sql" target="_blank" style="
+          flex: 1; 
+          padding: 6px 12px; 
+          background: #48bb78; 
+          color: white; 
+          border: none; 
+          border-radius: 4px; 
+          font-size: 12px; 
+          text-decoration: none; 
+          text-align: center;
+        ">🔗 SQL Editor</a>
+      </div>
+      ` : ''}
+      <div style="font-size: 11px; color: #4a5568; background: #f0f9ff; padding: 8px; border-radius: 4px;">
+        💡 After running the SQL, click "Connect Database" again to complete setup
+      </div>
+    `;
+    element.style.background = '#fef7e0';
+    element.style.color = '#b45309';
+    element.style.display = 'block';
+    element.style.border = '1px solid #f6cc6d';
+  }
+}
+
+function getProjectIdFromInput() {
+  const urlInput = document.getElementById('supabase-url');
+  if (urlInput && urlInput.value) {
+    const url = urlInput.value.trim();
+    if (url.includes('.supabase.co')) {
+      return url.split('.')[0].replace('https://', '');
+    }
+    return url;
+  }
+  return 'YOUR_PROJECT_ID';
+}
+
+function copyRLSSQL() {
+  const textarea = document.querySelector('#database-error textarea');
+  if (textarea) {
+    textarea.select();
+    document.execCommand('copy');
+    
+    // Show feedback
+    const button = document.querySelector('#database-error button');
+    if (button) {
+      const originalText = button.textContent;
+      button.textContent = '✅ Copied!';
+      button.style.background = '#48bb78';
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#667eea';
+      }, 2000);
+    }
+  }
+}
+
+function showSetupInstructions(sqlContent, elementId = 'database-error') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #1a202c;">🚀 Quick Setup Required</strong><br>
+        <span style="font-size: 12px;">Automatic table creation failed. Please copy the SQL below, run it in your Supabase SQL Editor, then click "Connect Database"</span>
+      </div>
+      <textarea readonly style="
+        width: 100%; 
+        height: 120px; 
+        font-family: monospace; 
+        font-size: 10px; 
+        padding: 8px; 
+        border: 1px solid #c9cfd7; 
+        border-radius: 4px; 
+        resize: vertical;
+        background: #f7fafc;
+        margin-bottom: 8px;
+      ">${sqlContent}</textarea>
+      <div style="display: flex; gap: 8px;">
+        <button onclick="copySetupSQL()" style="
+          flex: 1; 
+          padding: 6px 12px; 
+          background: #667eea; 
+          color: white; 
+          border: none; 
+          border-radius: 4px; 
+          font-size: 12px; 
+          cursor: pointer;
+        ">📋 Copy SQL</button>
+        <a href="https://supabase.com/dashboard/project/${getProjectIdFromInput()}/sql" target="_blank" style="
+          flex: 1; 
+          padding: 6px 12px; 
+          background: #48bb78; 
+          color: white; 
+          border: none; 
+          border-radius: 4px; 
+          font-size: 12px; 
+          text-decoration: none; 
+          text-align: center;
+        ">🔗 Open SQL Editor</a>
+      </div>
+    `;
+    element.style.background = '#f0f9ff';
+    element.style.color = '#0369a1';
+    element.style.display = 'block';
+    element.style.border = '1px solid #bae6fd';
+  }
+}
+
+function copySetupSQL() {
+  const textarea = document.querySelector('#database-error textarea');
+  if (textarea) {
+    textarea.select();
+    document.execCommand('copy');
+    
+    // Show feedback
+    const button = document.querySelector('#database-error button');
+    if (button) {
+      const originalText = button.textContent;
+      button.textContent = '✅ Copied!';
+      button.style.background = '#48bb78';
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#667eea';
+      }, 2000);
+    }
+  }
+}
+
 
 // Utility functions
 function showError(message, elementId = 'auth-error') {

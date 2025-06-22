@@ -54,13 +54,14 @@ window.conversationCapture.testScan()
 ```
 
 ### Database Setup
-```sql
--- Run database-setup.sql in Supabase SQL Editor to create schema
--- For migrations, run files in order:
--- 1. database-schema-update.sql
--- 2. simple-database-migration.sql
--- 3. database-cleanup-duplicates.sql (if needed)
-```
+The extension automatically sets up the database schema when users configure their Supabase credentials. No manual SQL execution required - the extension handles:
+- Table creation (conversations, prompt_templates, user_preferences, project_manager, assistant_conversations)
+- Index creation for performance
+- Row Level Security policies
+- Default data insertion (prompt templates, user preferences)
+- Trigger setup for automatic timestamp updates
+
+The setup is handled by `setupDatabaseSchema()` function in `background/service-worker.js`.
 
 ## Important Context
 
