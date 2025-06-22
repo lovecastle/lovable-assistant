@@ -415,7 +415,305 @@ window.UIDialogManager = {
     return dialog;
   },
 
-  showWelcomePage() {
+  showAuthSection() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '🔐 Sign In Required';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 24px; text-align: center;">
+        <div style="margin-bottom: 24px;">
+          <h2 style="margin: 0 0 8px 0; color: #1a202c; font-size: 24px; font-weight: 600;">
+            Welcome! 👋
+          </h2>
+          <p style="margin: 0; color: #4a5568; font-size: 16px;">
+            Please sign in to access your development assistant
+          </p>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 12px; padding: 24px; margin-bottom: 20px;">
+          <div id="auth-forms">
+            <!-- Login Form -->
+            <div id="login-form">
+              <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 18px; font-weight: 600;">Sign In</h3>
+              
+              <input type="email" id="login-email" placeholder="Email" style="
+                width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #c9cfd7; 
+                border-radius: 6px; font-size: 14px; box-sizing: border-box;
+              ">
+              <input type="password" id="login-password" placeholder="Password" style="
+                width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #c9cfd7; 
+                border-radius: 6px; font-size: 14px; box-sizing: border-box;
+              ">
+              
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button id="login-btn" style="
+                  flex: 1; background: #667eea; color: white; border: none; padding: 12px 16px;
+                  border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+                ">Sign In</button>
+                <button id="show-register-btn" style="
+                  flex: 1; background: white; color: #4a5568; border: 1px solid #c9cfd7; 
+                  padding: 12px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+                ">Register</button>
+              </div>
+            </div>
+            
+            <!-- Register Form -->
+            <div id="register-form" style="display: none;">
+              <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 18px; font-weight: 600;">Create Account</h3>
+              
+              <input type="text" id="register-name" placeholder="Display Name" style="
+                width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #c9cfd7; 
+                border-radius: 6px; font-size: 14px; box-sizing: border-box;
+              ">
+              <input type="email" id="register-email" placeholder="Email" style="
+                width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #c9cfd7; 
+                border-radius: 6px; font-size: 14px; box-sizing: border-box;
+              ">
+              <input type="password" id="register-password" placeholder="Password" style="
+                width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #c9cfd7; 
+                border-radius: 6px; font-size: 14px; box-sizing: border-box;
+              ">
+              
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button id="register-btn" style="
+                  flex: 1; background: #48bb78; color: white; border: none; padding: 12px 16px;
+                  border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+                ">Create Account</button>
+                <button id="show-login-btn" style="
+                  flex: 1; background: white; color: #4a5568; border: 1px solid #c9cfd7; 
+                  padding: 12px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+                ">Back to Sign In</button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Messages -->
+          <div id="auth-error" style="
+            background: #fed7d7; color: #c53030; padding: 12px; border-radius: 6px;
+            margin-top: 16px; display: none; font-size: 14px;
+          "></div>
+          <div id="auth-success" style="
+            background: #c6f6d5; color: #276749; padding: 12px; border-radius: 6px;
+            margin-top: 16px; display: none; font-size: 14px;
+          "></div>
+        </div>
+        
+        <div style="
+          background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;
+          padding: 16px; font-size: 13px; color: #0369a1;
+        ">
+          <strong>💡 Note:</strong> Your account syncs across all your projects and provides access to conversation history, project management, and advanced features.
+        </div>
+      </div>
+    `;
+    
+    this.setupAuthEventListeners();
+  },
+
+  setupAuthEventListeners() {
+    // Toggle between login and register forms
+    const showRegisterBtn = document.getElementById('show-register-btn');
+    const showLoginBtn = document.getElementById('show-login-btn');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    
+    if (showRegisterBtn && showLoginBtn && loginForm && registerForm) {
+      showRegisterBtn.addEventListener('click', () => {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+      });
+      
+      showLoginBtn.addEventListener('click', () => {
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+      });
+    }
+    
+    // Login form
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => this.handleLogin());
+    }
+    
+    // Register form
+    const registerBtn = document.getElementById('register-btn');
+    if (registerBtn) {
+      registerBtn.addEventListener('click', () => this.handleRegister());
+    }
+    
+    // Enter key support
+    const loginEmail = document.getElementById('login-email');
+    const loginPassword = document.getElementById('login-password');
+    const registerName = document.getElementById('register-name');
+    const registerEmail = document.getElementById('register-email');
+    const registerPassword = document.getElementById('register-password');
+    
+    [loginEmail, loginPassword].forEach(element => {
+      if (element) {
+        element.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.handleLogin();
+        });
+      }
+    });
+    
+    [registerName, registerEmail, registerPassword].forEach(element => {
+      if (element) {
+        element.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.handleRegister();
+        });
+      }
+    });
+  },
+
+  async handleLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    
+    if (!email || !password) {
+      this.showAuthError('Please enter both email and password');
+      return;
+    }
+    
+    this.showAuthLoading('Signing in...');
+    
+    try {
+      const response = await this.safeSendMessage({
+        action: 'masterAuth_login',
+        email: email,
+        password: password
+      });
+      
+      if (response.success) {
+        this.showAuthSuccess('Signed in successfully!');
+        setTimeout(() => {
+          // Restart conversation capture after successful login
+          if (window.conversationCapture && typeof window.conversationCapture.restartAfterAuth === 'function') {
+            window.conversationCapture.restartAfterAuth();
+          }
+          // Show welcome page
+          this.showWelcomePage();
+        }, 1000);
+      } else {
+        this.showAuthError(response.error || 'Sign in failed');
+      }
+    } catch (error) {
+      this.showAuthError('Network error. Please try again.');
+    }
+  },
+
+  async handleRegister() {
+    const name = document.getElementById('register-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    
+    if (!name || !email || !password) {
+      this.showAuthError('Please fill in all fields');
+      return;
+    }
+    
+    if (password.length < 6) {
+      this.showAuthError('Password must be at least 6 characters');
+      return;
+    }
+    
+    this.showAuthLoading('Creating account...');
+    
+    try {
+      const response = await this.safeSendMessage({
+        action: 'masterAuth_register',
+        email: email,
+        password: password,
+        displayName: name
+      });
+      
+      if (response.success) {
+        this.showAuthSuccess('Account created successfully! Please sign in.');
+        setTimeout(() => {
+          // Switch to login form
+          document.getElementById('register-form').style.display = 'none';
+          document.getElementById('login-form').style.display = 'block';
+          // Pre-fill email
+          document.getElementById('login-email').value = email;
+        }, 1500);
+      } else {
+        this.showAuthError(response.error || 'Registration failed');
+      }
+    } catch (error) {
+      this.showAuthError('Network error. Please try again.');
+    }
+  },
+
+  showAuthError(message) {
+    const errorElement = document.getElementById('auth-error');
+    const successElement = document.getElementById('auth-success');
+    
+    if (successElement) successElement.style.display = 'none';
+    
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+      setTimeout(() => {
+        errorElement.style.display = 'none';
+      }, 5000);
+    }
+  },
+
+  showAuthSuccess(message) {
+    const errorElement = document.getElementById('auth-error');
+    const successElement = document.getElementById('auth-success');
+    
+    if (errorElement) errorElement.style.display = 'none';
+    
+    if (successElement) {
+      successElement.textContent = message;
+      successElement.style.display = 'block';
+      setTimeout(() => {
+        successElement.style.display = 'none';
+      }, 3000);
+    }
+  },
+
+  showAuthLoading(message) {
+    const errorElement = document.getElementById('auth-error');
+    const successElement = document.getElementById('auth-success');
+    
+    if (successElement) successElement.style.display = 'none';
+    
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.background = '#bee3f8';
+      errorElement.style.color = '#2a69ac';
+      errorElement.style.display = 'block';
+      
+      // Reset styles after loading
+      setTimeout(() => {
+        errorElement.style.background = '#fed7d7';
+        errorElement.style.color = '#c53030';
+      }, 100);
+    }
+  },
+
+  async showWelcomePage() {
+    // Check authentication status first
+    try {
+      const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+      if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+        console.log('🔒 User not authenticated - showing login/register page');
+        this.showAuthSection();
+        return;
+      }
+    } catch (error) {
+      console.log('⚠️ Could not verify authentication - showing login/register page');
+      this.showAuthSection();
+      return;
+    }
+    
     // Safely get project name with fallback
     let projectName = 'Current Project';
     if (typeof this.extractProjectName === 'function') {
