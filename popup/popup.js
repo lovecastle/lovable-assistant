@@ -53,6 +53,9 @@ function setupEventListeners() {
   
   // General listeners
   document.getElementById('check-connection').addEventListener('click', checkConnectionStatus);
+  
+  // API key configuration
+  document.getElementById('save-api-keys-btn').addEventListener('click', saveAPIKeys);
 }
 
 async function handleLogin() {
@@ -162,6 +165,9 @@ function showUserDashboard(user) {
   document.getElementById('user-role').textContent = user.role;
   document.getElementById('user-plan').textContent = user.subscriptionStatus;
   
+  // Load existing API keys
+  loadAPIKeys();
+  
   clearMessages();
 }
 
@@ -244,6 +250,64 @@ function updateStatus(message, isError) {
   if (statusText) statusText.textContent = message;
   if (statusDot) {
     statusDot.style.backgroundColor = isError ? '#f56565' : '#48bb78';
+  }
+}
+
+// ===========================
+// API KEY CONFIGURATION
+// ===========================
+
+async function loadAPIKeys() {
+  try {
+    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
+    
+    // Show masked versions of existing keys
+    if (storage.geminiApiKey) {
+      document.getElementById('gemini-api-key').placeholder = '••••••••••••••••';
+    }
+    if (storage.claudeApiKey) {
+      document.getElementById('claude-api-key').placeholder = '••••••••••••••••';
+    }
+    if (storage.openaiApiKey) {
+      document.getElementById('openai-api-key').placeholder = '••••••••••••••••';
+    }
+  } catch (error) {
+    console.error('❌ Error loading API keys:', error);
+  }
+}
+
+async function saveAPIKeys() {
+  try {
+    const geminiKey = document.getElementById('gemini-api-key').value.trim();
+    const claudeKey = document.getElementById('claude-api-key').value.trim();
+    const openaiKey = document.getElementById('openai-api-key').value.trim();
+    
+    const updates = {};
+    
+    // Only update keys that have been entered
+    if (geminiKey) updates.geminiApiKey = geminiKey;
+    if (claudeKey) updates.claudeApiKey = claudeKey;
+    if (openaiKey) updates.openaiApiKey = openaiKey;
+    
+    if (Object.keys(updates).length === 0) {
+      showError('Please enter at least one API key to save', 'api-error');
+      return;
+    }
+    
+    await chrome.storage.sync.set(updates);
+    
+    // Clear the input fields
+    document.getElementById('gemini-api-key').value = '';
+    document.getElementById('claude-api-key').value = '';
+    document.getElementById('openai-api-key').value = '';
+    
+    // Update placeholders to show keys are saved
+    await loadAPIKeys();
+    
+    showSuccess('API keys saved successfully!', 'api-success');
+  } catch (error) {
+    console.error('❌ Error saving API keys:', error);
+    showError('Failed to save API keys. Please try again.', 'api-error');
   }
 }
 

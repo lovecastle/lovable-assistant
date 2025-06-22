@@ -334,6 +334,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    // Prompt Templates handlers
+    case 'getPromptTemplates':
+      handleGetPromptTemplates().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'savePromptTemplates':
+      handleSavePromptTemplates(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    // AI API handler
+    case 'callAI':
+      handleCallAI(request.data).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -2108,6 +2134,178 @@ async function handleCheckAuth() {
       }
     };
   }
+}
+
+// ===========================
+// PROMPT TEMPLATES HANDLERS
+// ===========================
+
+async function handleGetPromptTemplates() {
+  try {
+    console.log('📝 Service Worker: Getting prompt templates');
+    
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    
+    const result = await database.getPromptTemplates(userId);
+    return result;
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to get prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSavePromptTemplates(data) {
+  try {
+    console.log('📝 Service Worker: Saving prompt templates');
+    
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    
+    const { templates } = data;
+    const result = await database.savePromptTemplates(userId, templates);
+    return result;
+  } catch (error) {
+    console.error('❌ Service Worker: Failed to save prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ===========================
+// AI API HANDLER
+// ===========================
+
+async function handleCallAI(data) {
+  try {
+    console.log('🤖 Service Worker: Calling AI API');
+    
+    const { prompt, provider = 'gemini' } = data;
+    
+    // Get user's private API key from chrome storage
+    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
+    
+    let apiKey;
+    switch (provider) {
+      case 'gemini':
+        apiKey = storage.geminiApiKey;
+        break;
+      case 'claude':
+        apiKey = storage.claudeApiKey;
+        break;
+      case 'openai':
+        apiKey = storage.openaiApiKey;
+        break;
+      default:
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+    
+    if (!apiKey) {
+      throw new Error(`${provider} API key not configured. Please add your API key in the extension settings.`);
+    }
+    
+    let response;
+    switch (provider) {
+      case 'gemini':
+        response = await callGeminiAPI(prompt, apiKey);
+        break;
+      case 'claude':
+        response = await callClaudeAPI(prompt, apiKey);
+        break;
+      case 'openai':
+        response = await callOpenAIAPI(prompt, apiKey);
+        break;
+    }
+    
+    return { success: true, data: response };
+  } catch (error) {
+    console.error('❌ Service Worker: AI API call failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// AI Provider implementations
+async function callGeminiAPI(prompt, apiKey) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error: ${error}`);
+  }
+  
+  const data = await response.json();
+  return data.candidates[0]?.content?.parts[0]?.text || 'No response from Gemini';
+}
+
+async function callClaudeAPI(prompt, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Claude API error: ${error}`);
+  }
+  
+  const data = await response.json();
+  return data.content[0]?.text || 'No response from Claude';
+}
+
+async function callOpenAIAPI(prompt, apiKey) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [{
+        role: 'user',
+        content: prompt
+      }],
+      max_tokens: 2048,
+      temperature: 0.7
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenAI API error: ${error}`);
+  }
+  
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response from OpenAI';
 }
 
 // Create database tables by inserting data and letting Supabase auto-create schema
