@@ -714,11 +714,6 @@ export class SupabaseClient {
     const defaultPreferences = {
       user_id: userId,
       settings: {},
-      ui_preferences: {
-        'lovable-auto-expand': false,
-        'lovable-tab-rename': false,
-        'lovable-auto-switch': false
-      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -747,7 +742,6 @@ export class SupabaseClient {
       const mergedPreferences = {
         user_id: userId,
         settings: { ...(existing.data?.settings || {}), ...(updates.settings || {}) },
-        ui_preferences: { ...(existing.data?.ui_preferences || {}), ...(updates.ui_preferences || {}) },
         updated_at: new Date().toISOString()
       };
 
@@ -774,7 +768,8 @@ export class SupabaseClient {
     try {
       const userPrefs = await this.getUserPreferences(userId);
       if (userPrefs.success && userPrefs.data) {
-        const value = userPrefs.data.ui_preferences?.[preferenceKey];
+        // Store UI preferences in the settings column
+        const value = userPrefs.data.settings?.[preferenceKey];
         console.log('✅ Database-sync: UI preference found');
         return { success: true, data: value };
       } else {
@@ -792,7 +787,7 @@ export class SupabaseClient {
     
     try {
       const updates = {
-        ui_preferences: {
+        settings: {
           [preferenceKey]: preferenceValue
         }
       };
@@ -812,7 +807,8 @@ export class SupabaseClient {
     try {
       const userPrefs = await this.getUserPreferences(userId);
       if (userPrefs.success && userPrefs.data) {
-        const preferences = userPrefs.data.ui_preferences || {};
+        // Get UI preferences from settings column
+        const preferences = userPrefs.data.settings || {};
         console.log(`✅ Database-sync: Found ${Object.keys(preferences).length} UI preferences`);
         return { success: true, data: preferences };
       } else {
@@ -954,68 +950,18 @@ export class SupabaseClient {
 
   // These methods are now properly defined above with user ID support
 
-  // Individual Preference Column Methods
-  async saveIndividualPreference(userId = 'default', columnName, value) {
-    console.log(`🔍 Database-sync: Saving individual preference ${columnName}:`, value);
-    
-    try {
-      // First ensure user exists
-      await this.getUserPreferences(userId);
-      
-      const updates = {
-        [columnName]: value,
-        updated_at: new Date().toISOString()
-      };
-
-      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
-      });
-
-      console.log(`✅ Database-sync: Individual preference ${columnName} saved successfully`);
-      return { success: true, data: result };
-    } catch (error) {
-      console.error(`❌ Database-sync: Failed to save individual preference ${columnName}:`, error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async getIndividualPreference(userId = 'default', columnName) {
-    console.log(`🔍 Database-sync: Getting individual preference ${columnName}`);
-    
-    try {
-      const result = await this.request(`user_preferences?user_id=eq.${userId}&select=${columnName}&limit=1`);
-      
-      if (result && result.length > 0) {
-        const value = result[0][columnName];
-        console.log(`✅ Database-sync: Individual preference ${columnName} found:`, value);
-        return { success: true, data: value };
-      } else {
-        console.log(`📭 Database-sync: Individual preference ${columnName} not found`);
-        return { success: true, data: null };
-      }
-    } catch (error) {
-      console.error(`❌ Database-sync: Failed to get individual preference ${columnName}:`, error);
-      return { success: false, error: error.message };
-    }
-  }
+  // Individual Preference Column Methods - REMOVED (columns don't exist in schema)
 
   async getAllIndividualPreferences(userId = 'default') {
     console.log('🔍 Database-sync: Getting all individual preferences for user:', userId);
     
     try {
-      const columns = [
-        'desktop_notification', 'tab_rename', 'auto_switch',
-        'anthropic_api_key', 'anthropic_model', 'openai_api_key', 'openai_model',
-        'google_api_key', 'google_model', 'supabase_id', 'supabase_anon_key'
-      ];
+      // Use standard getUserPreferences which only uses existing columns
+      const result = await this.getUserPreferences(userId);
       
-      const selectColumns = columns.join(',');
-      const result = await this.request(`user_preferences?user_id=eq.${userId}&select=${selectColumns}&limit=1`);
-      
-      if (result && result.length > 0) {
+      if (result.success && result.data) {
         console.log('✅ Database-sync: Individual preferences found');
-        return { success: true, data: result[0] };
+        return result;
       } else {
         console.log('📭 Database-sync: No individual preferences found, creating defaults');
         // Create default preferences
@@ -1028,52 +974,6 @@ export class SupabaseClient {
     }
   }
 
-  // Convenience methods for specific preference types
-  async saveUIPreferenceIndividual(userId = 'default', preferenceKey, preferenceValue) {
-    const columnMap = {
-      'lovable-notifications': 'desktop_notification',
-      'lovable-tab-rename': 'tab_rename', 
-      'lovable-auto-switch': 'auto_switch'
-    };
-    
-    const columnName = columnMap[preferenceKey];
-    if (!columnName) {
-      console.error(`❌ Unknown UI preference key: ${preferenceKey}`);
-      return { success: false, error: `Unknown UI preference key: ${preferenceKey}` };
-    }
-    
-    return await this.saveIndividualPreference(userId, columnName, preferenceValue);
-  }
-
-  async getUIPreferenceIndividual(userId = 'default', preferenceKey) {
-    const columnMap = {
-      'lovable-notifications': 'desktop_notification',
-      'lovable-tab-rename': 'tab_rename',
-      'lovable-auto-switch': 'auto_switch'
-    };
-    
-    const columnName = columnMap[preferenceKey];
-    if (!columnName) {
-      console.error(`❌ Unknown UI preference key: ${preferenceKey}`);
-      return { success: false, error: `Unknown UI preference key: ${preferenceKey}` };
-    }
-    
-    return await this.getIndividualPreference(userId, columnName);
-  }
-
-  async getAllUIPreferencesIndividual(userId = 'default') {
-    const result = await this.getAllIndividualPreferences(userId);
-    if (result.success && result.data) {
-      const uiPrefs = {
-        'lovable-notifications': result.data.desktop_notification || false,
-        'lovable-tab-rename': result.data.tab_rename || false,
-        'lovable-auto-switch': result.data.auto_switch || false
-      };
-      return { success: true, data: uiPrefs };
-    }
-    return result;
-  }
-
   // AI Preferences Individual Methods - REMOVED (AI functionality disabled)
 
   // Individual UI preference methods (for service worker compatibility)
@@ -1081,29 +981,15 @@ export class SupabaseClient {
     console.log('🔍 Database-sync: Saving UI preference individually:', preferenceKey);
     
     try {
+      // Get existing preferences and update settings
+      const existing = await this.getUserPreferences(userId);
       const updates = {
+        settings: { 
+          ...(existing.data?.settings || {}), 
+          [preferenceKey]: preferenceValue 
+        },
         updated_at: new Date().toISOString()
       };
-      
-      // Map preference keys to column names
-      switch(preferenceKey) {
-        case 'lovable-auto-expand':
-          updates.desktop_notification = preferenceValue;
-          break;
-        case 'lovable-tab-rename':
-          updates.tab_rename = preferenceValue;
-          break;
-        case 'lovable-auto-switch':
-          updates.auto_switch = preferenceValue;
-          break;
-        default:
-          // Store in settings JSON for unknown preferences
-          const existing = await this.getUserPreferences(userId);
-          updates.settings = { 
-            ...(existing.data?.settings || {}), 
-            [preferenceKey]: preferenceValue 
-          };
-      }
       
       // Ensure user exists first
       await this.getUserPreferences(userId);
@@ -1125,19 +1011,14 @@ export class SupabaseClient {
     console.log('🔍 Database-sync: Getting all UI preferences individually');
     
     try {
-      const result = await this.getAllIndividualPreferences(userId);
+      const result = await this.getUserPreferences(userId);
       if (result.success && result.data) {
-        const uiPrefs = {
-          'lovable-auto-expand': result.data.desktop_notification || false,
-          'lovable-tab-rename': result.data.tab_rename || false,
-          'lovable-auto-switch': result.data.auto_switch || false,
-          // Include any additional preferences from settings
-          ...(result.data.settings || {})
-        };
+        // Return all preferences from settings column
+        const uiPrefs = result.data.settings || {};
         console.log(`✅ Database-sync: Found ${Object.keys(uiPrefs).length} UI preferences`);
         return { success: true, data: uiPrefs };
       }
-      return result;
+      return { success: true, data: {} };
     } catch (error) {
       console.error('❌ Database-sync: Failed to get UI preferences individually:', error);
       return { success: false, error: error.message };
@@ -1148,9 +1029,14 @@ export class SupabaseClient {
     console.log('🔍 Database-sync: Saving Supabase settings');
     
     try {
+      // Get existing preferences and update settings
+      const existing = await this.getUserPreferences(userId);
       const updates = {
-        supabase_id: supabaseId,
-        supabase_anon_key: supabaseKey,
+        settings: { 
+          ...(existing.data?.settings || {}), 
+          supabaseId: supabaseId,
+          supabaseKey: supabaseKey
+        },
         updated_at: new Date().toISOString()
       };
       
@@ -1171,13 +1057,13 @@ export class SupabaseClient {
   }
 
   async getSupabaseSettings(userId = 'default') {
-    const result = await this.getAllIndividualPreferences(userId);
+    const result = await this.getUserPreferences(userId);
     if (result.success && result.data) {
       return { 
         success: true, 
         data: {
-          supabaseId: result.data.supabase_id || '',
-          supabaseKey: result.data.supabase_anon_key || ''
+          supabaseId: result.data.settings?.supabaseId || '',
+          supabaseKey: result.data.settings?.supabaseKey || ''
         }
       };
     }
