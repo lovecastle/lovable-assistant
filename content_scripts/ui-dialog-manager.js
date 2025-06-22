@@ -699,6 +699,95 @@ window.UIDialogManager = {
     }
   },
 
+  showSettingsPage() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '⚙️ Settings';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 24px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-welcome-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 40px; min-width: 120px; transition: all 0.2s ease;
+          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
+             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Welcome</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            🔐 Account Settings
+          </h3>
+          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
+            Manage your account settings and preferences.
+          </p>
+          
+          <div style="display: flex; gap: 8px;">
+            <button id="logout-btn" style="
+              background: #f56565; color: white; border: none; padding: 10px 16px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+            ">Sign Out</button>
+          </div>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            📱 Extension Info
+          </h3>
+          <div style="color: #4a5568; font-size: 14px; line-height: 1.5;">
+            <p><strong>Version:</strong> 2.0.0</p>
+            <p><strong>Database:</strong> Master Supabase</p>
+            <p><strong>Authentication:</strong> Enabled</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    this.setupSettingsEventListeners();
+  },
+
+  setupSettingsEventListeners() {
+    // Back button
+    if (typeof this.setupBackButton === 'function') {
+      this.setupBackButton();
+    }
+    
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => this.handleLogout());
+    }
+  },
+
+  async handleLogout() {
+    try {
+      const response = await this.safeSendMessage({
+        action: 'masterAuth_logout'
+      });
+      
+      if (response.success) {
+        // Show auth section after logout
+        this.showAuthSection();
+        
+        // Stop conversation capture
+        if (window.conversationCapture && typeof window.conversationCapture.debugInfo === 'function') {
+          window.conversationCapture.debugInfo(); // This will show the user is no longer authenticated
+        }
+      } else {
+        console.error('Logout failed:', response.error);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  },
+
   async showWelcomePage() {
     // Check authentication status first
     try {

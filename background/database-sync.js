@@ -53,9 +53,18 @@ export class SupabaseClient {
       throw new Error(`Supabase request failed: ${errorText}`);
     }
 
-    const result = await response.json();
-    console.log(`✅ Database response data:`, result);
-    return result;
+    // Handle JSON parsing with better error handling
+    let responseText;
+    try {
+      responseText = await response.text();
+      const result = JSON.parse(responseText);
+      console.log(`✅ Database response data:`, result);
+      return result;
+    } catch (jsonError) {
+      console.error(`❌ Failed to parse JSON response:`, jsonError);
+      console.error(`❌ Response text:`, responseText);
+      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseText}`);
+    }
   }
   // Original method for backward compatibility
   async saveConversation(data) {
@@ -710,13 +719,6 @@ export class SupabaseClient {
         'lovable-tab-rename': false,
         'lovable-auto-switch': false
       },
-      ai_preferences: {
-        ai_provider: 'claude',
-        claude_model: 'claude-3-5-sonnet-20241022',
-        openai_model: 'gpt-4o',
-        gemini_model: 'gemini-1.5-pro-latest',
-        custom_instructions: ''
-      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -746,7 +748,6 @@ export class SupabaseClient {
         user_id: userId,
         settings: { ...(existing.data?.settings || {}), ...(updates.settings || {}) },
         ui_preferences: { ...(existing.data?.ui_preferences || {}), ...(updates.ui_preferences || {}) },
-        ai_preferences: { ...(existing.data?.ai_preferences || {}), ...(updates.ai_preferences || {}) },
         updated_at: new Date().toISOString()
       };
 
@@ -824,42 +825,7 @@ export class SupabaseClient {
     }
   }
 
-  // AI Preferences Methods (using consolidated user_preferences)
-  async getAIPreferences(userId = 'default') {
-    console.log('🔍 Database-sync: Getting AI preferences for:', userId);
-    
-    try {
-      const userPrefs = await this.getUserPreferences(userId);
-      if (userPrefs.success && userPrefs.data) {
-        const aiPrefs = userPrefs.data.ai_preferences || {};
-        console.log('✅ Database-sync: AI preferences found');
-        return { success: true, data: aiPrefs };
-      } else {
-        console.log('📭 Database-sync: No AI preferences found, will use defaults');
-        return { success: true, data: null };
-      }
-    } catch (error) {
-      console.error('❌ Database-sync: Failed to get AI preferences:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async saveAIPreferences(userId = 'default', preferences) {
-    console.log('🔍 Database-sync: Saving AI preferences for:', userId);
-    
-    try {
-      const updates = {
-        ai_preferences: preferences
-      };
-      
-      const result = await this.saveUserPreferences(userId, updates);
-      console.log('✅ Database-sync: AI preferences saved successfully');
-      return result;
-    } catch (error) {
-      console.error('❌ Database-sync: Failed to save AI preferences:', error);
-      return { success: false, error: error.message };
-    }
-  }
+  // AI Preferences Methods - REMOVED (AI functionality disabled)
 
   // Prompt Templates Methods
   async getPromptTemplates(userId = 'default') {
@@ -1108,59 +1074,7 @@ export class SupabaseClient {
     return result;
   }
 
-  async saveAIPreferencesIndividual(userId = 'default', preferences) {
-    console.log('🔍 Database-sync: Saving AI preferences individually');
-    
-    try {
-      const updates = {
-        updated_at: new Date().toISOString()
-      };
-      
-      // Map preference keys to column names
-      if (preferences.claude_api_key !== undefined) updates.anthropic_api_key = preferences.claude_api_key;
-      if (preferences.claude_model !== undefined) updates.anthropic_model = preferences.claude_model;
-      if (preferences.openai_api_key !== undefined) updates.openai_api_key = preferences.openai_api_key;
-      if (preferences.openai_model !== undefined) updates.openai_model = preferences.openai_model;
-      if (preferences.gemini_api_key !== undefined) updates.google_api_key = preferences.gemini_api_key;
-      if (preferences.gemini_model !== undefined) updates.google_model = preferences.gemini_model;
-      
-      // Also handle direct column names
-      if (preferences.anthropic_api_key !== undefined) updates.anthropic_api_key = preferences.anthropic_api_key;
-      if (preferences.anthropic_model !== undefined) updates.anthropic_model = preferences.anthropic_model;
-      if (preferences.google_api_key !== undefined) updates.google_api_key = preferences.google_api_key;
-      if (preferences.google_model !== undefined) updates.google_model = preferences.google_model;
-      
-      // Ensure user exists first
-      await this.getUserPreferences(userId);
-      
-      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
-      });
-
-      console.log('✅ Database-sync: AI preferences saved individually');
-      return { success: true, data: result };
-    } catch (error) {
-      console.error('❌ Database-sync: Failed to save AI preferences individually:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async getAIPreferencesIndividual(userId = 'default') {
-    const result = await this.getAllIndividualPreferences(userId);
-    if (result.success && result.data) {
-      const aiPrefs = {
-        claude_api_key: result.data.anthropic_api_key || '',
-        claude_model: result.data.anthropic_model || 'claude-3-5-sonnet-20241022',
-        openai_api_key: result.data.openai_api_key || '',
-        openai_model: result.data.openai_model || 'gpt-4o',
-        gemini_api_key: result.data.google_api_key || '',
-        gemini_model: result.data.google_model || 'gemini-1.5-pro-latest'
-      };
-      return { success: true, data: aiPrefs };
-    }
-    return result;
-  }
+  // AI Preferences Individual Methods - REMOVED (AI functionality disabled)
 
   // Individual UI preference methods (for service worker compatibility)
   async saveUIPreferenceIndividual(userId = 'default', preferenceKey, preferenceValue) {
