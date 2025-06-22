@@ -115,7 +115,9 @@ window.ConversationHistory = {
         </div>
       `;
       
-      this.setupBackButton();
+      if (typeof this.setupBackButton === 'function') {
+        this.setupBackButton();
+      }
       this.setupHistoryFilters();
       this.renderHistoryMessages(); // Render with already loaded data
     } catch (error) {

@@ -1,13 +1,9 @@
 // Service Worker for Chrome Extension Background Tasks
 import { SupabaseClient } from './database-sync.js';
-import { AIAPI } from './ai-api.js';
 import { MasterAuthService } from './master-auth-service.js';
 
 // Initialize database client
 const supabase = new SupabaseClient();
-
-// Initialize AI API client
-const aiAPI = new AIAPI();
 
 // Initialize master authentication service
 const masterAuth = new MasterAuthService();
@@ -16,10 +12,38 @@ chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
   chrome.storage.sync.set({
     autoCapture: true,
-    enhancePrompts: true,
-    showSuggestions: true
+    notificationEnabled: false
   });
 });
+
+// Restore session when service worker starts
+chrome.runtime.onStartup.addListener(() => {
+  console.log('🔄 Service Worker starting - restoring session...');
+  masterAuth.restoreSession().then(restored => {
+    if (restored) {
+      console.log('✅ Session restored on startup');
+    } else {
+      console.log('ℹ️ No session to restore on startup');
+    }
+  }).catch(error => {
+    console.error('❌ Failed to restore session on startup:', error);
+  });
+});
+
+// Also try to restore session when the service worker first loads
+(async () => {
+  try {
+    console.log('🔄 Service Worker loaded - attempting session restore...');
+    const restored = await masterAuth.restoreSession();
+    if (restored) {
+      console.log('✅ Session restored on service worker load');
+    } else {
+      console.log('ℹ️ No session to restore on service worker load');
+    }
+  } catch (error) {
+    console.error('❌ Failed to restore session on service worker load:', error);
+  }
+})();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
@@ -72,6 +96,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    case 'checkAuth':
+      handleCheckAuth().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     case 'testConnection':
       testConnection().then(result => {
         sendResponse({ success: result });
@@ -80,24 +112,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
-    case 'testSpecificConnection':
-      handleTestSpecificConnection(request.provider, request.apiKey).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
       
     case 'testDatabaseConnection':
       handleTestDatabaseConnection(request.projectId, request.apiKey).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
-      
-    case 'chatMessage':
-      handleChatMessage(request.message, request.context).then(result => {
         sendResponse(result);
       }).catch(error => {
         sendResponse({ success: false, error: error.message });
@@ -193,13 +210,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
-    case 'aiRequest':
-      handleAIRequest(request.prompt).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
       
     case 'openTab':
       handleOpenTab(request.url).then(result => {
@@ -315,50 +325,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
-    case 'saveAIPreferencesIndividual':
-      handleSaveAIPreferencesIndividual(request.data).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
       
     case 'saveSupabaseSettings':
       handleSaveSupabaseSettings(request.data).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
-      
-    // Prompt Templates handlers
-    case 'getPromptTemplates':
-      handleGetPromptTemplates().then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
-      
-    case 'saveAllPromptTemplates':
-      handleSaveAllPromptTemplates(request.data).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
-      
-    // AI Preferences handlers
-    case 'getAIPreferences':
-      handleGetAIPreferences().then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
-      
-    case 'saveAIPreferences':
-      handleSaveAIPreferences(request.data).then(result => {
         sendResponse(result);
       }).catch(error => {
         sendResponse({ success: false, error: error.message });
@@ -374,250 +343,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function testConnection() {
   try {
-    // Test AI API connection
-    const aiConnected = await aiAPI.testConnection();
-    
     // Test Supabase connection
     const settings = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
     const supabaseConnected = !!(settings.supabaseUrl && settings.supabaseKey);
     
-    return aiConnected && supabaseConnected;
+    return supabaseConnected;
   } catch (error) {
     console.error('Connection test failed:', error);
     return false;
   }
 }
 
-async function handleChatMessage(message, context) {
-  try {
-    // Build context information
-    const projectName = context?.projectName || 'Unknown Project';
-    const projectId = context?.projectId || 'unknown';
-    
-    // Get project information
-    let projectInfo = '';
-    if (context?.projectId) {
-      try {
-        const projectResult = await supabase.getProjectManager(context.projectId);
-        if (projectResult.success && projectResult.data) {
-          const project = projectResult.data;
-          projectInfo = '\n\nProject Information:\n';
-          if (project.description) {
-            projectInfo += `Description: ${project.description}\n`;
-          }
-          if (project.notes) {
-            projectInfo += `Notes: ${project.notes}\n`;
-          }
-          if (project.tech_stack) {
-            projectInfo += `Tech Stack: ${project.tech_stack}\n`;
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch project info:', error);
-      }
-    }
-    
-    // Get recent Lovable conversations for context
-    let lovableHistory = '';
-    if (context?.projectId) {
-      try {
-        const conversations = await supabase.getConversations(context.projectId, 10);
-        if (conversations && conversations.length > 0) {
-          lovableHistory = '\n\nRecent Lovable conversations:\n' + 
-            conversations.slice(0, 5).map(conv => 
-              `User: ${conv.user_message?.substring(0, 100)}...\nLovable: ${conv.lovable_response?.substring(0, 100)}...`
-            ).join('\n\n');
-        }
-      } catch (error) {
-        console.warn('Could not fetch Lovable history:', error);
-      }
-    }
-    
-    // Build conversation history context
-    let conversationContext = '';
-    if (context?.conversationHistory && context.conversationHistory.length > 0) {
-      conversationContext = '\n\nPrevious assistant conversations:\n' +
-        context.conversationHistory.map(conv => 
-          `User: ${conv.user}\nAssistant: ${conv.assistant}`
-        ).join('\n\n');
-    }
-    
-    const systemPrompt = `# LOVABLE PROJECT ASSISTANT 🚀
 
-## CORE IDENTITY & MISSION
-You are the **Lovable Project Assistant** - an expert development planning and documentation specialist for "${projectName}". Your primary mission is to help users create comprehensive development plans and high-quality project documentation that rivals the standards of codeguide.dev.
-
-## PRIMARY RESPONSIBILITIES
-
-### 🎯 **Development Planning Excellence**
-- Create detailed, step-by-step development roadmaps
-- Design scalable project architectures with frontend-first approach
-- Plan mobile-responsive implementations (mobile-first design)
-- Structure feature development in logical phases
-- Provide timeline estimates and milestone breakdowns
-
-### 📚 **Documentation Mastery**
-- Generate comprehensive project knowledge bases
-- Create detailed technical specifications
-- Write clear, actionable development guidelines
-- Produce codeguide.dev-quality documentation
-- Maintain consistent documentation standards
-
-### 🏗️ **Technical Architecture**
-- Design modern web application structures
-- Recommend optimal tech stacks for Lovable projects
-- Plan database schemas and API architectures
-- Ensure responsive, accessible, and performant designs
-- Integrate security and testing strategies from the start
-
-## LOVABLE DEVELOPMENT PRINCIPLES
-
-### **Frontend-First Approach**
-- Always start with UI/UX design and frontend implementation
-- Prioritize responsive design with mobile-first methodology
-- Focus on user experience before backend complexity
-- Use modern CSS frameworks and component libraries
-
-### **Progressive Development**
-- Begin with blank project, build incrementally
-- Implement core features before advanced functionality
-- Validate each phase before proceeding to next
-- Maintain working prototypes throughout development
-
-### **Quality Standards**
-- Write clean, maintainable, and well-documented code
-- Implement comprehensive testing strategies
-- Follow accessibility guidelines (WCAG standards)
-- Optimize for performance and SEO
-
-## DOCUMENTATION STRUCTURE TEMPLATE
-
-When creating project documentation, follow this comprehensive structure:
-
-### 1. **Project Overview**
-- Clear project description and objectives
-- Target audience and use case scenarios
-- Key features and functionality summary
-- Success metrics and project goals
-
-### 2. **Technical Specifications**
-- Complete tech stack breakdown
-- Architecture diagrams and system design
-- Database schema and data models
-- API documentation and endpoints
-
-### 3. **Development Roadmap**
-- Phase-by-phase implementation plan
-- Feature prioritization and dependencies
-- Timeline estimates and milestones
-- Resource requirements and team roles
-
-### 4. **Implementation Guidelines**
-- Coding standards and conventions
-- File structure and organization
-- Component architecture patterns
-- Testing and deployment procedures
-
-### 5. **User Experience Design**
-- User flow diagrams and wireframes
-- Responsive design specifications
-- Accessibility requirements
-- Performance optimization strategies
-
-## RESPONSE FORMATTING
-
-### **For Development Plans:**
-Use numbered sections with clear hierarchies:
-1. **Phase 1: Foundation** (Setup & Core UI)
-2. **Phase 2: Features** (Core Functionality)
-3. **Phase 3: Enhancement** (Advanced Features)
-4. **Phase 4: Optimization** (Performance & Deploy)
-
-### **For Documentation:**
-- Use clear headings and subheadings
-- Include code examples and snippets
-- Provide actionable next steps
-- Add FAQ sections when relevant
-- Include troubleshooting guides
-
-### **For Technical Advice:**
-- Start with context understanding
-- Provide step-by-step solutions
-- Explain the "why" behind recommendations
-- Include best practice alternatives
-- Suggest testing and validation approaches
-
-## CONTEXT AWARENESS
-
-You have access to the following project context:
-${projectInfo}
-
-Recent Lovable conversations:
-${lovableHistory}
-
-Previous assistant conversations:
-${conversationContext}
-
-**Current Project Details:**
-- Project: ${projectName}
-- Project ID: ${projectId}
-- URL: ${context?.url || 'Unknown'}
-
-## INTERACTION GUIDELINES
-
-1. **Always greet using the project name "${projectName}"** (never use project ID)
-2. **Ask clarifying questions** when requirements are unclear
-3. **Provide comprehensive, actionable responses** rather than brief answers
-4. **Reference project context** when making recommendations
-5. **Suggest iterative improvements** and follow-up actions
-6. **Maintain professional yet friendly tone** throughout interactions
-
-## QUALITY COMMITMENT
-
-Every response should:
-- ✅ Be detailed and comprehensive
-- ✅ Follow mobile-first, responsive design principles
-- ✅ Include specific, actionable next steps
-- ✅ Reference relevant best practices
-- ✅ Consider scalability and maintainability
-- ✅ Provide clear structure and organization
-
-Remember: Your goal is to be the most helpful development planning and documentation expert the user has ever worked with. Create responses that could serve as standalone project guides.`;
-
-    const response = await aiAPI.generateResponse(message, systemPrompt);
-    return { success: true, data: response };
-    
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-
-async function handleAIRequest(prompt) {
-  try {
-    if (!prompt || typeof prompt !== 'string') {
-      throw new Error('Invalid prompt provided');
-    }
-    
-    console.log('🤖 AI Request received:', prompt.substring(0, 100) + '...');
-    
-    const response = await aiAPI.generateResponse(prompt);
-    
-    if (!response || typeof response !== 'string') {
-      throw new Error('Invalid response from AI API');
-    }
-    
-    console.log('✅ AI Response generated:', response.substring(0, 100) + '...');
-    return { success: true, content: response };
-    
-  } catch (error) {
-    console.error('❌ AI Request failed:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Unknown error occurred',
-      details: error.toString()
-    };
-  }
-}
 
 async function handleSaveConversation(conversationData) {
   try {
@@ -628,6 +365,16 @@ async function handleSaveConversation(conversationData) {
       lovableResponseLength: conversationData.lovableResponse?.length || 0,
       timestamp: conversationData.timestamp
     });
+    
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save conversations.' 
+      };
+    }
     
     // Check if Supabase is properly configured
     const config = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
@@ -641,7 +388,7 @@ async function handleSaveConversation(conversationData) {
     
     console.log('✅ Service Worker: Supabase configuration found');
     
-    const result = await supabase.saveConversation(conversationData);
+    const result = await supabase.saveConversationWithUser(conversationData, userId);
     
     // Handle constraint violations and skipped duplicates
     if (result.skipped) {
@@ -676,6 +423,16 @@ async function handleBulkSaveConversations(conversationsArray) {
   try {
     console.log(`💾 Bulk saving ${conversationsArray.length} conversations...`);
     
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save conversations.' 
+      };
+    }
+    
     const results = [];
     let successCount = 0;
     let errorCount = 0;
@@ -683,7 +440,7 @@ async function handleBulkSaveConversations(conversationsArray) {
     
     for (const conversationData of conversationsArray) {
       try {
-        const result = await supabase.saveConversation(conversationData);
+        const result = await supabase.saveConversationWithUser(conversationData, userId);
         
         if (result.skipped) {
           results.push({ success: true, skipped: true, reason: result.reason });
@@ -720,6 +477,16 @@ async function handleSaveMessageGroup(messageGroup) {
   try {
     console.log('🔍 Service Worker: Auto-capture saving message group:', messageGroup.id);
     
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save conversations.' 
+      };
+    }
+    
     // Convert message group format to conversation format
     const conversationData = {
       id: generateUUID(),
@@ -745,7 +512,7 @@ async function handleSaveMessageGroup(messageGroup) {
       lovableResponseLength: conversationData.lovableResponse?.length || 0
     });
 
-    const result = await supabase.saveConversation(conversationData);
+    const result = await supabase.saveConversationWithUser(conversationData, userId);
     
     // Handle constraint violations and skipped duplicates
     if (result.skipped) {
@@ -780,8 +547,19 @@ async function handleGetConversations(filters = {}) {
   try {
     console.log('🔍 Service Worker: Getting conversations with filters:', filters);
     
-    const conversations = await supabase.getConversations(
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view conversations.' 
+      };
+    }
+    
+    const conversations = await supabase.getConversationsWithUser(
       filters.projectId, 
+      userId,
       filters.limit || 50
     );
     
@@ -797,12 +575,22 @@ async function handleDeleteConversations(filters = {}) {
   try {
     console.log('🔍 Service Worker: Deleting conversations with filters:', filters);
     
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to delete conversations.' 
+      };
+    }
+    
     // Special handling for bulk delete operations
     if (filters.ids && Array.isArray(filters.ids)) {
       console.log(`🔍 Service Worker: Bulk deleting ${filters.ids.length} conversations`);
     }
     
-    const result = await supabase.deleteConversations(filters);
+    const result = await supabase.deleteConversationsWithUser(filters, userId);
     
     console.log('✅ Service Worker: Conversations deleted:', result);
     return { success: true, data: result };
@@ -1064,7 +852,17 @@ async function handleSaveProjectManager(projectManagerData) {
   try {
     console.log(`🔍 Service Worker: Saving project manager for project ${projectManagerData.project_id}`);
     
-    const result = await supabase.saveProjectManager(projectManagerData);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save project data.' 
+      };
+    }
+    
+    const result = await supabase.saveProjectManagerWithUser(projectManagerData, userId);
     
     if (result.success) {
       console.log('✅ Service Worker: Project manager saved successfully');
@@ -1083,7 +881,17 @@ async function handleGetProjectManager(projectId) {
   try {
     console.log(`🔍 Service Worker: Getting project manager for project ${projectId}`);
     
-    const result = await supabase.getProjectManager(projectId);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view project data.' 
+      };
+    }
+    
+    const result = await supabase.getProjectManagerWithUser(projectId, userId);
     
     if (result.success) {
       console.log('✅ Service Worker: Project manager retrieved successfully');
@@ -1102,7 +910,17 @@ async function handleGetAllProjectManagers() {
   try {
     console.log('🔍 Service Worker: Getting all project managers');
     
-    const result = await supabase.getAllProjectManagers();
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view projects.' 
+      };
+    }
+    
+    const result = await supabase.getAllProjectManagersWithUser(userId);
     
     if (result.success) {
       console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} project managers`);
@@ -1121,8 +939,18 @@ async function handleGetProjectInfo(projectId) {
   try {
     console.log(`🔍 Service Worker: Getting project info for ${projectId}`);
     
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view project info.' 
+      };
+    }
+    
     // First try to get from project_managers table
-    const result = await supabase.getProjectManager(projectId);
+    const result = await supabase.getProjectManagerWithUser(projectId, userId);
     
     if (result.success && result.data) {
       console.log('✅ Service Worker: Project info retrieved successfully');
@@ -1157,7 +985,17 @@ async function handleSaveAssistantConversation(conversationData) {
   try {
     console.log('💾 Service Worker: Saving assistant conversation');
     
-    const result = await supabase.saveAssistantConversation(conversationData);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save assistant conversations.' 
+      };
+    }
+    
+    const result = await supabase.saveAssistantConversationWithUser(conversationData, userId);
     
     if (result.success) {
       console.log('✅ Service Worker: Assistant conversation saved successfully');
@@ -1176,7 +1014,17 @@ async function handleGetAssistantConversations(projectId, limit = 10) {
   try {
     console.log(`🔍 Service Worker: Getting assistant conversations for project ${projectId}`);
     
-    const result = await supabase.getAssistantConversations(projectId, limit);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view assistant conversations.' 
+      };
+    }
+    
+    const result = await supabase.getAssistantConversationsWithUser(projectId, userId, limit);
     
     if (result.success) {
       console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} assistant conversations`);
@@ -1195,7 +1043,17 @@ async function handleUpdateProjectManager(projectId, updateData) {
   try {
     console.log(`🔍 Service Worker: Updating project manager for project ${projectId}`);
     
-    const result = await supabase.updateProjectManager(projectId, updateData);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to update project data.' 
+      };
+    }
+    
+    const result = await supabase.updateProjectManagerWithUser(projectId, updateData, userId);
     
     if (result.success) {
       console.log('✅ Service Worker: Project manager updated successfully');
@@ -1214,7 +1072,17 @@ async function handleDeleteProjectManager(projectId) {
   try {
     console.log(`🔍 Service Worker: Deleting project manager for project ${projectId}`);
     
-    const result = await supabase.deleteProjectManager(projectId);
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to delete project data.' 
+      };
+    }
+    
+    const result = await supabase.deleteProjectManagerWithUser(projectId, userId);
     
     if (result.success) {
       console.log('✅ Service Worker: Project manager deleted successfully');
@@ -1229,17 +1097,22 @@ async function handleDeleteProjectManager(projectId) {
   }
 }
 
-// User ID helper function (for now using 'default', can be enhanced later)
-function getCurrentUserId() {
-  return 'default'; // TODO: Implement proper user authentication
-}
+// User ID helper function - removed, now using masterAuth.getCurrentUserId()
 
 // UI Preferences handlers
 async function handleSaveUIPreference(data) {
   try {
     console.log('🔍 Service Worker: Saving UI preference (individual):', data.preferenceKey);
     
-    const userId = getCurrentUserId();
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save preferences.' 
+      };
+    }
+    
     const result = await supabase.saveUIPreferenceIndividual(userId, data.preferenceKey, data.preferenceValue);
     
     if (result.success) {
@@ -1259,7 +1132,15 @@ async function handleGetUIPreference(data) {
   try {
     console.log('🔍 Service Worker: Getting UI preference:', data.preferenceKey);
     
-    const userId = getCurrentUserId();
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view preferences.' 
+      };
+    }
+    
     const result = await supabase.getUIPreference(userId, data.preferenceKey);
     
     if (result.success) {
@@ -1279,7 +1160,15 @@ async function handleGetAllUIPreferences() {
   try {
     console.log('🔍 Service Worker: Getting all UI preferences (individual)');
     
-    const userId = getCurrentUserId();
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to view preferences.' 
+      };
+    }
+    
     const result = await supabase.getAllUIPreferencesIndividual(userId);
     
     if (result.success) {
@@ -1295,235 +1184,14 @@ async function handleGetAllUIPreferences() {
   }
 }
 
-// Prompt Templates handlers
-async function handleGetPromptTemplates() {
-  try {
-    console.log('🔍 Service Worker: Getting prompt templates');
-    
-    const userId = getCurrentUserId();
-    const result = await supabase.getPromptTemplates(userId);
-    
-    if (result.success) {
-      console.log(`✅ Service Worker: Retrieved ${result.data?.length || 0} prompt templates`);
-      return result;
-    } else {
-      console.error('❌ Service Worker: Failed to get prompt templates:', result.error);
-      return result;
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error getting prompt templates:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-async function handleSaveAllPromptTemplates(data) {
-  try {
-    console.log('🔍 Service Worker: Saving all prompt templates');
-    
-    const userId = getCurrentUserId();
-    
-    // Convert templates to database format
-    const templates = data.templates.map(template => ({
-      category: template.category,
-      name: template.name,
-      template: template.template, // Use 'template' column name
-      shortcut: template.shortcut
-    }));
-    
-    const result = await supabase.saveAllPromptTemplates(userId, templates);
-    
-    if (result.success) {
-      console.log('✅ Service Worker: All prompt templates saved successfully');
-      return result;
-    } else {
-      console.error('❌ Service Worker: Failed to save prompt templates:', result.error);
-      return result;
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error saving prompt templates:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-// AI Preferences handlers
-async function handleGetAIPreferences() {
-  try {
-    console.log('🔍 Service Worker: Getting AI preferences');
-    
-    const userId = getCurrentUserId();
-    const result = await supabase.getAIPreferences(userId);
-    
-    if (result.success) {
-      console.log('✅ Service Worker: AI preferences retrieved successfully');
-      return result;
-    } else {
-      console.error('❌ Service Worker: Failed to get AI preferences:', result.error);
-      return result;
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error getting AI preferences:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-async function handleSaveAIPreferences(data) {
-  try {
-    console.log('🔍 Service Worker: Saving AI preferences');
-    
-    const userId = getCurrentUserId();
-    const result = await supabase.saveAIPreferences(userId, data);
-    
-    if (result.success) {
-      console.log('✅ Service Worker: AI preferences saved successfully');
-      return result;
-    } else {
-      console.error('❌ Service Worker: Failed to save AI preferences:', result.error);
-      return result;
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error saving AI preferences:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-// Test Specific Connection handler
-async function handleTestSpecificConnection(provider, apiKey) {
-  try {
-    console.log('🔍 Service Worker: Testing specific connection for provider:', provider);
-    
-    if (!provider || !apiKey) {
-      return { success: false, error: 'Provider and API key are required' };
-    }
-    
-    // Test the specific provider directly without changing global settings
-    const result = await testSpecificProvider(provider, apiKey);
-    
-    if (result.success) {
-      console.log('✅ Service Worker: Specific connection test successful for', provider);
-      return { success: true };
-    } else {
-      console.error('❌ Service Worker: Specific connection test failed for', provider, ':', result.error);
-      return { success: false, error: result.error };
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error testing specific connection:', error);
-    return { success: false, error: error.message };
-  }
-}
 
-// Test specific provider function
-async function testSpecificProvider(provider, apiKey) {
-  try {
-    const testPrompt = 'Hello! Please respond with "Connection successful" if you receive this.';
-    const systemPrompt = 'You are testing the API connection. Respond briefly.';
-    
-    let response;
-    
-    switch (provider) {
-      case 'claude':
-        response = await testClaudeConnection(apiKey, testPrompt, systemPrompt);
-        break;
-      case 'openai':
-        response = await testOpenAIConnection(apiKey, testPrompt, systemPrompt);
-        break;
-      case 'gemini':
-        response = await testGeminiConnection(apiKey, testPrompt, systemPrompt);
-        break;
-      default:
-        return { success: false, error: `Unknown provider: ${provider}` };
-    }
-    
-    // Check if response indicates success
-    const isSuccess = response && (
-      response.toLowerCase().includes('connection') || 
-      response.toLowerCase().includes('successful') ||
-      response.length > 0
-    );
-    
-    return { success: isSuccess, response };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
 
-// Individual provider test functions
-async function testClaudeConnection(apiKey, prompt, systemPrompt) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 50,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorData}`);
-  }
-  
-  const data = await response.json();
-  return data.content[0]?.text || '';
-}
 
-async function testOpenAIConnection(apiKey, prompt, systemPrompt) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 50,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-      ]
-    })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
-  }
-  
-  const data = await response.json();
-  return data.choices[0]?.message?.content || '';
-}
 
-async function testGeminiConnection(apiKey, prompt, systemPrompt) {
-  const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: fullPrompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: 50
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
-  }
-  
-  const data = await response.json();
-  return data.candidates[0]?.content?.parts[0]?.text || '';
-}
 
 // Database connection test function
 async function handleTestDatabaseConnection(projectIdOrUrl, apiKey) {
@@ -1622,7 +1290,7 @@ async function setupDatabaseSchema(supabaseUrl, apiKey) {
     
     // Check if tables already exist by trying to query one
     try {
-      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/prompt_templates?limit=1`, {
+      const checkResponse = await fetch(`${supabaseUrl}/rest/v1/user_preferences?limit=1`, {
         method: 'GET',
         headers: {
           'apikey': apiKey,
@@ -1646,19 +1314,6 @@ async function setupDatabaseSchema(supabaseUrl, apiKey) {
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
--- Create prompt_templates table
-CREATE TABLE IF NOT EXISTS prompt_templates (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  category TEXT NOT NULL,
-  name TEXT NOT NULL,
-  template TEXT NOT NULL,
-  shortcut TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  user_id TEXT NOT NULL DEFAULT 'default',
-  is_custom BOOLEAN DEFAULT TRUE,
-  is_active BOOLEAN DEFAULT TRUE
-);
 
 -- Create user_preferences table
 CREATE TABLE IF NOT EXISTS user_preferences (
@@ -1674,12 +1329,6 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   desktop_notification BOOLEAN DEFAULT FALSE,
   tab_rename BOOLEAN DEFAULT FALSE,
   auto_switch BOOLEAN DEFAULT FALSE,
-  anthropic_api_key TEXT,
-  anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
-  openai_api_key TEXT,
-  openai_model TEXT DEFAULT 'gpt-4o',
-  google_api_key TEXT,
-  google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
   supabase_id TEXT,
   supabase_anon_key TEXT
 );
@@ -1923,12 +1572,6 @@ async function createDatabaseSetupFunction(supabaseUrl, apiKey) {
               desktop_notification BOOLEAN DEFAULT FALSE,
               tab_rename BOOLEAN DEFAULT FALSE,
               auto_switch BOOLEAN DEFAULT FALSE,
-              anthropic_api_key TEXT,
-              anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
-              openai_api_key TEXT,
-              openai_model TEXT DEFAULT 'gpt-4o',
-              google_api_key TEXT,
-              google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
               supabase_id TEXT,
               supabase_anon_key TEXT
             );
@@ -2159,33 +1802,21 @@ async function insertDefaultData(supabaseUrl, apiKey) {
   }
 }
 
-// AI Preferences handlers (individual columns)
-async function handleSaveAIPreferencesIndividual(data) {
-  try {
-    console.log('🔍 Service Worker: Saving AI preferences individually');
-    
-    const userId = getCurrentUserId();
-    const result = await supabase.saveAIPreferencesIndividual(userId, data);
-    
-    if (result.success) {
-      console.log('✅ Service Worker: AI preferences saved individually');
-      return result;
-    } else {
-      console.error('❌ Service Worker: Failed to save AI preferences individually:', result.error);
-      return result;
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Error saving AI preferences individually:', error);
-    return { success: false, error: error.message };
-  }
-}
 
 // Supabase Settings handlers
 async function handleSaveSupabaseSettings(data) {
   try {
     console.log('🔍 Service Worker: Saving Supabase settings');
     
-    const userId = getCurrentUserId();
+    const userId = masterAuth.getCurrentUserId();
+    if (!userId) {
+      console.error('❌ Service Worker: User not authenticated');
+      return { 
+        success: false, 
+        error: 'User not authenticated. Please log in to save settings.' 
+      };
+    }
+    
     const result = await supabase.saveSupabaseSettings(userId, data.supabaseId, data.supabaseKey);
     
     if (result.success) {
@@ -2229,59 +1860,29 @@ async function handleInitializeUserDatabase() {
         show_notifications BOOLEAN DEFAULT TRUE,
         tab_rename BOOLEAN DEFAULT TRUE,
         
-        -- AI Provider settings
-        ai_provider TEXT DEFAULT 'claude' CHECK (ai_provider IN ('claude', 'openai', 'gemini')),
-        claude_api_key TEXT,
-        openai_api_key TEXT,
-        gemini_api_key TEXT,
         
         -- UI preferences
         ui_preferences JSONB DEFAULT '{}',
         
-        -- Custom prompt templates
-        custom_templates JSONB DEFAULT '[]'
       );
 
-      -- Custom prompt templates table
-      CREATE TABLE IF NOT EXISTS custom_prompt_templates (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        name TEXT NOT NULL,
-        description TEXT,
-        template_content TEXT NOT NULL,
-        category TEXT DEFAULT 'custom',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        usage_count INTEGER DEFAULT 0
-      );
 
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_user_settings_updated_at ON user_settings(updated_at);
-      CREATE INDEX IF NOT EXISTS idx_custom_templates_category ON custom_prompt_templates(category);
 
       -- Enable RLS
       ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
-      ALTER TABLE custom_prompt_templates ENABLE ROW LEVEL SECURITY;
 
       -- Create policies that allow all access (user's own database)
       DROP POLICY IF EXISTS "Allow all access to user_settings" ON user_settings;
       CREATE POLICY "Allow all access to user_settings" ON user_settings FOR ALL USING (true);
       
-      DROP POLICY IF EXISTS "Allow all access to custom_templates" ON custom_prompt_templates;
-      CREATE POLICY "Allow all access to custom_templates" ON custom_prompt_templates FOR ALL USING (true);
 
       -- Insert default settings if not exists
       INSERT INTO user_settings (id) 
       SELECT uuid_generate_v4() 
       WHERE NOT EXISTS (SELECT 1 FROM user_settings);
 
-      -- Insert default custom templates
-      INSERT INTO custom_prompt_templates (name, description, template_content, category) 
-      SELECT * FROM (VALUES
-        ('Quick Bug Fix', 'Template for reporting and fixing bugs', 'I found this issue:\\n\\n{issue_description}\\n\\nSteps to reproduce:\\n1. {step_1}\\n2. {step_2}\\n3. {step_3}\\n\\nExpected: {expected_behavior}\\nActual: {actual_behavior}\\n\\nCan you help me fix this?', 'debugging'),
-        ('Feature Request', 'Template for new feature requests', 'I would like to add this feature:\\n\\n{feature_description}\\n\\nUse case:\\n{use_case}\\n\\nAcceptance criteria:\\n- {criteria_1}\\n- {criteria_2}\\n- {criteria_3}\\n\\nPlease help me implement this.', 'planning'),
-        ('Code Review', 'Template for code review requests', 'Please review this code:\\n\\n\`\`\`{language}\\n{code}\\n\`\`\`\\n\\nSpecific areas to focus on:\\n- {focus_area_1}\\n- {focus_area_2}\\n- {focus_area_3}\\n\\nAny suggestions for improvement?', 'review')
-      ) AS t(name, description, template_content, category)
-      WHERE NOT EXISTS (SELECT 1 FROM custom_prompt_templates WHERE name = t.name);
 
       -- Functions for updated_at trigger
       CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -2299,11 +1900,6 @@ async function handleInitializeUserDatabase() {
         FOR EACH ROW
         EXECUTE FUNCTION update_updated_at_column();
 
-      DROP TRIGGER IF EXISTS update_custom_templates_updated_at ON custom_prompt_templates;
-      CREATE TRIGGER update_custom_templates_updated_at
-        BEFORE UPDATE ON custom_prompt_templates
-        FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
     `;
     
     // Execute schema setup via REST API
@@ -2485,6 +2081,35 @@ async function handleMasterAuthUpdateUserDatabase(databaseUrl, databaseKey) {
   }
 }
 
+async function handleCheckAuth() {
+  try {
+    console.log('🔐 Service Worker: Checking authentication status');
+    
+    // Check if user is authenticated
+    const userId = masterAuth.getCurrentUserId();
+    const userInfo = masterAuth.getUserInfo();
+    
+    return {
+      success: true,
+      data: {
+        isAuthenticated: !!userId,
+        userId: userId,
+        userInfo: userInfo
+      }
+    };
+  } catch (error) {
+    console.error('❌ Service Worker: Check auth failed:', error);
+    return { 
+      success: true, // Don't fail the check itself
+      data: {
+        isAuthenticated: false,
+        userId: null,
+        userInfo: null
+      }
+    };
+  }
+}
+
 // Create database tables by inserting data and letting Supabase auto-create schema
 async function createTablesViaRestAPI(supabaseUrl, apiKey) {
   try {
@@ -2558,12 +2183,6 @@ async function createUserPreferencesTable(supabaseUrl, apiKey) {
       desktop_notification: false,
       tab_rename: false,
       auto_switch: false,
-      anthropic_api_key: null,
-      anthropic_model: 'claude-3-5-sonnet-20241022',
-      openai_api_key: null,
-      openai_model: 'gpt-4o',
-      google_api_key: null,
-      google_model: 'gemini-1.5-pro-latest',
       supabase_id: null,
       supabase_anon_key: null
     };
@@ -2912,29 +2531,10 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   desktop_notification BOOLEAN DEFAULT FALSE,
   tab_rename BOOLEAN DEFAULT FALSE,
   auto_switch BOOLEAN DEFAULT FALSE,
-  anthropic_api_key TEXT,
-  anthropic_model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
-  openai_api_key TEXT,
-  openai_model TEXT DEFAULT 'gpt-4o',
-  google_api_key TEXT,
-  google_model TEXT DEFAULT 'gemini-1.5-pro-latest',
   supabase_id TEXT,
   supabase_anon_key TEXT
 );
 
--- Create prompt_templates table
-CREATE TABLE IF NOT EXISTS prompt_templates (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  category TEXT NOT NULL,
-  name TEXT NOT NULL,
-  template TEXT NOT NULL,
-  shortcut TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  user_id TEXT NOT NULL DEFAULT 'default',
-  is_custom BOOLEAN DEFAULT TRUE,
-  is_active BOOLEAN DEFAULT TRUE
-);
 
 -- Create project_manager table
 CREATE TABLE IF NOT EXISTS project_manager (

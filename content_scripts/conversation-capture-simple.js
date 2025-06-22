@@ -7,11 +7,35 @@ class SimpleConversationCapture {
     this.isMonitoring = false;
     this.chatObserver = null;
     this.verboseLogging = false;
+    this.waitingForAuthentication = false; // Track authentication status
     
     this.init();
   }
 
-  init() {
+  async init() {
+    // Check if user is authenticated before initializing conversation capture
+    console.log('📚 Checking user authentication before initializing conversation capture...');
+    
+    try {
+      // Check authentication with service worker
+      const response = await this.safeSendMessage({ action: 'checkAuth' });
+      
+      if (!response?.success || !response.data?.isAuthenticated) {
+        console.log('🔒 User not authenticated - conversation capture will not start');
+        this.waitingForAuthentication = true;
+        this.waitingForOwnershipConfirmation = true;
+        return;
+      }
+      
+      console.log('✅ User authenticated - conversation capture can proceed');
+      this.waitingForAuthentication = false;
+    } catch (error) {
+      console.log('⚠️ Could not verify authentication - conversation capture will not start');
+      this.waitingForAuthentication = true;
+      this.waitingForOwnershipConfirmation = true;
+      return;
+    }
+    
     // Simple Conversation Capture initialized but not started yet
     console.log('📚 Conversation capture initialized but waiting for project ownership confirmation...');
     
@@ -29,6 +53,11 @@ class SimpleConversationCapture {
   // Method to start monitoring after project ownership is confirmed
   startMonitoringAfterOwnershipConfirmed(projectId) {
     if (this.isMonitoring) return;
+    
+    if (this.waitingForAuthentication) {
+      console.log('🔒 Cannot start monitoring - user not authenticated');
+      return;
+    }
     
     console.log('✅ Project ownership confirmed! Starting conversation capture for project:', projectId);
     this.projectId = projectId; // Store the confirmed project ID
@@ -53,6 +82,11 @@ class SimpleConversationCapture {
 
   startMonitoring() {
     if (this.isMonitoring) return;
+    
+    if (this.waitingForAuthentication) {
+      console.log('🔒 Conversation capture is waiting for user authentication...');
+      return;
+    }
     
     if (this.waitingForOwnershipConfirmation) {
       console.log('⏳ Conversation capture is waiting for project ownership confirmation...');
@@ -916,6 +950,30 @@ class SimpleConversationCapture {
     setTimeout(() => {
       this.startMonitoring();
     }, 1000);
+  },
+
+  async restartAfterAuth() {
+    console.log('🔄 Restarting capture after authentication...');
+    // Re-check authentication status
+    try {
+      const response = await this.safeSendMessage({ action: 'checkAuth' });
+      
+      if (response?.success && response.data?.isAuthenticated) {
+        console.log('✅ User authenticated - restarting conversation capture');
+        this.waitingForAuthentication = false;
+        
+        // Restart monitoring if project ownership was already confirmed
+        if (!this.waitingForOwnershipConfirmation && this.projectId) {
+          this.startMonitoring();
+        }
+      } else {
+        console.log('🔒 User still not authenticated');
+        this.waitingForAuthentication = true;
+      }
+    } catch (error) {
+      console.log('⚠️ Could not verify authentication during restart');
+      this.waitingForAuthentication = true;
+    }
   }
 
   destroy() {
@@ -941,14 +999,17 @@ window.conversationCapture = {
     const capture = window.simpleConversationCapture;
     return {
       isMonitoring: capture.isMonitoring,
+      waitingForAuthentication: capture.waitingForAuthentication,
       waitingForOwnership: capture.waitingForOwnershipConfirmation,
       projectId: capture.projectId,
       hasObserver: !!capture.chatObserver,
       messageGroupsCount: capture.messageGroups.size,
       pendingGroup: !!capture.pendingGroup,
-      status: capture.waitingForOwnershipConfirmation ? 
-        'Waiting for project ownership confirmation' : 
-        (capture.isMonitoring ? 'Active - capturing conversations' : 'Inactive')
+      status: capture.waitingForAuthentication ? 
+        'Waiting for user authentication' :
+        (capture.waitingForOwnershipConfirmation ? 
+          'Waiting for project ownership confirmation' : 
+          (capture.isMonitoring ? 'Active - capturing conversations' : 'Inactive'))
     };
   },
   
@@ -963,6 +1024,10 @@ window.conversationCapture = {
   
   restart: () => {
     return window.simpleConversationCapture.restart();
+  },
+  
+  restartAfterAuth: () => {
+    return window.simpleConversationCapture.restartAfterAuth();
   },
   
   // Legacy properties for compatibility

@@ -162,120 +162,13 @@
       </div>
       
       <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-        <button id="setup-personal-db" class="btn" style="flex: 1; font-size: 12px;">
-          🗄️ Setup Personal DB
-        </button>
-        <button id="logout-btn" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
+        <button id="logout-btn" class="btn btn-secondary" style="width: 100%; font-size: 12px;">
           🚪 Sign Out
         </button>
       </div>
-      
-      <div id="database-status" style="font-size: 12px; color: #4a5568;">
-        <span id="db-status-text">Personal database: Not configured</span>
-      </div>
     </div>
   </div>
 
-  <!-- Database Setup Section -->
-  <div id="database-setup" style="display: none;">
-    <div class="info-box">
-      <h3>🏗️ Database Setup</h3>
-      <p style="font-size: 13px; color: #4a5568; margin-bottom: 12px;">
-        Lovable Assistant stores your data in your own private Supabase database. This ensures complete privacy and data ownership.
-      </p>
-      
-      <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #0369a1;">
-        <strong>✨ Why your own database?</strong><br>
-        • Complete data privacy and ownership<br>
-        • No central data collection<br>
-        • Free Supabase tier (up to 500MB)<br>
-        • Full control over your information
-      </div>
-      
-      <div style="margin-bottom: 12px;">
-        <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
-          Supabase Project URL
-        </label>
-        <input type="url" id="supabase-url" placeholder="https://your-project.supabase.co" style="
-          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-          font-size: 14px; box-sizing: border-box;
-        ">
-      </div>
-      
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 13px; font-weight: 600; color: #1a202c; margin-bottom: 6px;">
-          API Key (anon/public)
-        </label>
-        <input type="password" id="supabase-key" placeholder="Your anon key" style="
-          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 6px;
-          font-size: 14px; box-sizing: border-box;
-        ">
-      </div>
-      
-      <div style="display: flex; gap: 8px;">
-        <button id="setup-database" class="btn" style="flex: 1;">
-          🔗 Connect Database
-        </button>
-        <button id="show-setup-guide" class="btn btn-secondary" style="flex: 1;">
-          📖 Setup Guide
-        </button>
-      </div>
-      
-      <div id="database-error" style="display: none; background: #fed7d7; color: #c53030; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-top: 8px;"></div>
-    </div>
-    
-    <div id="setup-guide" style="display: none; margin-top: 16px;" class="info-box">
-      <h4 style="margin: 0 0 12px 0; color: #1a202c; font-size: 14px;">📖 Setup Guide</h4>
-      
-      <div style="margin-bottom: 16px;">
-        <strong style="font-size: 12px; color: #1a202c;">🚀 Automatic Setup (Recommended)</strong>
-        <ol style="margin: 8px 0 0 0; padding-left: 20px; font-size: 12px; color: #4a5568; line-height: 1.6;">
-          <li>Go to <a href="https://supabase.com" target="_blank" style="color: #667eea;">supabase.com</a> and create account</li>
-          <li>Create a new project (free tier works perfectly)</li>
-          <li>Go to Settings → API in your project</li>
-          <li>Copy the "Project URL" and "anon public" key</li>
-          <li>Paste them above and click "Connect Database"</li>
-          <li>Extension will automatically set up the required tables</li>
-        </ol>
-      </div>
-      
-      <div style="border-top: 1px solid #e2e8f0; padding-top: 12px;">
-        <strong style="font-size: 12px; color: #1a202c;">🛠️ Manual Setup (If automatic fails)</strong>
-        <ol style="margin: 8px 0 0 0; padding-left: 20px; font-size: 12px; color: #4a5568; line-height: 1.6;">
-          <li>Follow steps 1-4 above</li>
-          <li>Go to SQL Editor in your Supabase dashboard</li>
-          <li>Copy the contents of <code>simple-db-setup.sql</code> from the extension folder</li>
-          <li>Paste and run the SQL to create tables (this disables RLS for easier setup)</li>
-          <li>Then click "Connect Database" above</li>
-        </ol>
-        <div style="margin-top: 8px; padding: 6px; background: #fef7e0; border-radius: 4px; font-size: 11px; color: #b45309;">
-          ⚠️ If you see "table access failed", use the manual setup above
-        </div>
-      </div>
-      
-      <div style="margin-top: 12px; padding: 8px; background: #f0f9ff; border-radius: 4px; font-size: 11px; color: #0369a1;">
-        💡 Your database credentials are stored locally and never shared
-      </div>
-    </div>
-  </div>
-
-  <!-- User Status Section -->
-  <div id="user-status" style="display: none;">
-    <div class="info-box">
-      <h3>👤 Your Database</h3>
-      <p style="font-size: 13px; color: #4a5568; margin-bottom: 8px;">
-        <span id="database-url-display" style="font-weight: 500;"></span>
-      </p>
-      <div style="display: flex; gap: 8px;">
-        <button id="change-database" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
-          🔄 Change Database
-        </button>
-        <button id="reset-extension" class="btn btn-secondary" style="flex: 1; font-size: 12px;">
-          🗑️ Reset Extension
-        </button>
-      </div>
-    </div>
-  </div>
 
   <div class="status-indicator">
     <div class="status-dot" id="status-dot"></div>
@@ -288,7 +181,6 @@
   </div>
 
   <div class="quick-actions">
-    <button class="btn" id="open-settings">⚙️ Open Settings</button>
     <button class="btn btn-secondary" id="check-connection">🔄 Check Connection</button>
   </div>
 

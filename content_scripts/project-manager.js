@@ -61,7 +61,9 @@ window.ProjectManager = {
         </div>
       `;
       
-      this.setupBackButton();
+      if (typeof this.setupBackButton === 'function') {
+        this.setupBackButton();
+      }
       this.renderProjectsList(); // Use a render method that works with pre-loaded data
     } catch (error) {
       console.error('❌ Error loading project manager:', error);

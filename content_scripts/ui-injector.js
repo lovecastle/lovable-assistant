@@ -33,8 +33,6 @@ class UIInjector {
       <div class="la-header">
         <div class="la-header-buttons">
           <button class="la-btn la-btn-icon" id="la-search" title="Search History">🔍</button>
-          <button class="la-btn la-btn-icon" id="la-enhance" title="Enhance Prompt">⚡</button>
-          <button class="la-btn la-btn-icon" id="la-suggest" title="Suggest Features">💡</button>
           <button class="la-btn la-btn-icon" id="la-settings" title="Settings">⚙️</button>
         </div>
         <div class="la-drag-handle" id="la-drag-handle">
@@ -48,19 +46,12 @@ class UIInjector {
           <div class="la-messages" id="la-messages">
             <div class="la-message la-message-system">
               <div class="la-message-content">
-                Welcome! I'm here to help enhance your Lovable.dev development experience.
+                Welcome to Lovable Assistant!
                 <br><br>
-                • Type in the chat below to get real-time assistance
-                • Use Ctrl+Enter to open prompt helper menu
                 • Use Ctrl+K to search your conversation history
+                • View and manage your project information
+                • Export conversation data
               </div>
-            </div>
-          </div>
-          <div class="la-input-container">
-            <textarea id="la-input" placeholder="Ask me anything about your project..." rows="2"></textarea>
-            <div class="la-input-actions">
-              <button class="la-btn la-btn-primary" id="la-send">Send</button>
-              <button class="la-btn la-btn-icon" id="la-enhance-current" title="Enhance Current Input">🎯</button>
             </div>
           </div>
         </div>
@@ -77,11 +68,7 @@ class UIInjector {
         e.preventDefault();
         this.showDialog('search');
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        if (this.isVisible) {
-          this.enhanceCurrentInput();
-        }
-      }
+      // Removed AI enhancement shortcut
       if (e.key === 'Escape' && this.isVisible) {
         this.hideDialog();
       }
@@ -110,34 +97,12 @@ class UIInjector {
 
     // Header buttons
     const searchBtn = this.dialog.querySelector('#la-search');
-    const enhanceBtn = this.dialog.querySelector('#la-enhance');
-    const suggestBtn = this.dialog.querySelector('#la-suggest');
     const settingsBtn = this.dialog.querySelector('#la-settings');
     const closeBtn = this.dialog.querySelector('#la-close');
 
     searchBtn?.addEventListener('click', () => this.switchView('search'));
-    enhanceBtn?.addEventListener('click', () => this.enhancePrompt());
-    suggestBtn?.addEventListener('click', () => this.suggestFeatures());
     settingsBtn?.addEventListener('click', () => this.switchView('settings'));
     closeBtn?.addEventListener('click', () => this.hideDialog());
-
-    // Chat functionality
-    const sendBtn = this.dialog.querySelector('#la-send');
-    const enhanceCurrentBtn = this.dialog.querySelector('#la-enhance-current');
-    const input = this.dialog.querySelector('#la-input');
-
-    sendBtn?.addEventListener('click', () => this.sendMessage());
-    enhanceCurrentBtn?.addEventListener('click', () => this.enhanceCurrentInput());
-    
-    input?.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        this.enhanceCurrentInput();
-      } else if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage();
-      }
-    });
 
     // Drag functionality
     this.setupDragEvents();
@@ -287,19 +252,12 @@ class UIInjector {
         <div class="la-messages" id="la-messages">
           <div class="la-message la-message-system">
             <div class="la-message-content">
-              Welcome! I'm here to help enhance your Lovable.dev development experience.
+              Welcome to Lovable Assistant!
               <br><br>
-              • Type in the chat below to get real-time assistance
-              • Use Ctrl+Enter to open prompt helper menu
               • Use Ctrl+K to search your conversation history
+              • View and manage your project information
+              • Export conversation data
             </div>
-          </div>
-        </div>
-        <div class="la-input-container">
-          <textarea id="la-input" placeholder="Ask me anything about your project..." rows="2"></textarea>
-          <div class="la-input-actions">
-            <button class="la-btn la-btn-primary" id="la-send">Send</button>
-            <button class="la-btn la-btn-icon" id="la-enhance-current" title="Enhance Current Input">🎯</button>
           </div>
         </div>
       </div>
@@ -331,12 +289,7 @@ class UIInjector {
         </div>
         <div class="la-settings-content">
           <div class="la-setting-group">
-            <h4>API Configuration</h4>
-            <div class="la-setting-item">
-              <label for="la-claude-key">Claude API Key:</label>
-              <input type="password" id="la-claude-key" placeholder="Enter your Claude API key">
-              <button class="la-btn la-btn-icon" id="la-test-claude" title="Test Connection">🔗</button>
-            </div>
+            <h4>Database Configuration</h4>
             <div class="la-setting-item">
               <label for="la-supabase-url">Supabase URL:</label>
               <input type="text" id="la-supabase-url" placeholder="https://your-project.supabase.co">
@@ -355,16 +308,6 @@ class UIInjector {
                 <input type="checkbox" id="la-auto-capture"> Auto-capture conversations
               </label>
             </div>
-            <div class="la-setting-item">
-              <label>
-                <input type="checkbox" id="la-auto-enhance"> Auto-enhance prompts
-              </label>
-            </div>
-            <div class="la-setting-item">
-              <label>
-                <input type="checkbox" id="la-show-suggestions"> Show feature suggestions
-              </label>
-            </div>
           </div>
           
           <div class="la-setting-actions">
@@ -378,24 +321,7 @@ class UIInjector {
   }
 
   setupChatView() {
-    const sendBtn = this.dialog.querySelector('#la-send');
-    const enhanceCurrentBtn = this.dialog.querySelector('#la-enhance-current');
-    const input = this.dialog.querySelector('#la-input');
-
-    sendBtn?.addEventListener('click', () => this.sendMessage());
-    enhanceCurrentBtn?.addEventListener('click', () => this.enhanceCurrentInput());
-    
-    input?.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        this.enhanceCurrentInput();
-      } else if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage();
-      }
-    });
-
-    input?.focus();
+    // No chat input functionality needed anymore
   }
 
   setupSearchView() {
@@ -417,117 +343,24 @@ class UIInjector {
     const saveBtn = this.dialog.querySelector('#la-save-settings');
     const exportBtn = this.dialog.querySelector('#la-export-data');
     const importBtn = this.dialog.querySelector('#la-import-data');
-    const testClaudeBtn = this.dialog.querySelector('#la-test-claude');
     const testSupabaseBtn = this.dialog.querySelector('#la-test-supabase');
     
     backBtn?.addEventListener('click', () => this.switchView('chat'));
     saveBtn?.addEventListener('click', () => this.saveSettings());
     exportBtn?.addEventListener('click', () => this.exportData());
     importBtn?.addEventListener('click', () => this.importData());
-    testClaudeBtn?.addEventListener('click', () => this.testClaudeConnection());
     testSupabaseBtn?.addEventListener('click', () => this.testSupabaseConnection());
     
     this.loadSettingsIntoForm();
   }
 
-  async sendMessage() {
-    const input = this.dialog.querySelector('#la-input');
-    const message = input?.value.trim();
-    
-    if (!message) return;
-    
-    this.addMessageToChat('user', message);
-    input.value = '';
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'chatWithClaude',
-        message: message,
-        context: await this.getProjectContext()
-      });
-      
-      if (response.success) {
-        this.addMessageToChat('assistant', response.content);
-      } else {
-        this.addMessageToChat('error', 'Failed to get response: ' + (response.error || 'Unknown error'));
-      }
-    } catch (error) {
-      this.addMessageToChat('error', 'Connection error: ' + error.message);
-    }
-  }
+  // Removed sendMessage() - AI chat functionality removed
 
-  async enhanceCurrentInput() {
-    const input = this.dialog.querySelector('#la-input');
-    const currentText = input?.value.trim();
-    
-    if (!currentText) return;
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'enhancePrompt',
-        text: currentText,
-        context: await this.getProjectContext()
-      });
-      
-      if (response.success && input) {
-        input.value = response.enhanced;
-        input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
-      }
-    } catch (error) {
-      console.error('Failed to enhance prompt:', error);
-    }
-  }
+  // Removed enhanceCurrentInput() - AI enhancement functionality removed
 
-  async enhancePrompt() {
-    // Get current text from Lovable's input field
-    const lovableInput = document.querySelector('textarea[placeholder*="message"], textarea[placeholder*="question"], .ProseMirror, [contenteditable="true"]');
-    let currentText = '';
-    
-    if (lovableInput) {
-      currentText = lovableInput.value || lovableInput.textContent || '';
-    }
-    
-    if (!currentText.trim()) {
-      this.addMessageToChat('system', 'No text found to enhance. Please type something in the Lovable chat first.');
-      return;
-    }
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'enhancePrompt',
-        text: currentText,
-        context: await this.getProjectContext()
-      });
-      
-      if (response.success) {
-        this.addMessageToChat('system', 'Enhanced prompt suggestion:');
-        this.addMessageToChat('assistant', response.enhanced);
-        
-        // Optionally copy to clipboard
-        await navigator.clipboard.writeText(response.enhanced);
-        this.addMessageToChat('system', 'Enhanced prompt copied to clipboard!');
-      }
-    } catch (error) {
-      this.addMessageToChat('error', 'Failed to enhance prompt: ' + error.message);
-    }
-  }
+  // Removed enhancePrompt() - AI enhancement functionality removed
 
-  async suggestFeatures() {
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'suggestFeatures',
-        context: await this.getProjectContext()
-      });
-      
-      if (response.success) {
-        this.addMessageToChat('system', 'Feature suggestions for your project:');
-        this.addMessageToChat('assistant', response.suggestions);
-      }
-    } catch (error) {
-      this.addMessageToChat('error', 'Failed to get feature suggestions: ' + error.message);
-    }
-  }
+  // Removed suggestFeatures() - AI suggestions functionality removed
 
   addMessageToChat(type, content) {
     const messagesContainer = this.dialog.querySelector('#la-messages');
@@ -743,20 +576,14 @@ class UIInjector {
     
     // If in settings view, also save form data
     if (this.currentView === 'settings') {
-      const claudeKey = this.dialog.querySelector('#la-claude-key')?.value;
       const supabaseUrl = this.dialog.querySelector('#la-supabase-url')?.value;
       const supabaseKey = this.dialog.querySelector('#la-supabase-key')?.value;
       const autoCapture = this.dialog.querySelector('#la-auto-capture')?.checked;
-      const autoEnhance = this.dialog.querySelector('#la-auto-enhance')?.checked;
-      const showSuggestions = this.dialog.querySelector('#la-show-suggestions')?.checked;
       
       Object.assign(settings, {
-        claudeApiKey: claudeKey,
         supabaseUrl: supabaseUrl,
         supabaseKey: supabaseKey,
-        autoCapture: autoCapture,
-        autoEnhance: autoEnhance,
-        showSuggestions: showSuggestions
+        autoCapture: autoCapture
       });
     }
     
@@ -783,47 +610,20 @@ class UIInjector {
       if (response.success) {
         const settings = response.settings;
         
-        const claudeKey = this.dialog.querySelector('#la-claude-key');
         const supabaseUrl = this.dialog.querySelector('#la-supabase-url');
         const supabaseKey = this.dialog.querySelector('#la-supabase-key');
         const autoCapture = this.dialog.querySelector('#la-auto-capture');
-        const autoEnhance = this.dialog.querySelector('#la-auto-enhance');
-        const showSuggestions = this.dialog.querySelector('#la-show-suggestions');
         
-        if (claudeKey) claudeKey.value = settings.claudeApiKey || '';
         if (supabaseUrl) supabaseUrl.value = settings.supabaseUrl || '';
         if (supabaseKey) supabaseKey.value = settings.supabaseKey || '';
         if (autoCapture) autoCapture.checked = settings.autoCapture !== false;
-        if (autoEnhance) autoEnhance.checked = settings.autoEnhance !== false;
-        if (showSuggestions) showSuggestions.checked = settings.showSuggestions !== false;
       }
     } catch (error) {
       console.error('Failed to load settings into form:', error);
     }
   }
 
-  async testClaudeConnection() {
-    const claudeKey = this.dialog.querySelector('#la-claude-key')?.value;
-    if (!claudeKey) {
-      this.addMessageToChat('error', 'Please enter a Claude API key first.');
-      return;
-    }
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'testClaudeConnection',
-        apiKey: claudeKey
-      });
-      
-      if (response.success) {
-        this.addMessageToChat('system', '✅ Claude connection successful!');
-      } else {
-        this.addMessageToChat('error', '❌ Claude connection failed: ' + response.error);
-      }
-    } catch (error) {
-      this.addMessageToChat('error', '❌ Connection test failed: ' + error.message);
-    }
-  }
+  // Removed testClaudeConnection() - AI functionality removed
 
   async testSupabaseConnection() {
     const supabaseUrl = this.dialog.querySelector('#la-supabase-url')?.value;

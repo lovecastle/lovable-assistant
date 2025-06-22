@@ -495,4 +495,9 @@ export class MasterAuthService {
       createdAt: this.userProfile.created_at
     };
   }
+
+  getCurrentUserId() {
+    if (!this.currentUser) return null;
+    return this.currentUser.id;
+  }
 }

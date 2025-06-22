@@ -257,7 +257,33 @@ window.UIDialogManager = {
     return match ? match[1] : null;
   },
 
-  // extractProjectName() method moved to chat-interface.js
+  // Project name extraction functionality
+  extractProjectName() {
+    try {
+      // Try to get from page title first
+      const titleElement = document.querySelector('title');
+      if (titleElement) {
+        const title = titleElement.textContent;
+        // Look for pattern like "ProjectName - Lovable"
+        const titleMatch = title.match(/^(.+?)\s*[-–]\s*Lovable/i);
+        if (titleMatch && titleMatch[1].trim()) {
+          return titleMatch[1].trim();
+        }
+      }
+
+      // Try to get from URL path
+      const urlProjectId = this.extractProjectIdFromUrl();
+      if (urlProjectId) {
+        return urlProjectId;
+      }
+
+      // Fallback to "Unknown Project"
+      return 'Unknown Project';
+    } catch (error) {
+      console.warn('⚠️ Could not extract project name:', error);
+      return 'Unknown Project';
+    }
+  },
 
   escapeHtml(text) {
     const div = document.createElement('div');
@@ -417,7 +443,7 @@ window.UIDialogManager = {
             Welcome! 👋
           </h2>
           <p style="margin: 0; color: #4a5568; font-size: 16px;">
-            AI assistant for project <strong style="color: #667eea;" data-project-name>${projectName}</strong>
+            Development assistant for project <strong style="color: #667eea;" data-project-name>${projectName}</strong>
           </p>
         </div>
         
@@ -447,30 +473,7 @@ window.UIDialogManager = {
             </div>
           </div>
           
-          <!-- PROJECT AI ASSISTANT -->
-          <div class="feature-card" data-feature="chat" style="
-            background: white; border: 2px solid #c9cfd7; border-radius: 12px;
-            padding: 20px; cursor: pointer; transition: all 0.2s ease;
-            text-align: left; position: relative; overflow: hidden;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; width: 40px; height: 40px; border-radius: 10px;
-                display: flex; align-items: center; justify-content: center;
-                font-size: 18px; font-weight: bold;
-              ">💬</div>
-              <div style="flex: 1;">
-                <h3 style="margin: 0 0 4px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
-                  Project Assistant
-                </h3>
-                <p style="margin: 0; color: #718096; font-size: 14px;">
-                  AI-powered chat for development assistance and coding help
-                </p>
-              </div>
-              <div style="color: #cbd5e0; font-size: 18px;">→</div>
-            </div>
-          </div>
+          <!-- REMOVED PROJECT AI ASSISTANT - AI functionality removed -->
           
           <!-- Lovable Chat History -->
           <div class="feature-card" data-feature="history" style="
@@ -949,11 +952,8 @@ window.UIDialogManager = {
   async handleFeatureSelection(feature) {
     switch (feature) {
       case 'chat':
-        if (typeof this.showChatInterface === 'function') {
-          this.showChatInterface();
-        } else {
-          console.error('showChatInterface method not available');
-        }
+        // Removed AI chat interface - AI functionality removed
+        console.log('AI chat functionality has been removed');
         break;
       case 'history':
         if (typeof this.showConversationHistory === 'function') {
@@ -1017,6 +1017,8 @@ window.UIDialogManager = {
       </div>
     `;
     
-    this.setupBackButton();
+    if (typeof this.setupBackButton === 'function') {
+      this.setupBackButton();
+    }
   }
 };

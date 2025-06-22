@@ -9,13 +9,9 @@ export class SupabaseClient {
   async init() {
     if (this.initialized) return;
     
-    const config = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
-    if (!config.supabaseUrl || !config.supabaseKey) {
-      throw new Error('Supabase configuration not found. Please configure in extension popup.');
-    }
-    
-    this.baseURL = config.supabaseUrl;
-    this.apiKey = config.supabaseKey;
+    // Use master database configuration
+    this.baseURL = 'https://dwbrjztmskvzpyufwxnt.supabase.co';
+    this.apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3YnJqenRtc2t2enB5dWZ3eG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTkyNTAsImV4cCI6MjA2MzU5NTI1MH0.t5qo1CEePXCxfdFRaVABMqR0TOX9DHIbHXb7Z8zFq1Q';
     this.initialized = true;
   }
 
@@ -61,8 +57,15 @@ export class SupabaseClient {
     console.log(`✅ Database response data:`, result);
     return result;
   }
+  // Original method for backward compatibility
   async saveConversation(data) {
-    console.log('🔍 Database-sync: Saving conversation:', data.id);
+    // Default to 'default' user for backward compatibility
+    return this.saveConversationWithUser(data, 'default');
+  }
+
+  // New method with user ID
+  async saveConversationWithUser(data, userId) {
+    console.log('🔍 Database-sync: Saving conversation:', data.id, 'for user:', userId);
     
     // Enhanced duplicate checking based on lovable_message_id
     const lovableMessageId = data.projectContext?.lovableId || data.lovable_message_id;
@@ -137,7 +140,8 @@ export class SupabaseClient {
       lovable_response: data.lovableResponse,
       timestamp: data.timestamp || new Date().toISOString(),
       tags: data.categories || [], // Map categories to tags field in database
-      effectiveness_score: null // Always null as requested
+      effectiveness_score: null, // Always null as requested
+      user_id: userId // Add user ID
     };
 
     // Try to add new columns if they exist, otherwise use old project_context method
@@ -237,7 +241,12 @@ export class SupabaseClient {
 
   // Project Manager CRUD operations
   async saveProjectManager(projectManagerData) {
-    console.log('🔍 Database-sync: Saving project manager:', projectManagerData.project_id);
+    // Default to 'default' user for backward compatibility
+    return this.saveProjectManagerWithUser(projectManagerData, 'default');
+  }
+
+  async saveProjectManagerWithUser(projectManagerData, userId) {
+    console.log('🔍 Database-sync: Saving project manager:', projectManagerData.project_id, 'for user:', userId);
     
     const projectManager = {
       project_id: projectManagerData.project_id,
@@ -245,7 +254,8 @@ export class SupabaseClient {
       project_url: projectManagerData.project_url,
       description: projectManagerData.description || '',
       knowledge: projectManagerData.knowledge || '',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      user_id: userId
     };
 
     try {
@@ -266,10 +276,15 @@ export class SupabaseClient {
   }
 
   async getProjectManager(projectId) {
-    console.log('🔍 Database-sync: Getting project manager for project:', projectId);
+    // Default to 'default' user for backward compatibility
+    return this.getProjectManagerWithUser(projectId, 'default');
+  }
+
+  async getProjectManagerWithUser(projectId, userId) {
+    console.log('🔍 Database-sync: Getting project manager for project:', projectId, 'for user:', userId);
     
     try {
-      const result = await this.request(`project_manager?project_id=eq.${projectId}&limit=1`);
+      const result = await this.request(`project_manager?project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`);
       
       if (result && result.length > 0) {
         console.log('✅ Database-sync: Project manager found');
@@ -285,10 +300,15 @@ export class SupabaseClient {
   }
 
   async getAllProjectManagers() {
-    console.log('🔍 Database-sync: Getting all project managers');
+    // Default to 'default' user for backward compatibility
+    return this.getAllProjectManagersWithUser('default');
+  }
+
+  async getAllProjectManagersWithUser(userId) {
+    console.log('🔍 Database-sync: Getting all project managers for user:', userId);
     
     try {
-      const result = await this.request('project_manager?order=updated_at.desc');
+      const result = await this.request(`project_manager?user_id=eq.${userId}&order=updated_at.desc`);
       
       console.log(`✅ Database-sync: Found ${result?.length || 0} project managers`);
       return { success: true, data: result || [] };
@@ -299,7 +319,12 @@ export class SupabaseClient {
   }
 
   async updateProjectManager(projectId, updateData) {
-    console.log('🔍 Database-sync: Updating project manager:', projectId);
+    // Default to 'default' user for backward compatibility
+    return this.updateProjectManagerWithUser(projectId, updateData, 'default');
+  }
+
+  async updateProjectManagerWithUser(projectId, updateData, userId) {
+    console.log('🔍 Database-sync: Updating project manager:', projectId, 'for user:', userId);
     
     const updateFields = {
       ...updateData,
@@ -307,7 +332,7 @@ export class SupabaseClient {
     };
 
     try {
-      const result = await this.request(`project_manager?project_id=eq.${projectId}`, {
+      const result = await this.request(`project_manager?project_id=eq.${projectId}&user_id=eq.${userId}`, {
         method: 'PATCH',
         body: JSON.stringify(updateFields)
       });
@@ -321,10 +346,15 @@ export class SupabaseClient {
   }
 
   async deleteProjectManager(projectId) {
-    console.log('🔍 Database-sync: Deleting project manager:', projectId);
+    // Default to 'default' user for backward compatibility
+    return this.deleteProjectManagerWithUser(projectId, 'default');
+  }
+
+  async deleteProjectManagerWithUser(projectId, userId) {
+    console.log('🔍 Database-sync: Deleting project manager:', projectId, 'for user:', userId);
     
     try {
-      const result = await this.request(`project_manager?project_id=eq.${projectId}`, {
+      const result = await this.request(`project_manager?project_id=eq.${projectId}&user_id=eq.${userId}`, {
         method: 'DELETE'
       });
 
@@ -351,10 +381,18 @@ export class SupabaseClient {
   }
 
   async deleteConversations(filters = {}) {
-    console.log('🔍 Database-sync: Deleting conversations with filters:', filters);
+    // Default to 'default' user for backward compatibility
+    return this.deleteConversationsWithUser(filters, 'default');
+  }
+
+  async deleteConversationsWithUser(filters = {}, userId) {
+    console.log('🔍 Database-sync: Deleting conversations with filters:', filters, 'for user:', userId);
     
     let endpoint = 'conversations';
     const conditions = [];
+    
+    // Always filter by user ID
+    conditions.push(`user_id=eq.${userId}`);
 
     // Apply filters for targeted deletion
     if (filters.id) {
@@ -413,7 +451,12 @@ export class SupabaseClient {
   }
 
   async getConversations(projectId = null, limit = 50) {
-    let endpoint = `conversations?order=timestamp.desc&limit=${limit}`;
+    // Default to 'default' user for backward compatibility
+    return this.getConversationsWithUser(projectId, 'default', limit);
+  }
+
+  async getConversationsWithUser(projectId = null, userId, limit = 50) {
+    let endpoint = `conversations?user_id=eq.${userId}&order=timestamp.desc&limit=${limit}`;
     if (projectId) {
       endpoint += `&project_id=eq.${projectId}`;
     }
@@ -533,7 +576,12 @@ export class SupabaseClient {
 
   // Assistant Conversation Methods
   async saveAssistantConversation(conversationData) {
-    console.log('💾 Database-sync: Saving assistant conversation');
+    // Default to 'default' user for backward compatibility
+    return this.saveAssistantConversationWithUser(conversationData, 'default');
+  }
+
+  async saveAssistantConversationWithUser(conversationData, userId) {
+    console.log('💾 Database-sync: Saving assistant conversation for user:', userId);
     
     try {
       // Generate UUID if not provided
@@ -541,9 +589,15 @@ export class SupabaseClient {
         conversationData.id = this.generateUUID();
       }
       
+      // Add user ID to conversation data
+      const conversationWithUser = {
+        ...conversationData,
+        user_id: userId
+      };
+      
       const result = await this.request('assistant_conversations', {
         method: 'POST',
-        body: JSON.stringify(conversationData)
+        body: JSON.stringify(conversationWithUser)
       });
 
       console.log('✅ Database-sync: Assistant conversation saved successfully');
@@ -555,10 +609,15 @@ export class SupabaseClient {
   }
 
   async getAssistantConversations(projectId, limit = 10) {
-    console.log(`🔍 Database-sync: Getting assistant conversations for project ${projectId}`);
+    // Default to 'default' user for backward compatibility
+    return this.getAssistantConversationsWithUser(projectId, 'default', limit);
+  }
+
+  async getAssistantConversationsWithUser(projectId, userId, limit = 10) {
+    console.log(`🔍 Database-sync: Getting assistant conversations for project ${projectId} and user ${userId}`);
     
     try {
-      const endpoint = `assistant_conversations?project_id=eq.${projectId}&order=created_at.desc&limit=${limit}`;
+      const endpoint = `assistant_conversations?project_id=eq.${projectId}&user_id=eq.${userId}&order=created_at.desc&limit=${limit}`;
       const result = await this.request(endpoint);
       
       console.log(`✅ Database-sync: Retrieved ${result.length} assistant conversations`);
@@ -920,38 +979,7 @@ export class SupabaseClient {
     }
   }
 
-  // Add user_id support to existing methods
-  async saveConversationWithUser(data, userId = 'default') {
-    return this.saveConversation({ ...data, user_id: userId });
-  }
-
-  async getConversationsWithUser(projectId = null, userId = 'default', limit = 50) {
-    let endpoint = `conversations?user_id=eq.${userId}&order=timestamp.desc&limit=${limit}`;
-    if (projectId) {
-      endpoint += `&project_id=eq.${projectId}`;
-    }
-    return await this.request(endpoint);
-  }
-
-  async saveProjectManagerWithUser(projectManagerData, userId = 'default') {
-    return this.saveProjectManager({ ...projectManagerData, user_id: userId });
-  }
-
-  async getProjectManagerWithUser(projectId, userId = 'default') {
-    const endpoint = `project_manager?project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`;
-    const result = await this.request(endpoint);
-    return result && result.length > 0 ? { success: true, data: result[0] } : { success: true, data: null };
-  }
-
-  async saveAssistantConversationWithUser(conversationData, userId = 'default') {
-    return this.saveAssistantConversation({ ...conversationData, user_id: userId });
-  }
-
-  async getAssistantConversationsWithUser(projectId, userId = 'default', limit = 10) {
-    const endpoint = `assistant_conversations?project_id=eq.${projectId}&user_id=eq.${userId}&order=created_at.desc&limit=${limit}`;
-    const result = await this.request(endpoint);
-    return { success: true, data: result };
-  }
+  // These methods are now properly defined above with user ID support
 
   // Individual Preference Column Methods
   async saveIndividualPreference(userId = 'default', columnName, value) {
@@ -1125,6 +1153,74 @@ export class SupabaseClient {
       return { success: true, data: aiPrefs };
     }
     return result;
+  }
+
+  // Individual UI preference methods (for service worker compatibility)
+  async saveUIPreferenceIndividual(userId = 'default', preferenceKey, preferenceValue) {
+    console.log('🔍 Database-sync: Saving UI preference individually:', preferenceKey);
+    
+    try {
+      const updates = {
+        updated_at: new Date().toISOString()
+      };
+      
+      // Map preference keys to column names
+      switch(preferenceKey) {
+        case 'lovable-auto-expand':
+          updates.desktop_notification = preferenceValue;
+          break;
+        case 'lovable-tab-rename':
+          updates.tab_rename = preferenceValue;
+          break;
+        case 'lovable-auto-switch':
+          updates.auto_switch = preferenceValue;
+          break;
+        default:
+          // Store in settings JSON for unknown preferences
+          const existing = await this.getUserPreferences(userId);
+          updates.settings = { 
+            ...(existing.data?.settings || {}), 
+            [preferenceKey]: preferenceValue 
+          };
+      }
+      
+      // Ensure user exists first
+      await this.getUserPreferences(userId);
+      
+      const result = await this.request(`user_preferences?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+
+      console.log('✅ Database-sync: UI preference saved individually');
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to save UI preference individually:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getAllUIPreferencesIndividual(userId = 'default') {
+    console.log('🔍 Database-sync: Getting all UI preferences individually');
+    
+    try {
+      const result = await this.getAllIndividualPreferences(userId);
+      if (result.success && result.data) {
+        const uiPrefs = {
+          'lovable-auto-expand': result.data.desktop_notification || false,
+          'lovable-tab-rename': result.data.tab_rename || false,
+          'lovable-auto-switch': result.data.auto_switch || false,
+          // Include any additional preferences from settings
+          ...(result.data.settings || {})
+        };
+        console.log(`✅ Database-sync: Found ${Object.keys(uiPrefs).length} UI preferences`);
+        return { success: true, data: uiPrefs };
+      }
+      return result;
+    } catch (error) {
+      console.error('❌ Database-sync: Failed to get UI preferences individually:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   async saveSupabaseSettings(userId = 'default', supabaseId, supabaseKey) {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lovable.dev Assistant",
   "version": "1.0.0",
-  "description": "Intelligent prompt assistance and conversation management for Lovable.dev",
+  "description": "Conversation capture and project management for Lovable.dev",
   "permissions": [
     "storage",
     "activeTab",
@@ -11,9 +11,6 @@
   ],
   "host_permissions": [
     "https://lovable.dev/*",
-    "https://api.anthropic.com/*",
-    "https://api.openai.com/*",
-    "https://generativelanguage.googleapis.com/*",
     "https://*.supabase.co/*"
   ],
   "background": {
@@ -27,7 +24,6 @@
         "markdown-formatter.js",
         "content_scripts/ui-dialog-manager.js",
         "content_scripts/project-manager.js",
-        "content_scripts/chat-interface.js",
         "content_scripts/conversation-history.js",
         "content_scripts/utilities-manager.js",
         "content_scripts/status-monitor.js",
