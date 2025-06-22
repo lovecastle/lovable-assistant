@@ -950,7 +950,7 @@ class SimpleConversationCapture {
     setTimeout(() => {
       this.startMonitoring();
     }, 1000);
-  },
+  }
 
   async restartAfterAuth() {
     console.log('🔄 Restarting capture after authentication...');
