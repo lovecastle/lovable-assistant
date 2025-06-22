@@ -467,6 +467,13 @@ export class SupabaseClient {
     let endpoint = 'conversations?';
     const conditions = [];
 
+    // SECURITY: Always filter by user ID first
+    if (filters.userId) {
+      conditions.push(`user_id=eq.${filters.userId}`);
+    } else {
+      throw new Error('User ID is required for text search');
+    }
+
     // Text search in user_message and lovable_response
     if (query) {
       conditions.push(`or=(user_message.ilike.*${query}*,lovable_response.ilike.*${query}*)`);
