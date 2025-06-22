@@ -187,7 +187,7 @@ window.UtilitiesManager = {
   renderUtilitiesSettings() {
     // This method will render the UI with pre-loaded data
     // The settings are already applied to the UI elements during loadUtilitiesSettings
-  }
+  },
 
   setupBackButton() {
     const backBtn = document.getElementById('back-to-welcome-btn');

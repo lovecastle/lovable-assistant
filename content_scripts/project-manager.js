@@ -395,6 +395,18 @@ window.ProjectManager = {
    */
   async getCurrentProject() {
     try {
+      // Check if user is authenticated before proceeding
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+          console.log('🔒 User not authenticated - skipping project data operations');
+          return null;
+        }
+      } catch (error) {
+        console.log('⚠️ Could not verify authentication - skipping project data operations');
+        return null;
+      }
+      
       // Use the current project ID from the detector, fallback to URL extraction if needed
       const projectId = this.projectId || this.extractProjectId();
       console.log('🔍 Using project ID:', projectId);
@@ -723,6 +735,18 @@ window.ProjectManager = {
 
   async getSavedProjects() {
     try {
+      // Check if user is authenticated before proceeding
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+          console.log('🔒 User not authenticated - skipping saved projects retrieval');
+          return [];
+        }
+      } catch (error) {
+        console.log('⚠️ Could not verify authentication - skipping saved projects retrieval');
+        return [];
+      }
+      
       console.log('🔍 Fetching all saved projects from database...');
       const response = await this.safeSendMessageWithRetry({
         action: 'getAllProjectManagers'

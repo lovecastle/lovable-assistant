@@ -262,6 +262,24 @@ window.ConversationHistory = {
     this.allHistoryMessages = [];
     
     try {
+      // Check if user is authenticated before proceeding
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+          console.log('🔒 User not authenticated - skipping conversation history loading');
+          this.allHistoryMessages = [];
+          this.filteredHistoryMessages = [];
+          this.renderHistoryMessages();
+          return;
+        }
+      } catch (error) {
+        console.log('⚠️ Could not verify authentication - skipping conversation history loading');
+        this.allHistoryMessages = [];
+        this.filteredHistoryMessages = [];
+        this.renderHistoryMessages();
+        return;
+      }
+      
       // Use the current project ID from the detector, fallback to URL extraction if needed
       const projectId = this.projectId || this.extractProjectId();
       if (!projectId) {
