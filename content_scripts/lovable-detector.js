@@ -56,6 +56,7 @@ class LovableDetector {
   init() {
     this.detectLovablePage();
     this.setupKeyboardShortcuts();
+    this.setupUrlChangeDetection();
     
     // Only call setupPromptEnhancement if it exists (from ChatInterface mixin)
     if (typeof this.setupPromptEnhancement === 'function') {
@@ -102,23 +103,50 @@ class LovableDetector {
         });
       }
       
-      // Check project info after page is fully loaded
+      // Check project info after page is fully loaded AND chat interface is ready
       // This ensures all elements are rendered before checking
-      if (document.readyState === 'complete') {
-        setTimeout(() => {
-          if (typeof this.autoSaveProjectInfo === 'function') {
-            this.autoSaveProjectInfo();
-          }
-        }, 1000);
-      } else {
-        window.addEventListener('load', () => {
-          setTimeout(() => {
+      const checkProjectWhenReady = () => {
+        // Wait for chat interface to be fully loaded
+        const waitForChatInterface = setInterval(() => {
+          // Check if either the send button or form exists
+          const hasChat = document.querySelector('form') || 
+                         document.getElementById('chatinput-send-message-button') ||
+                         document.querySelector('button[type="submit"]') ||
+                         document.querySelector('textarea') ||
+                         document.querySelector('input[type="text"]');
+          
+          // Also check if the page has the lock icon (which loads early)
+          const hasLockIcon = document.evaluate(
+            '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]',
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
+          
+          // If we found either chat elements or lock icon, the page is ready
+          if (hasChat || hasLockIcon) {
+            clearInterval(waitForChatInterface);
+            console.log('📋 Page elements loaded, checking project ownership...');
+            
             if (typeof this.autoSaveProjectInfo === 'function') {
               this.autoSaveProjectInfo();
             }
-          }, 1000);
-        });
-      }
+          }
+        }, 500); // Check every 500ms
+        
+        // Maximum wait time of 10 seconds
+        setTimeout(() => {
+          clearInterval(waitForChatInterface);
+          console.log('⏱️ Timeout waiting for page elements, checking anyway...');
+          if (typeof this.autoSaveProjectInfo === 'function') {
+            this.autoSaveProjectInfo();
+          }
+        }, 10000);
+      };
+      
+      // Start checking after a small initial delay
+      setTimeout(checkProjectWhenReady, 2000);
       
       // Initialize working status monitor after page detection
       setTimeout(() => {
@@ -153,6 +181,127 @@ class LovableDetector {
     
     // Only use document listener to avoid double events
     document.addEventListener('keydown', this.handleKeydown, true);
+  }
+
+  setupUrlChangeDetection() {
+    // Store current URL and project ID
+    this.currentUrl = window.location.href;
+    this.currentProjectId = this.projectId;
+    
+    // Monitor URL changes (for SPA navigation)
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    const handleUrlChange = () => {
+      const newUrl = window.location.href;
+      if (newUrl !== this.currentUrl) {
+        console.log('🔄 URL changed, checking for project switch...');
+        this.handleProjectSwitch(newUrl);
+      }
+    };
+    
+    // Override pushState and replaceState
+    history.pushState = function(...args) {
+      originalPushState.apply(history, args);
+      setTimeout(handleUrlChange, 100);
+    };
+    
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(history, args);
+      setTimeout(handleUrlChange, 100);
+    };
+    
+    // Also listen for popstate (back/forward buttons)
+    window.addEventListener('popstate', () => {
+      setTimeout(handleUrlChange, 100);
+    });
+    
+    // Periodic check as fallback (every 2 seconds)
+    setInterval(() => {
+      const currentUrl = window.location.href;
+      if (currentUrl !== this.currentUrl) {
+        this.handleProjectSwitch(currentUrl);
+      }
+    }, 2000);
+  }
+
+  handleProjectSwitch(newUrl) {
+    this.currentUrl = newUrl;
+    
+    // Extract new project ID
+    const isProjectPage = newUrl.includes('lovable.dev/projects/');
+    if (isProjectPage) {
+      const match = newUrl.match(/\/projects\/([^\/\?]+)/);
+      const newProjectId = match ? match[1] : null;
+      
+      if (newProjectId && newProjectId !== this.currentProjectId) {
+        console.log('🔄 Project switched from', this.currentProjectId, 'to', newProjectId);
+        
+        this.currentProjectId = newProjectId;
+        this.projectId = newProjectId;
+        
+        // Refresh project-specific data in the dialog if it's open
+        if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
+          this.refreshProjectData();
+        }
+        
+        // Reset conversation capture for the new project
+        if (window.simpleConversationCapture) {
+          console.log('🔄 Resetting conversation capture for new project...');
+          window.simpleConversationCapture.waitingForOwnershipConfirmation = true;
+          window.simpleConversationCapture.isMonitoring = false;
+          if (window.simpleConversationCapture.chatObserver) {
+            window.simpleConversationCapture.chatObserver.disconnect();
+            window.simpleConversationCapture.chatObserver = null;
+          }
+        }
+        
+        // Auto-save new project info (which will restart conversation capture if project is owned)
+        setTimeout(() => {
+          if (typeof this.autoSaveProjectInfo === 'function') {
+            console.log('📝 Auto-saving new project info...');
+            this.autoSaveProjectInfo();
+          }
+        }, 1000);
+      }
+    }
+  }
+
+  refreshProjectData() {
+    console.log('🔄 Refreshing project-specific data for project:', this.projectId);
+    
+    // Refresh conversation history if the conversation history tab is currently open
+    if (typeof this.loadHistoryMessages === 'function') {
+      // Check if conversation history is currently visible
+      const dialogTitle = document.getElementById('dialog-title');
+      if (dialogTitle && dialogTitle.textContent.includes('Chat History')) {
+        console.log('🔄 Refreshing conversation history for new project...');
+        this.loadHistoryMessages();
+      }
+    }
+    
+    // Refresh project information in utilities if utilities is currently open
+    if (typeof this.autoSaveProjectInfo === 'function') {
+      // Check if utilities/project manager is currently visible
+      const dialogTitle = document.getElementById('dialog-title');
+      if (dialogTitle && (dialogTitle.textContent.includes('Utilities') || dialogTitle.textContent.includes('Project Manager'))) {
+        console.log('🔄 Refreshing project info for new project...');
+        this.autoSaveProjectInfo();
+      }
+    }
+    
+    // Update project title in dialog if visible
+    this.updateProjectTitle();
+  }
+
+  updateProjectTitle() {
+    // Update any project-specific titles or info displayed in the dialog
+    const titleElements = document.querySelectorAll('.project-title, .current-project');
+    titleElements.forEach(element => {
+      if (element.textContent.includes(this.currentProjectId)) {
+        element.textContent = element.textContent.replace(this.currentProjectId, this.projectId);
+      }
+    });
   }
 
 

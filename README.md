@@ -38,11 +38,16 @@ Before installing the extension, you'll need:
 2. Extract the files if downloaded as ZIP
 
 ### Step 2: Set Up Supabase Database
-1. Create a new Supabase project
-2. Go to the SQL Editor in your Supabase dashboard
-3. Copy and paste the contents of `database-setup.sql`
-4. Run the script to create all necessary tables and functions
-5. Note your project URL and anon key from the project settings
+1. Go to [supabase.com](https://supabase.com) and create a free account
+2. Click "New Project"
+3. Choose your organization and name your project (e.g., "lovable-assistant")  
+4. Set a database password and choose a region
+5. Wait for the project to be ready (~2 minutes)
+6. In your Supabase dashboard, go to **SQL Editor**
+7. Copy the entire content of `user-database-schema.sql`
+8. Paste it into the SQL Editor and click **RUN**
+9. You should see a success message: "Lovable Assistant database schema created successfully!"
+10. Go to **Settings > API** to get your Project URL and anon/public key
 ### Step 3: Install the Chrome Extension
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable "Developer mode" in the top right
@@ -156,7 +161,7 @@ lovable-assistant/
 │   ├── icons/                # Extension icons
 │   └── styles/
 │       └── content.css       # Injected styles
-├── database-setup.sql        # Supabase schema
+├── user-database-schema.sql  # Supabase schema
 └── README.md                 # Documentation
 ```
 ## 🚀 Quick Start

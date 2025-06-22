@@ -12,17 +12,55 @@ class SimpleConversationCapture {
   }
 
   init() {
-    // Simple Conversation Capture initialized
-    this.startMonitoring();
+    // Simple Conversation Capture initialized but not started yet
+    console.log('📚 Conversation capture initialized but waiting for project ownership confirmation...');
     
-    // Process periodically
-    setInterval(() => this.processPendingGroups(), 3000);
+    // Don't start monitoring immediately - wait for project ownership confirmation
+    this.waitingForOwnershipConfirmation = true;
+    
+    // Process periodically (but only if monitoring has started)
+    setInterval(() => {
+      if (this.isMonitoring) {
+        this.processPendingGroups();
+      }
+    }, 3000);
+  }
+
+  // Method to start monitoring after project ownership is confirmed
+  startMonitoringAfterOwnershipConfirmed(projectId) {
+    if (this.isMonitoring) return;
+    
+    console.log('✅ Project ownership confirmed! Starting conversation capture for project:', projectId);
+    this.projectId = projectId; // Store the confirmed project ID
+    this.waitingForOwnershipConfirmation = false;
+    this.startMonitoring();
+  }
+
+  // Method to stop monitoring when project ownership is not confirmed
+  stopMonitoringDueToOwnership(reason = 'Project ownership not confirmed') {
+    console.log('🚫 Stopping conversation capture:', reason);
+    this.waitingForOwnershipConfirmation = true;
+    this.isMonitoring = false;
+    
+    if (this.chatObserver) {
+      this.chatObserver.disconnect();
+      this.chatObserver = null;
+    }
+    
+    // Clear any pending groups for non-owned projects
+    this.pendingGroup = null;
   }
 
   startMonitoring() {
     if (this.isMonitoring) return;
     
+    if (this.waitingForOwnershipConfirmation) {
+      console.log('⏳ Conversation capture is waiting for project ownership confirmation...');
+      return;
+    }
+    
     this.isMonitoring = true;
+    console.log('🚀 Starting conversation monitoring...');
     
     // Find and monitor chat container
     this.findAndSetupMonitoring();
@@ -664,6 +702,12 @@ class SimpleConversationCapture {
   }
 
   extractProjectId() {
+    // Use the stored project ID if available (from ownership confirmation)
+    if (this.projectId) {
+      return this.projectId;
+    }
+    
+    // Fallback to URL extraction
     const url = window.location.href;
     const match = url.match(/\/projects\/([^\/\?]+)/);
     return match ? match[1] : null;
@@ -892,6 +936,22 @@ window.simpleConversationCapture = simpleConversationCapture;
 
 // Create compatibility layer for old system references
 window.conversationCapture = {
+  // Get debug information including ownership status
+  debugInfo() {
+    const capture = window.simpleConversationCapture;
+    return {
+      isMonitoring: capture.isMonitoring,
+      waitingForOwnership: capture.waitingForOwnershipConfirmation,
+      projectId: capture.projectId,
+      hasObserver: !!capture.chatObserver,
+      messageGroupsCount: capture.messageGroups.size,
+      pendingGroup: !!capture.pendingGroup,
+      status: capture.waitingForOwnershipConfirmation ? 
+        'Waiting for project ownership confirmation' : 
+        (capture.isMonitoring ? 'Active - capturing conversations' : 'Inactive')
+    };
+  },
+  
   // Redirect to new system methods
   setVerbose: (enabled) => {
     return window.simpleConversationCapture.setVerbose(enabled);

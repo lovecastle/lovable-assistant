@@ -260,7 +260,8 @@ window.ConversationHistory = {
     this.allHistoryMessages = [];
     
     try {
-      const projectId = this.extractProjectId();
+      // Use the current project ID from the detector, fallback to URL extraction if needed
+      const projectId = this.projectId || this.extractProjectId();
       if (!projectId) {
         console.warn('⚠️ No project ID found - make sure you are on a Lovable.dev project page');
         this.allHistoryMessages = [];
@@ -268,6 +269,8 @@ window.ConversationHistory = {
         this.renderHistoryMessages();
         return;
       }
+      
+      console.log('📋 Loading conversations for project:', projectId);
 
       const response = await this.safeSendMessageWithRetry({
         action: 'getConversations',

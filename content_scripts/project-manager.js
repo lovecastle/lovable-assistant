@@ -393,23 +393,20 @@ window.ProjectManager = {
    */
   async getCurrentProject() {
     try {
-      const currentUrl = window.location.href;
-      console.log('🔍 Current URL:', currentUrl);
+      // Use the current project ID from the detector, fallback to URL extraction if needed
+      const projectId = this.projectId || this.extractProjectId();
+      console.log('🔍 Using project ID:', projectId);
       
+      if (!projectId) {
+        console.log('❌ Could not determine project ID');
+        return null;
+      }
+      
+      const currentUrl = window.location.href;
       if (!currentUrl.includes('lovable.dev/projects/')) {
         console.log('❌ Not on a Lovable project page');
         return null;
       }
-      
-      const urlMatch = currentUrl.match(/lovable\.dev\/projects\/([^/?]+)/);
-      console.log('🔍 URL match result:', urlMatch);
-      
-      if (!urlMatch) {
-        console.log('❌ Could not extract project ID from URL');
-        return null;
-      }
-      
-      const projectId = urlMatch[1];
       const projectName = this.getProjectNameFromTitle();
       console.log('🔍 Detected project:', { projectId, projectName });
       
@@ -419,6 +416,12 @@ window.ProjectManager = {
       
       if (!isUserProject) {
         console.log('🚫 Not a user-owned project, skipping auto-save');
+        
+        // Stop conversation capture for non-owned projects
+        if (window.simpleConversationCapture && typeof window.simpleConversationCapture.stopMonitoringDueToOwnership === 'function') {
+          window.simpleConversationCapture.stopMonitoringDueToOwnership('Project is not user-owned');
+        }
+        
         return null;
       }
       
@@ -475,6 +478,16 @@ window.ProjectManager = {
         });
       } else {
         console.log('ℹ️ Project information already exists and is up to date');
+      }
+      
+      // ========================================
+      // START CONVERSATION CAPTURE - After Ownership Confirmed
+      // ========================================
+      // Now that we've confirmed this is a user-owned project with valid project ID,
+      // start the conversation capture to automatically save chat messages
+      if (window.simpleConversationCapture && typeof window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed === 'function') {
+        console.log('🚀 Starting conversation capture for confirmed user-owned project:', projectId);
+        window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed(projectId);
       }
       
       console.log('✅ Final current project:', currentProject);
@@ -606,9 +619,11 @@ window.ProjectManager = {
     try {
       console.log('🔍 Checking if project is user-owned...');
       
-      // Method 1: Check for lock icon (indicates non-owned project)
+      // Method 1: Check for lock icon (indicates PRIVATE/user-owned project)
       try {
-        // Check for lock icon using the provided XPath
+        // Check for lock icon using multiple methods
+        
+        // First try the specific XPath
         const lockIconXPath = '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]';
         const lockResult = document.evaluate(
           lockIconXPath,
@@ -619,14 +634,33 @@ window.ProjectManager = {
         );
         
         if (lockResult.singleNodeValue) {
-          // Also check if it's the lock icon by path data
-          const svgPath = lockResult.singleNodeValue.querySelector('path');
-          if (svgPath && svgPath.getAttribute('d')?.includes('M220-80q-24.75')) {
-            console.log('🔒 Found lock icon - this is NOT a user-owned project');
-            return false;
+          // Verify it's the lock icon by checking the path data
+          const svgElement = lockResult.singleNodeValue;
+          const pathElement = svgElement.querySelector('path');
+          if (pathElement) {
+            const pathData = pathElement.getAttribute('d');
+            if (pathData && (pathData.includes('M220-80q-24.75') || pathData.includes('220-80'))) {
+              console.log('🔒 Found lock icon via XPath - this IS a private/user-owned project');
+              return true;
+            }
+          }
+        }
+        
+        // Also try finding lock icon by searching all SVGs
+        const allSvgs = document.querySelectorAll('svg');
+        for (const svg of allSvgs) {
+          if (svg.getAttribute('width') === '100%' && 
+              svg.getAttribute('height') === '100%' && 
+              svg.getAttribute('viewBox') === '0 -960 960 960') {
+            const path = svg.querySelector('path');
+            if (path && path.getAttribute('d')?.includes('M220-80q-24.75')) {
+              console.log('🔒 Found lock icon via SVG search - this IS a private/user-owned project');
+              return true;
+            }
           }
         }
       } catch (e) {
+        console.warn('⚠️ Error checking for lock icon:', e);
         // Continue checking other methods
       }
       
