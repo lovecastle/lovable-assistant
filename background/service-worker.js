@@ -192,7 +192,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       break;
-      
+
     case 'checkWorkingStatus':
       // Content script will send current status
       handleWorkingStatusUpdate(sender.tab.id, request.data).then(result => {
@@ -2136,177 +2136,7 @@ async function handleCheckAuth() {
   }
 }
 
-// ===========================
-// PROMPT TEMPLATES HANDLERS
-// ===========================
 
-async function handleGetPromptTemplates() {
-  try {
-    console.log('📝 Service Worker: Getting prompt templates');
-    
-    const userId = masterAuth.getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-    
-    const result = await database.getPromptTemplates(userId);
-    return result;
-  } catch (error) {
-    console.error('❌ Service Worker: Failed to get prompt templates:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-async function handleSavePromptTemplates(data) {
-  try {
-    console.log('📝 Service Worker: Saving prompt templates');
-    
-    const userId = masterAuth.getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-    
-    const { templates } = data;
-    const result = await database.savePromptTemplates(userId, templates);
-    return result;
-  } catch (error) {
-    console.error('❌ Service Worker: Failed to save prompt templates:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// ===========================
-// AI API HANDLER
-// ===========================
-
-async function handleCallAI(data) {
-  try {
-    console.log('🤖 Service Worker: Calling AI API');
-    
-    const { prompt, provider = 'gemini' } = data;
-    
-    // Get user's private API key from chrome storage
-    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
-    
-    let apiKey;
-    switch (provider) {
-      case 'gemini':
-        apiKey = storage.geminiApiKey;
-        break;
-      case 'claude':
-        apiKey = storage.claudeApiKey;
-        break;
-      case 'openai':
-        apiKey = storage.openaiApiKey;
-        break;
-      default:
-        throw new Error(`Unsupported AI provider: ${provider}`);
-    }
-    
-    if (!apiKey) {
-      throw new Error(`${provider} API key not configured. Please add your API key in the extension settings.`);
-    }
-    
-    let response;
-    switch (provider) {
-      case 'gemini':
-        response = await callGeminiAPI(prompt, apiKey);
-        break;
-      case 'claude':
-        response = await callClaudeAPI(prompt, apiKey);
-        break;
-      case 'openai':
-        response = await callOpenAIAPI(prompt, apiKey);
-        break;
-    }
-    
-    return { success: true, data: response };
-  } catch (error) {
-    console.error('❌ Service Worker: AI API call failed:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// AI Provider implementations
-async function callGeminiAPI(prompt, apiKey) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2048
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error: ${error}`);
-  }
-  
-  const data = await response.json();
-  return data.candidates[0]?.content?.parts[0]?.text || 'No response from Gemini';
-}
-
-async function callClaudeAPI(prompt, apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    })
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Claude API error: ${error}`);
-  }
-  
-  const data = await response.json();
-  return data.content[0]?.text || 'No response from Claude';
-}
-
-async function callOpenAIAPI(prompt, apiKey) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [{
-        role: 'user',
-        content: prompt
-      }],
-      max_tokens: 2048,
-      temperature: 0.7
-    })
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${error}`);
-  }
-  
-  const data = await response.json();
-  return data.choices[0]?.message?.content || 'No response from OpenAI';
-}
 
 // Create database tables by inserting data and letting Supabase auto-create schema
 async function createTablesViaRestAPI(supabaseUrl, apiKey) {
@@ -2797,6 +2627,199 @@ ON CONFLICT DO NOTHING;
 
 -- Success message
 SELECT 'Lovable Assistant database setup complete!' as message;`;
+}
+
+// ===========================
+// PROMPT TEMPLATES HANDLERS
+// ===========================
+
+async function handleGetPromptTemplates() {
+  try {
+    // Load templates from localStorage (since they're now managed locally)
+    // Return templates in the format expected by the original UI
+    const defaultTemplates = {
+      'Design': {
+        'UI Change': 'Modify the UI to focus strictly on visual design elements without altering functionality. Ensure mobile responsiveness is maintained and test on different screen sizes. Use modern design principles.',
+        'Optimize for Mobile': 'Optimize this interface specifically for mobile devices. Ensure touch-friendly controls, proper sizing, and intuitive mobile navigation while maintaining desktop compatibility.'
+      },
+      'Editing Features': {
+        'Modifying an Existing Feature': 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
+        'Fragile Update': 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.'
+      },
+      'Error Debugging': {
+        'Minor Errors': 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+        'Persistent Errors': 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
+        'Major Errors': 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+        'Clean up Console Logs': 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
+        'Critical Errors': 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
+        'Extreme Errors': 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.'
+      },
+      'Refactoring': {
+        'Refactoring After Request Made by Lovable': 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.'
+      },
+      'Using another LLM': {
+        'Generate Comprehensive Explanation': 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.'
+      }
+    };
+
+    return { success: true, data: defaultTemplates };
+  } catch (error) {
+    console.error('❌ Error getting prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSavePromptTemplates(templates) {
+  try {
+    // Templates are now managed locally in localStorage via utilities-manager.js
+    // This handler is kept for backward compatibility
+    return { success: true, message: 'Templates are now managed locally' };
+  } catch (error) {
+    console.error('❌ Error saving prompt templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ===========================
+// AI API HANDLERS
+// ===========================
+
+async function handleCallAI(data) {
+  try {
+    const { prompt, provider = 'gemini' } = data;
+    
+    if (!prompt) {
+      return { success: false, error: 'Prompt is required' };
+    }
+
+    // Get API keys from chrome storage
+    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
+    
+    let response;
+    switch (provider) {
+      case 'gemini':
+        if (!storage.geminiApiKey) {
+          return { success: false, error: 'Gemini API key not configured. Please add it in the extension popup.' };
+        }
+        response = await callGeminiAPI(prompt, storage.geminiApiKey);
+        break;
+        
+      case 'claude':
+        if (!storage.claudeApiKey) {
+          return { success: false, error: 'Claude API key not configured. Please add it in the extension popup.' };
+        }
+        response = await callClaudeAPI(prompt, storage.claudeApiKey);
+        break;
+        
+      case 'openai':
+        if (!storage.openaiApiKey) {
+          return { success: false, error: 'OpenAI API key not configured. Please add it in the extension popup.' };
+        }
+        response = await callOpenAIAPI(prompt, storage.openaiApiKey);
+        break;
+        
+      default:
+        return { success: false, error: `Unsupported AI provider: ${provider}` };
+    }
+
+    return { success: true, data: response };
+  } catch (error) {
+    console.error('❌ Error calling AI:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function callGeminiAPI(prompt, apiKey) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: prompt
+        }]
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+    return data.candidates[0].content.parts[0].text;
+  } else {
+    throw new Error('Invalid response format from Gemini API');
+  }
+}
+
+async function callClaudeAPI(prompt, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-sonnet-20240229',
+      max_tokens: 4000,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.content && data.content[0] && data.content[0].text) {
+    return data.content[0].text;
+  } else {
+    throw new Error('Invalid response format from Claude API');
+  }
+}
+
+async function callOpenAIAPI(prompt, apiKey) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 4000
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.choices && data.choices[0] && data.choices[0].message) {
+    return data.choices[0].message.content;
+  } else {
+    throw new Error('Invalid response format from OpenAI API');
+  }
 }
 
 

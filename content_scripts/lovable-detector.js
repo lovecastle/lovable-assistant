@@ -23,7 +23,10 @@ class LovableDetector {
       Object.assign(this, window.ProjectManager);
     }
     
-    // Removed Chat Interface mixin - AI functionality removed
+    // Mix in Chat Interface methods (for prompt enhancement)
+    if (window.ChatInterface) {
+      Object.assign(this, window.ChatInterface);
+    }
     
     // Mix in Conversation History methods
     if (window.ConversationHistory) {
@@ -55,7 +58,15 @@ class LovableDetector {
     this.setupKeyboardShortcuts();
     this.setupUrlChangeDetection();
     
-    // Removed prompt enhancement setup - AI functionality removed
+    // Setup prompt enhancement (CMD+Enter functionality)
+    if (typeof this.setupPromptEnhancement === 'function') {
+      this.setupPromptEnhancement();
+    }
+    
+    // Setup input auto-expansion
+    if (typeof this.setupInputAutoExpansion === 'function') {
+      this.setupInputAutoExpansion();
+    }
   }
 
   detectLovablePage() {

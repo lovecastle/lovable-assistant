@@ -285,6 +285,17 @@ window.UIDialogManager = {
     }
   },
 
+  extractProjectIdFromUrl() {
+    try {
+      const url = window.location.href;
+      const match = url.match(/\/projects\/([^\/\?]+)/);
+      return match ? match[1] : null;
+    } catch (error) {
+      console.warn('⚠️ Could not extract project ID from URL:', error);
+      return null;
+    }
+  },
+
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;

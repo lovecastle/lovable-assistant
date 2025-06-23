@@ -2,47 +2,27 @@
 // UTILITIES MANAGER - EXTRACTED MODULE
 // ===========================
 // This section handles utilities page, settings, prompt enhancement, and advanced features
-// This section manages all utility functions and user preferences including:
-// - Settings and configuration management
-// - Prompt template management and customization
-// - API provider configuration (Claude, OpenAI, Gemini)
-// - Notification settings
-// - Message scraping functionality
-// - Settings import/export capabilities
-// - Toggle switch management for various features
+// This section manages all utility functions and user preferences
 
 // Create UtilitiesManager class that will be mixed into LovableDetector
 window.UtilitiesManager = {
-  async showUtilitiesPage() {
-    // Show loading state immediately
-    if (typeof this.showDialogLoading === 'function') {
-      this.showDialogLoading('Utilities');
+  showUtilitiesPage() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '🛠️ Utilities';
     }
     
-    try {
-      // Load settings and templates data first
-      await this.loadUtilitiesData();
-      
-      // Then render the UI with the loaded data
-      const content = document.getElementById('dialog-content');
-      const title = document.getElementById('dialog-title');
-      
-      if (title) {
-        title.textContent = '🛠️ Utilities';
-      }
-      
-      if (!content) return;
+    if (!content) return;
     
     content.innerHTML = `
       <div style="padding: 20px;">
         <div style="margin-bottom: 20px;">
           <button id="back-to-welcome-btn" style="
             background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
-            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
-            display: inline-flex; align-items: center; justify-content: center;
-            min-height: 40px; min-width: 120px; transition: all 0.2s ease;
-          " onmouseover="this.style.background='#e2e8f0'; this.style.borderColor='#9ca3af'" 
-             onmouseout="this.style.background='#f7fafc'; this.style.borderColor='#c9cfd7'">← Back to Welcome</button>
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Welcome</button>
         </div>
         
         <!-- Message Scraping -->
@@ -133,702 +113,707 @@ window.UtilitiesManager = {
           "></div>
         </div>
         
-        <!-- Prompt Templates -->
+        <!-- Prompt Helper -->
         <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-            📝 Prompt Templates
+            ✨ Prompt Helper
           </h3>
-          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
-            Manage your custom prompt templates for different development tasks. Use CMD/CTRL + Enter in any chat input to access the prompt helper.
-          </p>
-          
-          <div id="prompt-templates-container">
-            <!-- Templates will be loaded here -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="color: #4a5568; font-size: 14px;">Auto-expand input area on new lines</label>
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
+              <input type="checkbox" id="auto-expand-toggle" style="opacity: 0; width: 0; height: 0;">
+              <span class="toggle-slider" style="
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #ccc; transition: .4s; border-radius: 24px;
+              "></span>
+            </label>
           </div>
-          
-          <div style="display: flex; gap: 8px; margin-top: 16px;">
-            <button id="add-template-section-btn" style="
-              background: #667eea; color: white; border: none; padding: 8px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
-            ">Add Section</button>
-            <button id="reset-templates-btn" style="
-              background: #f56565; color: white; border: none; padding: 8px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">Reset to Defaults</button>
+          <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
+            <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
+              Prompt Helper Templates (Ctrl+Enter / Cmd+Enter)
+            </h4>
+            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 13px;">
+              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
+            </p>
+            
+            <div id="prompt-templates-container">
+              <!-- Templates will be loaded here -->
+            </div>
+            
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+              <button id="create-section-btn" style="
+                background: #667eea; color: white; border: none; padding: 6px 12px;
+                border-radius: 4px; cursor: pointer; font-size: 12px;
+              ">Create Section</button>
+              <button id="reset-prompt-templates-btn" style="
+                background: #f56565; color: white; border: none; padding: 6px 12px;
+                border-radius: 4px; cursor: pointer; font-size: 12px;
+              ">Reset to Defaults</button>
+            </div>
           </div>
-          
-          <div style="
-            background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
-            padding: 10px; margin-top: 12px; font-size: 13px; color: #0369a1;
-          ">
-            <strong>⌨️ Keyboard Shortcut:</strong> Press <kbd>CMD/CTRL + Enter</kbd> while typing in any Lovable chat input to open the prompt helper with Translate/Rewrite/Enhance options.
-          </div>
-        </div>
-        
-        <!-- Settings -->
-        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
-          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-            ⚙️ Utility Settings
-          </h3>
-          <button id="reset-utilities-btn" style="
-            background: #f56565; color: white; border: none; padding: 8px 16px;
-            border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 8px;
-          ">Reset All Settings</button>
-          <button id="export-settings-btn" style="
-            background: #48bb78; color: white; border: none; padding: 8px 16px;
-            border-radius: 6px; cursor: pointer; font-size: 14px;
-          ">Export Settings</button>
         </div>
       </div>
     `;
     
-      if (typeof this.setupBackButton === 'function') {
-        this.setupBackButton();
-      }
-      this.setupUtilitiesEvents();
-      this.renderUtilitiesSettings(); // Use pre-loaded data
-    } catch (error) {
-      console.error('❌ Error loading utilities page:', error);
-      // Show error state
-      const content = document.getElementById('dialog-content');
-      if (content) {
-        content.innerHTML = `
-          <div style="
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100%; color: #e53e3e; font-size: 14px; gap: 16px; padding: 20px;
-          ">
-            <div style="font-size: 24px;">❌</div>
-            <div>Failed to load utilities page</div>
-            <button onclick="window.lovableDetector.showUtilitiesPage()" style="
-              background: #667eea; color: white; border: none; padding: 8px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">Retry</button>
-          </div>
-        `;
-      }
-    }
+    this.setupBackButton();
+    this.setupUtilitiesEventListeners();
+    this.loadUtilitiesSettings();
+    this.loadPromptTemplates();
   },
 
-  async loadUtilitiesData() {
-    // Load settings and templates
-    await this.loadUtilitiesSettings();
-    await this.loadPromptTemplates();
-  },
-
-  renderUtilitiesSettings() {
-    // This method will render the UI with pre-loaded data
-    // The settings are already applied to the UI elements during loadUtilitiesSettings
-    this.renderPromptTemplates();
-  },
-
-  setupBackButton() {
-    const backBtn = document.getElementById('back-to-welcome-btn');
-    if (backBtn) {
-      backBtn.addEventListener('click', () => {
-        this.showWelcomePage();
-      });
-    }
-  },
-
-  setupUtilitiesEvents() {
-    // Message scraping
-    const scrapeBtn = document.getElementById('scrape-messages-btn');
-    const stopBtn = document.getElementById('stop-scraping-btn');
-    
-    if (scrapeBtn) {
-      scrapeBtn.addEventListener('click', () => this.scrapeAllMessages());
-    }
-    
-    if (stopBtn) {
-      stopBtn.addEventListener('click', () => {
-        if (window.currentMessageScraper) {
-          window.currentMessageScraper.stop();
-          stopBtn.style.display = 'none';
-          scrapeBtn.style.display = 'inline-block';
-        }
-      });
-    }
-
-    // Toggle switches
-    this.setupToggleSwitch('tab-rename-toggle', 'lovable-tab-rename');
-    this.setupToggleSwitch('auto-switch-toggle', 'lovable-auto-switch');
-    this.setupToggleSwitch('notifications-toggle', 'lovable-notifications');
-
-    // Settings buttons
-    const resetBtn = document.getElementById('reset-utilities-btn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => this.resetUtilitiesSettings());
-    }
-
-    const exportBtn = document.getElementById('export-settings-btn');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => this.exportUtilitiesSettings());
-    }
-
-    // Initialize toggle CSS
-    this.addToggleCSS();
-    
-    // Setup prompt templates
-    this.setupPromptTemplates();
-  },
-
-  setupToggleSwitch(toggleId, settingKey) {
-    const toggle = document.getElementById(toggleId);
-    if (!toggle) {
-      console.warn(`⚠️ Toggle element not found: ${toggleId}`);
-      return;
-    }
-
-    toggle.addEventListener('change', async () => {
-      const isEnabled = toggle.checked;
-      
-      // Save to database instead of localStorage
-      try {
-        const message = {
-          action: 'saveUIPreference',
-          data: {
-            preferenceKey: settingKey,
-            preferenceValue: isEnabled
-          }
-        };
-        
-        const response = await this.safeSendMessage(message);
-        
-        if (response.success) {
-          console.log(`✅ ${settingKey} ${isEnabled ? 'enabled' : 'disabled'}`);
-        } else {
-          console.error('❌ Failed to save setting:', response.error);
-          // Revert toggle state on error
-          toggle.checked = !isEnabled;
-        }
-      } catch (error) {
-        console.error('❌ Error saving setting:', error);
-        // Revert toggle state on error
-        toggle.checked = !isEnabled;
-      }
-    });
-  },
-
-  addToggleCSS() {
-    if (document.getElementById('toggle-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'toggle-styles';
-    style.textContent = `
-      .toggle-switch input:checked + .toggle-slider {
-        background-color: #667eea;
-      }
-      
-      .toggle-slider:before {
-        position: absolute;
-        content: "";
-        height: 18px;
-        width: 18px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        transition: .4s;
-        border-radius: 50%;
-      }
-      
-      .toggle-switch input:checked + .toggle-slider:before {
-        transform: translateX(26px);
-      }
-    `;
-    document.head.appendChild(style);
-  },
-
-  async loadUtilitiesSettings() {
-    // Load saved settings from database
-    const settings = [
-      { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
-      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
-      { id: 'notifications-toggle', key: 'lovable-notifications' }
-    ];
-
-    try {
-      // Get all UI preferences from database
-      const message = { action: 'getAllUIPreferences' };
-      const response = await this.safeSendMessage(message);
-      
-      if (response.success) {
-        const preferences = response.data || {};
-        
-        settings.forEach(({ id, key }) => {
-          const toggle = document.getElementById(id);
-          if (toggle) {
-            // Use database value or default to false
-            toggle.checked = preferences[key] === true;
-          }
-        });
-      } else {
-        console.error('❌ Failed to load UI settings:', response.error);
-        // Fallback to default values
-        settings.forEach(({ id }) => {
-          const toggle = document.getElementById(id);
-          if (toggle) {
-            toggle.checked = false;
-          }
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error loading UI settings:', error);
-      // Fallback to default values
-      settings.forEach(({ id }) => {
-        const toggle = document.getElementById(id);
-        if (toggle) {
-          toggle.checked = false;
-        }
-      });
-    }
-    
-    // Removed API settings loading - AI functionality removed
-  },
-
-  // ===========================
-  // PROMPT TEMPLATES MANAGEMENT
-  // ===========================
-
-  async loadPromptTemplates() {
-    try {
-      // Load templates from database
-      const message = { action: 'getPromptTemplates' };
-      const response = await this.safeSendMessage(message);
-      
-      if (response.success) {
-        this.promptTemplates = response.data || this.getDefaultPromptTemplates();
-      } else {
-        console.log('📝 No existing templates, using defaults');
-        this.promptTemplates = this.getDefaultPromptTemplates();
-      }
-    } catch (error) {
-      console.error('❌ Error loading prompt templates:', error);
-      this.promptTemplates = this.getDefaultPromptTemplates();
-    }
-  },
-
+  // Original prompt templates methods from git history
   getDefaultPromptTemplates() {
-    return {
-      "Development": {
-        "Bug Fix": "I found a bug where [describe the issue]. The expected behavior is [describe expected]. Please help me fix this issue.",
-        "Feature Request": "I need to implement [feature name] that should [describe functionality]. Please help me build this feature.",
-        "Code Review": "Please review this code and suggest improvements: [paste code here]",
-        "Refactoring": "I want to refactor this code to make it more [maintainable/performant/readable]: [paste code]"
+    return [
+      {
+        category: 'Design',
+        name: 'UI Change',
+        template: 'Modify the UI to focus strictly on visual design elements without altering functionality. Ensure mobile responsiveness is maintained and test on different screen sizes. Use modern design principles.',
+        shortcut: 'ui_change'
       },
-      "UI/UX": {
-        "Component Creation": "Create a [component type] component that [describe functionality]. It should be responsive and follow modern design principles.",
-        "Styling Help": "Help me style this element to look [describe desired appearance]. Here's the current code: [paste code]",
-        "Layout Issue": "I'm having trouble with the layout of [describe element]. It should [describe expected layout].",
-        "Mobile Responsive": "Make this component mobile-responsive: [paste code]"
+      {
+        category: 'Design',
+        name: 'Optimize for Mobile',
+        template: 'Optimize this interface specifically for mobile devices. Ensure touch-friendly controls, proper sizing, and intuitive mobile navigation while maintaining desktop compatibility.',
+        shortcut: 'mobile_optimize'
       },
-      "API Integration": {
-        "API Setup": "Help me integrate with the [API name] API. I need to [describe what you want to achieve].",
-        "Error Handling": "Add proper error handling to this API call: [paste code]",
-        "Data Transformation": "Help me transform this API response data: [paste data structure]"
+      {
+        category: 'Editing Features',
+        name: 'Modifying an Existing Feature',
+        template: 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
+        shortcut: 'modify_feature'
       },
-      "Database": {
-        "Schema Design": "Design a database schema for [describe your data/app]. The main entities are [list entities].",
-        "Query Help": "Help me write a query to [describe what you want to query].",
-        "Data Migration": "Help me migrate data from [old structure] to [new structure]."
+      {
+        category: 'Editing Features',
+        name: 'Fragile Update',
+        template: 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.',
+        shortcut: 'fragile_update'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Minor Errors',
+        template: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+        shortcut: 'minor_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Persistent Errors',
+        template: 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
+        shortcut: 'persistent_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Major Errors',
+        template: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+        shortcut: 'major_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Clean up Console Logs',
+        template: 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
+        shortcut: 'clean_logs'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Critical Errors',
+        template: 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
+        shortcut: 'critical_errors'
+      },
+      {
+        category: 'Error Debugging',
+        name: 'Extreme Errors',
+        template: 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.',
+        shortcut: 'extreme_errors'
+      },
+      {
+        category: 'Refactoring',
+        name: 'Refactoring After Request Made by Lovable',
+        template: 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.',
+        shortcut: 'refactor_lovable'
+      },
+      {
+        category: 'Using another LLM',
+        name: 'Generate Comprehensive Explanation',
+        template: 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.',
+        shortcut: 'explain_for_llm'
       }
-    };
+    ];
   },
 
-  renderPromptTemplates() {
+  loadPromptTemplates() {
     const container = document.getElementById('prompt-templates-container');
-    if (!container || !this.promptTemplates) return;
-
-    let html = '';
+    if (!container) return;
     
-    Object.entries(this.promptTemplates).forEach(([categoryName, templates]) => {
-      const categoryId = categoryName.replace(/\s+/g, '-').toLowerCase();
-      const categoryIcon = this.getCategoryIcon(categoryName);
-      const categoryColor = this.getCategoryColor(categoryName);
+    // Try to load from localStorage first, then fall back to defaults
+    let templates;
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      console.warn('Failed to load stored templates, using defaults:', error);
+      templates = this.getDefaultPromptTemplates();
+    }
+    
+    this.renderPromptTemplates(templates);
+  },
+
+  renderPromptTemplates(templates) {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return;
+    
+    // Group templates by category
+    const categories = {};
+    templates.forEach(template => {
+      if (!categories[template.category]) {
+        categories[template.category] = [];
+      }
+      categories[template.category].push(template);
+    });
+    
+    let html = '';
+    Object.keys(categories).forEach((category, categoryIndex) => {
+      const icon = this.getCategoryIcon(category);
+      const categoryId = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
       
       html += `
-        <div class="template-section" data-category="${categoryName}" style="margin-bottom: 16px;">
-          <div style="
-            display: flex; align-items: center; justify-content: space-between;
-            background: ${categoryColor}; color: white; padding: 10px 16px;
-            border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;
-          ">
-            <span style="display: flex; align-items: center; gap: 8px;">
-              <span>${categoryIcon}</span>
-              <span class="category-name" data-editable="true">${categoryName}</span>
-            </span>
-            <div style="display: flex; gap: 8px;">
-              <button class="add-template-btn" data-category="${categoryName}" style="
-                background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
-                color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">+ Add</button>
-              <button class="delete-section-btn" data-category="${categoryName}" style="
-                background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
-                color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Delete</button>
-            </div>
+        <div style="margin-bottom: 20px;" data-category-container="${category}">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h5 id="${categoryId}" class="editable-category"
+               style="margin: 0; color: #1a202c; font-size: 13px; font-weight: 600; 
+                      border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; cursor: pointer;
+                      flex: 1; margin-right: 8px;"
+               data-original-value="${category}" data-edit-type="category">
+              ${icon} ${category}
+            </h5>
+            <button class="delete-section-btn" data-category="${category}" style="
+              background: #f56565; color: white; border: none; padding: 2px 6px;
+              border-radius: 3px; cursor: pointer; font-size: 10px; margin-left: 8px;
+            ">Delete Section</button>
           </div>
-          <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
       `;
       
-      Object.entries(templates).forEach(([templateName, templateContent]) => {
+      categories[category].forEach((template, index) => {
+        const templateId = `template-${template.category.replace(/\s+/g, '-').toLowerCase()}-${index}`;
+        const templateNameId = `name-${templateId}`;
+        
         html += `
-          <div class="template-item" data-category="${categoryName}" data-template="${templateName}" style="
-            border-bottom: 1px solid #f1f5f9; padding: 12px 16px; background: white;
-          ">
-            <div style="display: flex; justify-content: space-between; align-items: start; gap: 12px;">
-              <div style="flex: 1;">
-                <div class="template-name" data-editable="true" style="
-                  font-weight: 600; color: #1a202c; margin-bottom: 6px; cursor: pointer;
-                ">${templateName}</div>
-                <div class="template-content" data-editable="true" style="
-                  color: #4a5568; font-size: 13px; line-height: 1.4; cursor: pointer;
-                  white-space: pre-wrap; word-break: break-word;
-                ">${templateContent}</div>
-              </div>
-              <div style="display: flex; gap: 6px; flex-shrink: 0;">
-                <button class="copy-template-btn" data-template-content="${this.escapeHtml(templateContent)}" style="
-                  background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568;
-                  padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
-                " title="Copy template">📋</button>
-                <button class="delete-template-btn" data-category="${categoryName}" data-template="${templateName}" style="
-                  background: #fed7d7; border: 1px solid #f56565; color: #c53030;
-                  padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
-                " title="Delete template">🗑️</button>
+          <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white;"
+               data-template-container="${templateId}">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span id="${templateNameId}" class="editable-template-name"
+                    style="font-weight: 500; color: #1a202c; font-size: 12px; cursor: pointer; 
+                           border: 1px solid transparent; padding: 2px 4px; border-radius: 3px;"
+                    data-original-value="${template.name}" data-template-id="${templateId}" data-edit-type="template-name">
+                ${template.name}
+              </span>
+              <div style="display: flex; gap: 4px;">
+                <button class="copy-template-btn" data-template-id="${templateId}" style="
+                  background: #667eea; color: white; border: none; padding: 4px 8px;
+                  border-radius: 4px; cursor: pointer; font-size: 10px;
+                ">Copy</button>
+                <button class="delete-template-btn" data-template-id="${templateId}" style="
+                  background: #f56565; color: white; border: none; padding: 4px 8px;
+                  border-radius: 4px; cursor: pointer; font-size: 10px;
+                ">Delete</button>
               </div>
             </div>
+            <textarea id="${templateId}" class="template-content"
+                      data-category="${template.category}" 
+                      data-name="${template.name}" 
+                      data-shortcut="${template.shortcut}"
+                      style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
+                             border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
+                             background: white; color: #1a202c;">${template.template}</textarea>
           </div>
         `;
       });
       
+      // Add "Add Template" button at the bottom of each section
       html += `
-          </div>
+        <div style="margin-bottom: 8px;">
+          <button class="add-template-btn" data-category="${category}" style="
+            background: #e2e8f0; color: #4a5568; border: 1px dashed #9ca3af; padding: 8px 12px;
+            border-radius: 4px; cursor: pointer; font-size: 11px; width: 100%;
+            transition: all 0.2s ease;
+          ">
+            + Add Template
+          </button>
         </div>
       `;
+      
+      html += '</div>';
     });
-
+    
     container.innerHTML = html;
-  },
-
-  setupPromptTemplates() {
-    // Add section button
-    const addSectionBtn = document.getElementById('add-template-section-btn');
-    if (addSectionBtn) {
-      addSectionBtn.addEventListener('click', () => this.createNewSection());
-    }
-
-    // Reset templates button
-    const resetBtn = document.getElementById('reset-templates-btn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => this.resetPromptTemplates());
-    }
-
-    // Setup event listeners for template interactions
+    
+    // Add event listeners after HTML is rendered
     this.setupTemplateEventListeners();
   },
 
   setupTemplateEventListeners() {
     const container = document.getElementById('prompt-templates-container');
     if (!container) return;
-
-    // Event delegation for dynamic content
-    container.addEventListener('click', (e) => {
-      const target = e.target;
-      
-      if (target.classList.contains('add-template-btn')) {
-        const category = target.dataset.category;
-        this.addNewTemplate(category);
-      } else if (target.classList.contains('delete-section-btn')) {
-        const category = target.dataset.category;
-        this.deleteSection(category);
-      } else if (target.classList.contains('copy-template-btn')) {
-        const content = target.dataset.templateContent;
-        this.copyTemplate(content);
-      } else if (target.classList.contains('delete-template-btn')) {
-        const category = target.dataset.category;
-        const template = target.dataset.template;
-        this.deleteTemplate(category, template);
-      }
-    });
-
-    // Double-click editing for category names and template content
-    container.addEventListener('dblclick', (e) => {
-      const target = e.target;
-      
-      if (target.dataset.editable === 'true') {
-        this.makeEditable(target);
-      }
-    });
-  },
-
-  getCategoryIcon(categoryName) {
-    const icons = {
-      'Development': '💻',
-      'UI/UX': '🎨',
-      'API Integration': '🔗',
-      'Database': '🗄️',
-      'Testing': '🧪',
-      'Deployment': '🚀',
-      'Documentation': '📚'
-    };
-    return icons[categoryName] || '📁';
-  },
-
-  getCategoryColor(categoryName) {
-    const colors = {
-      'Development': '#667eea',
-      'UI/UX': '#ed8936',
-      'API Integration': '#48bb78',
-      'Database': '#9f7aea',
-      'Testing': '#f093fb',
-      'Deployment': '#38b2ac',
-      'Documentation': '#fbb6ce'
-    };
-    return colors[categoryName] || '#718096';
-  },
-
-  copyTemplate(content) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(content).then(() => {
-        console.log('✅ Template copied to clipboard');
-        // Show brief feedback
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-          position: fixed; top: 20px; right: 20px; background: #48bb78; color: white;
-          padding: 8px 16px; border-radius: 6px; font-size: 14px; z-index: 10000;
-          transition: opacity 0.3s ease;
-        `;
-        notification.textContent = '✅ Template copied!';
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          notification.style.opacity = '0';
-          setTimeout(() => document.body.removeChild(notification), 300);
-        }, 2000);
-      }).catch(err => {
-        console.error('❌ Failed to copy template:', err);
+    
+    // Editable category names
+    container.querySelectorAll('.editable-category').forEach(element => {
+      element.addEventListener('click', () => {
+        this.makeEditable(element.id, 'category');
       });
+    });
+    
+    // Editable template names
+    container.querySelectorAll('.editable-template-name').forEach(element => {
+      element.addEventListener('click', () => {
+        this.makeEditable(element.id, 'template-name');
+      });
+    });
+    
+    // Copy template buttons
+    container.querySelectorAll('.copy-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const templateId = button.dataset.templateId;
+        this.copyTemplate(templateId);
+      });
+    });
+    
+    // Delete template buttons
+    container.querySelectorAll('.delete-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const templateId = button.dataset.templateId;
+        this.deleteTemplate(templateId);
+      });
+    });
+    
+    // Delete section buttons
+    container.querySelectorAll('.delete-section-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const category = button.dataset.category;
+        this.deleteSection(category);
+      });
+    });
+    
+    // Add template buttons
+    container.querySelectorAll('.add-template-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const category = button.dataset.category;
+        this.addNewTemplate(category);
+      });
+      
+      // Add hover effects
+      button.addEventListener('mouseover', () => {
+        button.style.background = '#d1d5db';
+      });
+      button.addEventListener('mouseout', () => {
+        button.style.background = '#e2e8f0';
+      });
+    });
+    
+    // Auto-save for template content
+    container.querySelectorAll('.template-content').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        this.autoSaveTemplate(textarea.id);
+      });
+    });
+  },
+
+  getCategoryIcon(category) {
+    const icons = {
+      'Design': '🎨',
+      'Editing Features': '✏️',
+      'Error Debugging': '🐛',
+      'Refactoring': '🔄',
+      'Using another LLM': '🤖'
+    };
+    return icons[category] || '📝';
+  },
+
+  copyTemplate(templateId) {
+    const textarea = document.getElementById(templateId);
+    if (textarea) {
+      textarea.select();
+      textarea.setSelectionRange(0, 99999); // For mobile devices
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        console.log('Template copied to clipboard');
+        // Show brief success message
+        const button = textarea.parentElement.querySelector('.copy-template-btn');
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = '#48bb78';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.background = '#667eea';
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy template:', err);
+      });
+    }
+  },
+
+  resetPromptTemplates() {
+    if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {
+      localStorage.removeItem('lovable-prompt-templates');
+      this.loadPromptTemplates();
+      console.log('🔄 Prompt templates reset to defaults');
     }
   },
 
   createNewSection() {
     const sectionName = prompt('Enter section name:');
-    if (!sectionName || sectionName.trim() === '') return;
+    if (!sectionName || !sectionName.trim()) return;
     
-    const trimmedName = sectionName.trim();
-    if (this.promptTemplates[trimmedName]) {
-      alert('A section with this name already exists.');
+    const templates = this.getCurrentTemplates();
+    // Check if section already exists
+    const exists = templates.some(t => t.category === sectionName.trim());
+    if (exists) {
+      alert('Section already exists!');
       return;
     }
     
-    this.promptTemplates[trimmedName] = {
-      'New Template': 'Enter your template content here...'
-    };
+    // Add a placeholder template to create the section
+    templates.push({
+      category: sectionName.trim(),
+      name: 'New Template',
+      template: 'Enter your template content here...',
+      shortcut: sectionName.toLowerCase().replace(/\s+/g, '_')
+    });
     
-    this.saveTemplatesAndReload();
+    this.saveTemplatesAndReload(templates);
   },
 
-  addNewTemplate(categoryName) {
+  addNewTemplate(category) {
     const templateName = prompt('Enter template name:');
-    if (!templateName || templateName.trim() === '') return;
+    if (!templateName || !templateName.trim()) return;
     
-    const trimmedName = templateName.trim();
-    if (this.promptTemplates[categoryName][trimmedName]) {
-      alert('A template with this name already exists in this section.');
-      return;
-    }
+    const templates = this.getCurrentTemplates();
+    templates.push({
+      category: category,
+      name: templateName.trim(),
+      template: 'Enter your template content here...',
+      shortcut: templateName.toLowerCase().replace(/\s+/g, '_')
+    });
     
-    this.promptTemplates[categoryName][trimmedName] = 'Enter your template content here...';
-    this.saveTemplatesAndReload();
+    this.saveTemplatesAndReload(templates);
   },
 
-  deleteSection(categoryName) {
-    if (!confirm(`Are you sure you want to delete the "${categoryName}" section and all its templates?`)) return;
+  deleteSection(category) {
+    if (!confirm(`Are you sure you want to delete the entire "${category}" section and all its templates?`)) return;
     
-    delete this.promptTemplates[categoryName];
-    this.saveTemplatesAndReload();
+    const templates = this.getCurrentTemplates();
+    const filteredTemplates = templates.filter(t => t.category !== category);
+    this.saveTemplatesAndReload(filteredTemplates);
   },
 
-  deleteTemplate(categoryName, templateName) {
-    if (!confirm(`Are you sure you want to delete the "${templateName}" template?`)) return;
+  deleteTemplate(templateId) {
+    const textarea = document.getElementById(templateId);
+    if (!textarea) return;
     
-    delete this.promptTemplates[categoryName][templateName];
+    const category = textarea.dataset.category;
+    const name = textarea.dataset.name;
     
-    // If section is empty, remove it
-    if (Object.keys(this.promptTemplates[categoryName]).length === 0) {
-      delete this.promptTemplates[categoryName];
-    }
+    if (!confirm(`Are you sure you want to delete the template "${name}"?`)) return;
     
-    this.saveTemplatesAndReload();
+    const templates = this.getCurrentTemplates();
+    const filteredTemplates = templates.filter(t => !(t.category === category && t.name === name));
+    this.saveTemplatesAndReload(filteredTemplates);
   },
 
-  makeEditable(element) {
-    const originalText = element.textContent;
+  makeEditable(elementId, type) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const originalValue = element.dataset.originalValue || element.textContent.replace(/^[🎨✏️🐛🔄🤖📝]\s*/, '');
     const input = document.createElement('input');
     input.type = 'text';
-    input.value = originalText;
+    input.value = originalValue;
     input.style.cssText = `
-      width: 100%; padding: 4px; border: 2px solid #667eea; border-radius: 4px;
-      font-size: inherit; font-family: inherit; background: white;
+      width: 100%; border: 1px solid #667eea; border-radius: 3px; padding: 2px 4px;
+      font-size: ${type === 'category' ? '13px' : '12px'}; font-weight: ${type === 'category' ? '600' : '500'};
+      background: white; color: #1a202c;
     `;
     
-    element.replaceWith(input);
-    input.focus();
-    input.select();
-    
-    const saveChanges = () => {
-      const newText = input.value.trim();
-      if (newText === '') {
-        element.textContent = originalText;
-        input.replaceWith(element);
+    const saveEdit = () => {
+      const newValue = input.value.trim();
+      if (!newValue) {
+        input.focus();
         return;
       }
       
-      element.textContent = newText;
-      input.replaceWith(element);
-      
-      // Update the data based on what was edited
-      if (element.classList.contains('category-name')) {
-        this.updateCategoryName(originalText, newText);
-      } else if (element.classList.contains('template-name')) {
-        const categoryName = element.closest('.template-item').dataset.category;
-        this.updateTemplateName(categoryName, originalText, newText);
-      } else if (element.classList.contains('template-content')) {
-        const item = element.closest('.template-item');
-        const categoryName = item.dataset.category;
-        const templateName = item.dataset.template;
-        this.autoSaveTemplate(categoryName, templateName, newText);
+      if (type === 'category') {
+        this.updateCategoryName(originalValue, newValue);
+      } else if (type === 'template-name') {
+        const templateId = element.dataset.templateId;
+        this.updateTemplateName(templateId, newValue);
       }
+      
+      element.style.display = '';
+      input.remove();
     };
     
-    input.addEventListener('blur', saveChanges);
+    const cancelEdit = () => {
+      element.style.display = '';
+      input.remove();
+    };
+    
+    input.addEventListener('blur', saveEdit);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        saveChanges();
+        saveEdit();
       } else if (e.key === 'Escape') {
-        element.textContent = originalText;
-        input.replaceWith(element);
+        e.preventDefault();
+        cancelEdit();
       }
     });
+    
+    element.style.display = 'none';
+    element.parentNode.insertBefore(input, element);
+    input.focus();
+    input.select();
   },
 
   updateCategoryName(oldName, newName) {
-    if (oldName === newName) return;
-    
-    if (this.promptTemplates[newName]) {
-      alert('A section with this name already exists.');
-      return;
-    }
-    
-    this.promptTemplates[newName] = this.promptTemplates[oldName];
-    delete this.promptTemplates[oldName];
-    this.saveTemplatesAndReload();
-  },
-
-  updateTemplateName(categoryName, oldName, newName) {
-    if (oldName === newName) return;
-    
-    if (this.promptTemplates[categoryName][newName]) {
-      alert('A template with this name already exists in this section.');
-      return;
-    }
-    
-    const content = this.promptTemplates[categoryName][oldName];
-    this.promptTemplates[categoryName][newName] = content;
-    delete this.promptTemplates[categoryName][oldName];
-    this.saveTemplatesAndReload();
-  },
-
-  autoSaveTemplate(categoryName, templateName, content) {
-    this.promptTemplates[categoryName][templateName] = content;
-    this.saveCurrentTemplates();
-  },
-
-  async saveCurrentTemplates() {
-    try {
-      const message = {
-        action: 'savePromptTemplates',
-        data: { templates: this.promptTemplates }
-      };
-      
-      const response = await this.safeSendMessage(message);
-      if (response.success) {
-        console.log('✅ Templates saved successfully');
-      } else {
-        console.error('❌ Failed to save templates:', response.error);
+    const templates = this.getCurrentTemplates();
+    templates.forEach(template => {
+      if (template.category === oldName) {
+        template.category = newName;
       }
-    } catch (error) {
-      console.error('❌ Error saving templates:', error);
+    });
+    this.saveTemplatesAndReload(templates);
+  },
+
+  updateTemplateName(templateId, newName) {
+    const textarea = document.getElementById(templateId);
+    if (!textarea) return;
+    
+    const templates = this.getCurrentTemplates();
+    const template = templates.find(t => 
+      t.category === textarea.dataset.category && 
+      t.name === textarea.dataset.name
+    );
+    
+    if (template) {
+      template.name = newName;
+      textarea.dataset.name = newName;
+      this.saveTemplatesAndReload(templates);
     }
   },
 
-  async saveTemplatesAndReload() {
-    await this.saveCurrentTemplates();
-    this.renderPromptTemplates();
-    this.setupTemplateEventListeners();
+  autoSaveTemplate(templateId) {
+    // Debounce auto-save to prevent excessive saves
+    clearTimeout(this.autoSaveTimeout);
+    this.autoSaveTimeout = setTimeout(() => {
+      this.saveCurrentTemplates();
+    }, 1000);
   },
 
-  resetPromptTemplates() {
-    if (!confirm('Are you sure you want to reset all templates to defaults? This will delete all your custom templates.')) return;
+  saveCurrentTemplates() {
+    const templates = this.getCurrentTemplatesFromDOM();
+    try {
+      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      console.log('✅ Templates auto-saved');
+    } catch (error) {
+      console.error('Failed to auto-save templates:', error);
+    }
+  },
+
+  getCurrentTemplates() {
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      return stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      return this.getDefaultPromptTemplates();
+    }
+  },
+
+  getCurrentTemplatesFromDOM() {
+    const container = document.getElementById('prompt-templates-container');
+    if (!container) return [];
     
-    this.promptTemplates = this.getDefaultPromptTemplates();
-    this.saveTemplatesAndReload();
+    const templates = [];
+    const textareas = container.querySelectorAll('textarea');
+    
+    textareas.forEach(textarea => {
+      templates.push({
+        category: textarea.dataset.category,
+        name: textarea.dataset.name,
+        template: textarea.value,
+        shortcut: textarea.dataset.shortcut
+      });
+    });
+    
+    return templates;
   },
-  
-  
-  // Removed setupAPIProviderSelection() - AI functionality removed
-  
-  // Removed setupAPIConfiguration() - AI functionality removed
-  
-  // Removed loadAPISettings() - AI functionality removed
 
-  // Removed isValidModelOption() - AI functionality removed
+  saveTemplatesAndReload(templates) {
+    try {
+      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      this.loadPromptTemplates();
+      console.log('✅ Templates saved and reloaded');
+    } catch (error) {
+      console.error('Failed to save templates:', error);
+    }
+  },
 
-  // Removed setupPromptTemplates() - AI prompt templates functionality removed
+  loadTemplatesIntoMenu() {
+    const menuContainer = document.getElementById('prompt-templates-menu');
+    if (!menuContainer) return;
+    
+    // Load templates from localStorage or defaults
+    let templates;
+    try {
+      const stored = localStorage.getItem('lovable-prompt-templates');
+      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+    } catch (error) {
+      templates = this.getDefaultPromptTemplates();
+    }
+    
+    // Group templates by category
+    const categories = {};
+    templates.forEach(template => {
+      if (!categories[template.category]) {
+        categories[template.category] = [];
+      }
+      categories[template.category].push(template);
+    });
+    
+    let html = '';
+    Object.keys(categories).forEach(category => {
+      const icon = this.getCategoryIcon(category);
+      const color = this.getCategoryColor(category);
+      
+      html += `
+        <div class="prompt-category" data-category="${category.toLowerCase().replace(/\s+/g, '-')}">
+          <div style="font-weight: 600; color: ${color}; margin-bottom: 4px;">${icon} ${category}</div>
+      `;
+      
+      categories[category].forEach(template => {
+        html += `
+          <button class="prompt-option" data-template="${template.template}" title="${template.name}">
+            ${template.name}
+          </button>
+        `;
+      });
+      
+      html += '</div>';
+    });
+    
+    menuContainer.innerHTML = html;
+  },
 
-  // Removed getDefaultPromptTemplates() - AI prompt templates functionality removed
+  getCategoryColor(category) {
+    const colors = {
+      'Design': '#667eea',
+      'Editing Features': '#48bb78',
+      'Error Debugging': '#f56565',
+      'Refactoring': '#805ad5',
+      'Using another LLM': '#ed8936'
+    };
+    return colors[category] || '#4a5568';
+  },
 
-  // Removed loadPromptTemplates() - AI prompt templates functionality removed
+  setupUtilitiesEventListeners() {
+    // Message scraping
+    const scrapeBtn = document.getElementById('scrape-messages-btn');
+    const stopBtn = document.getElementById('stop-scraping-btn');
+    
+    if (scrapeBtn) {
+      scrapeBtn.addEventListener('click', () => {
+        this.scrapeAllMessages();
+      });
+    }
+    
+    if (stopBtn) {
+      stopBtn.addEventListener('click', () => {
+        if (window.currentMessageScraper) {
+          window.currentMessageScraper.stopScraping();
+        }
+      });
+    }
 
-  // Removed renderPromptTemplates() - AI prompt templates functionality removed
+    // Prompt template management
+    const createSectionBtn = document.getElementById('create-section-btn');
+    const resetTemplatesBtn = document.getElementById('reset-prompt-templates-btn');
+    
+    if (createSectionBtn) {
+      createSectionBtn.addEventListener('click', () => {
+        this.createNewSection();
+      });
+    }
+    
+    if (resetTemplatesBtn) {
+      resetTemplatesBtn.addEventListener('click', () => {
+        this.resetPromptTemplates();
+      });
+    }
 
-  // Removed setupTemplateEventListeners() - AI prompt templates functionality removed
+    // Toggle switches
+    this.setupToggleSwitches();
+  },
 
-  // Removed getCategoryIcon() - AI prompt templates functionality removed
+  setupToggleSwitches() {
+    // Add CSS for toggle switches
+    if (!document.getElementById('toggle-switch-styles')) {
+      const style = document.createElement('style');
+      style.id = 'toggle-switch-styles';
+      style.textContent = `
+        .toggle-switch input:checked + .toggle-slider {
+          background-color: #667eea;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+          transform: translateX(26px);
+        }
+        .toggle-slider:before {
+          position: absolute;
+          content: "";
+          height: 20px;
+          width: 20px;
+          left: 2px;
+          bottom: 2px;
+          background-color: white;
+          transition: .4s;
+          border-radius: 50%;
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
-  // Removed copyTemplate() - AI prompt templates functionality removed
+    // Setup individual toggles
+    this.setupToggle('notifications-toggle', 'lovable-notifications');
+    this.setupToggle('tab-rename-toggle', 'lovable-tab-rename');
+    this.setupToggle('auto-switch-toggle', 'lovable-auto-switch');
+    this.setupToggle('auto-expand-toggle', 'lovable-auto-expand');
+  },
 
-  // Removed resetPromptTemplates() - AI prompt templates functionality removed
+  setupToggle(toggleId, storageKey) {
+    const toggle = document.getElementById(toggleId);
+    if (!toggle) return;
 
-  // Removed createNewSection() - AI prompt templates functionality removed
+    // Load current state
+    const currentState = localStorage.getItem(storageKey) === 'true';
+    toggle.checked = currentState;
 
-  // Removed addNewTemplate() - AI prompt templates functionality removed
+    // Add change listener
+    toggle.addEventListener('change', () => {
+      localStorage.setItem(storageKey, toggle.checked.toString());
+      console.log(`🔧 ${storageKey} ${toggle.checked ? 'enabled' : 'disabled'}`);
+    });
+  },
 
-  // Removed deleteSection() - AI prompt templates functionality removed
+  loadUtilitiesSettings() {
+    // Load toggle states
+    const settings = [
+      { id: 'notifications-toggle', key: 'lovable-notifications' },
+      { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
+      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
+      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' }
+    ];
 
-  // Removed deleteTemplate() - AI prompt templates functionality removed
-
-  // Removed makeEditable() - AI prompt templates functionality removed
-
-  // Removed updateCategoryName() - AI prompt templates functionality removed
-
-  // Removed updateTemplateName() - AI prompt templates functionality removed
-
-  // Removed autoSaveTemplate() - AI prompt templates functionality removed
-
-  // Removed saveCurrentTemplates() - AI prompt templates functionality removed
-
-  // Removed getCurrentTemplates() - AI prompt templates functionality removed
-
-  // Removed getCurrentTemplatesFromDOM() - AI prompt templates functionality removed
-
-  // Removed saveAllTemplatesToDatabase() - AI prompt templates functionality removed
-
-  // Removed saveTemplatesAndReload() - AI prompt templates functionality removed
-
-  // Removed loadTemplatesIntoMenu() - AI prompt templates functionality removed
-
-  // Removed getCategoryColor() - AI prompt templates functionality removed
+    settings.forEach(setting => {
+      const toggle = document.getElementById(setting.id);
+      if (toggle) {
+        toggle.checked = localStorage.getItem(setting.key) === 'true';
+      }
+    });
+  },
 
   async scrapeAllMessages() {
     const statusDiv = document.getElementById('scrape-status');
@@ -879,40 +864,12 @@ window.UtilitiesManager = {
     }
   },
 
-  resetUtilitiesSettings() {
-    if (!confirm('Are you sure you want to reset all utility settings? This will disable all features.')) return;
-    
-    const settings = [
-      'lovable-auto-expand'
-    ];
-    
-    settings.forEach(key => localStorage.removeItem(key));
-    
-    // Reload settings
-    this.loadUtilitiesSettings();
-    
-    console.log('🔧 All utility settings reset');
-  },
-
-  exportUtilitiesSettings() {
-    const settings = {
-      autoExpand: localStorage.getItem('lovable-auto-expand') === 'true',
-      exportDate: new Date().toISOString(),
-      projectId: this.projectId
-    };
-    
-    const dataStr = JSON.stringify(settings, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lovable-utilities-settings-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    console.log('📥 Settings exported');
+  setupBackButton() {
+    const backBtn = document.getElementById('back-to-welcome-btn');
+    if (backBtn && this.showWelcomePage) {
+      backBtn.addEventListener('click', () => {
+        this.showWelcomePage();
+      });
+    }
   }
 };
