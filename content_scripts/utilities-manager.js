@@ -118,16 +118,6 @@ window.UtilitiesManager = {
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
             ✨ Prompt Helper
           </h3>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <label style="color: #4a5568; font-size: 14px;">Auto-expand input area on new lines</label>
-            <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 24px;">
-              <input type="checkbox" id="auto-expand-toggle" style="opacity: 0; width: 0; height: 0;">
-              <span class="toggle-slider" style="
-                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-                background-color: #ccc; transition: .4s; border-radius: 24px;
-              "></span>
-            </label>
-          </div>
           <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
             <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
               Prompt Helper Templates (Ctrl+Enter / Cmd+Enter)
@@ -157,8 +147,10 @@ window.UtilitiesManager = {
     
     this.setupBackButton();
     this.setupUtilitiesEventListeners();
-    this.loadUtilitiesSettings();
-    this.loadPromptTemplates();
+    // Load settings first, then prompt templates
+    this.loadUtilitiesSettings().then(() => {
+      this.loadPromptTemplates();
+    });
   },
 
   // Original prompt templates methods from git history
@@ -239,11 +231,25 @@ window.UtilitiesManager = {
     ];
   },
 
-  loadPromptTemplates() {
+  async loadPromptTemplates() {
     const container = document.getElementById('prompt-templates-container');
     if (!container) return;
     
-    // Try to load from localStorage first, then fall back to defaults
+    try {
+      // Try to load from database first if user is authenticated
+      const response = await this.safeSendMessage({ action: 'getPromptTemplatesFromDB' });
+      
+      if (response && response.success) {
+        // Convert database format to UI format
+        const templates = this.convertDBTemplatesToUIFormat(response.data);
+        this.renderPromptTemplates(templates);
+        return;
+      }
+    } catch (error) {
+      console.warn('Failed to load templates from database, falling back to localStorage:', error);
+    }
+    
+    // Fallback to localStorage and defaults
     let templates;
     try {
       const stored = localStorage.getItem('lovable-prompt-templates');
@@ -254,6 +260,30 @@ window.UtilitiesManager = {
     }
     
     this.renderPromptTemplates(templates);
+  },
+
+  convertDBTemplatesToUIFormat(dbTemplates) {
+    // Convert database format to the format expected by the UI
+    return dbTemplates.map(template => ({
+      category: template.category,
+      name: template.name,
+      template: template.template_content || template.content,
+      shortcut: template.shortcut,
+      template_id: template.template_id,
+      is_system_template: template.is_system_template
+    }));
+  },
+
+  convertUITemplatesToDBFormat(uiTemplates) {
+    // Convert UI format to database format
+    return uiTemplates.map(template => ({
+      template_id: template.template_id,
+      category: template.category,
+      name: template.name,
+      template_content: template.template,
+      shortcut: template.shortcut,
+      is_system_template: template.is_system_template || false
+    }));
   },
 
   renderPromptTemplates(templates) {
@@ -320,6 +350,8 @@ window.UtilitiesManager = {
                       data-category="${template.category}" 
                       data-name="${template.name}" 
                       data-shortcut="${template.shortcut}"
+                      data-template-id="${template.template_id || ''}"
+                      data-is-system-template="${template.is_system_template || false}"
                       style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
                              border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
                              background: white; color: #1a202c;">${template.template}</textarea>
@@ -502,18 +534,66 @@ window.UtilitiesManager = {
     this.saveTemplatesAndReload(filteredTemplates);
   },
 
-  deleteTemplate(templateId) {
+  async deleteTemplate(templateId) {
     const textarea = document.getElementById(templateId);
     if (!textarea) return;
     
     const category = textarea.dataset.category;
     const name = textarea.dataset.name;
+    const isSystemTemplate = textarea.dataset.isSystemTemplate === 'true';
+    const templateDbId = textarea.dataset.templateId;
     
-    if (!confirm(`Are you sure you want to delete the template "${name}"?`)) return;
+    let confirmMessage;
+    if (isSystemTemplate) {
+      confirmMessage = `Are you sure you want to hide the system template "${name}"? You can restore it later by resetting templates to defaults.`;
+    } else {
+      confirmMessage = `Are you sure you want to delete the template "${name}"? This action cannot be undone.`;
+    }
     
+    if (!confirm(confirmMessage)) return;
+    
+    // Handle system templates by hiding them
+    if (isSystemTemplate && templateDbId) {
+      try {
+        const response = await this.safeSendMessage({ 
+          action: 'hideSystemTemplate', 
+          templateId: templateDbId 
+        });
+        
+        if (response && response.success) {
+          console.log('✅ System template hidden successfully');
+          await this.loadPromptTemplates(); // Reload from database
+          return;
+        } else {
+          console.warn('⚠️ Failed to hide system template:', response?.error);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to hide system template:', error);
+      }
+    }
+    
+    // Handle user templates or fallback for system templates
+    if (!isSystemTemplate && templateDbId) {
+      try {
+        const response = await this.safeSendMessage({ 
+          action: 'deletePromptTemplateFromDB', 
+          templateId: templateDbId 
+        });
+        
+        if (response && response.success) {
+          console.log('✅ Template deleted from database successfully');
+        } else {
+          console.warn('⚠️ Failed to delete from database:', response?.error);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to delete from database:', error);
+      }
+    }
+    
+    // Update local templates as well
     const templates = this.getCurrentTemplates();
     const filteredTemplates = templates.filter(t => !(t.category === category && t.name === name));
-    this.saveTemplatesAndReload(filteredTemplates);
+    await this.saveTemplatesAndReload(filteredTemplates);
   },
 
   makeEditable(elementId, type) {
@@ -643,10 +723,29 @@ window.UtilitiesManager = {
     return templates;
   },
 
-  saveTemplatesAndReload(templates) {
+  async saveTemplatesAndReload(templates) {
     try {
+      // Save to localStorage as backup
       localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
-      this.loadPromptTemplates();
+      
+      // Try to save to database if user is authenticated
+      try {
+        const dbTemplates = this.convertUITemplatesToDBFormat(templates);
+        const response = await this.safeSendMessage({ 
+          action: 'savePromptTemplatesToDB', 
+          templates: dbTemplates 
+        });
+        
+        if (response && response.success) {
+          console.log('✅ Templates saved to database successfully');
+        } else {
+          console.warn('⚠️ Failed to save to database, saved locally only:', response?.error);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to save to database, saved locally only:', error);
+      }
+      
+      await this.loadPromptTemplates();
       console.log('✅ Templates saved and reloaded');
     } catch (error) {
       console.error('Failed to save templates:', error);
@@ -745,8 +844,7 @@ window.UtilitiesManager = {
       });
     }
 
-    // Toggle switches
-    this.setupToggleSwitches();
+    // Note: Toggle switches setup moved to after loadUtilitiesSettings
   },
 
   setupToggleSwitches() {
@@ -780,39 +878,102 @@ window.UtilitiesManager = {
     this.setupToggle('notifications-toggle', 'lovable-notifications');
     this.setupToggle('tab-rename-toggle', 'lovable-tab-rename');
     this.setupToggle('auto-switch-toggle', 'lovable-auto-switch');
-    this.setupToggle('auto-expand-toggle', 'lovable-auto-expand');
   },
 
   setupToggle(toggleId, storageKey) {
     const toggle = document.getElementById(toggleId);
     if (!toggle) return;
 
-    // Load current state
-    const currentState = localStorage.getItem(storageKey) === 'true';
-    toggle.checked = currentState;
-
-    // Add change listener
-    toggle.addEventListener('change', () => {
+    // Don't set the initial state here - it's already set in loadUtilitiesSettings
+    // Just add the change listener
+    
+    // Add change listener with database sync
+    toggle.addEventListener('change', async () => {
+      // Update localStorage immediately
       localStorage.setItem(storageKey, toggle.checked.toString());
       console.log(`🔧 ${storageKey} ${toggle.checked ? 'enabled' : 'disabled'}`);
+      
+      // Try to save to database
+      try {
+        await this.saveUserPreferencesToDatabase();
+        console.log('💾 Saving preference change to database...');
+      } catch (error) {
+        console.warn('⚠️ Failed to save preferences to database:', error);
+      }
     });
   },
 
-  loadUtilitiesSettings() {
-    // Load toggle states
-    const settings = [
-      { id: 'notifications-toggle', key: 'lovable-notifications' },
-      { id: 'tab-rename-toggle', key: 'lovable-tab-rename' },
-      { id: 'auto-switch-toggle', key: 'lovable-auto-switch' },
-      { id: 'auto-expand-toggle', key: 'lovable-auto-expand' }
-    ];
-
-    settings.forEach(setting => {
-      const toggle = document.getElementById(setting.id);
-      if (toggle) {
-        toggle.checked = localStorage.getItem(setting.key) === 'true';
+  async saveUserPreferencesToDatabase() {
+    try {
+      const preferences = {
+        notifications: localStorage.getItem('lovable-notifications') === 'true',
+        tabRename: localStorage.getItem('lovable-tab-rename') === 'true',
+        autoSwitch: localStorage.getItem('lovable-auto-switch') === 'true'
+      };
+      
+      const response = await this.safeSendMessage({ 
+        action: 'saveUserPreferences', 
+        preferences: preferences 
+      });
+      
+      if (response && response.success) {
+        console.log('✅ User preferences saved to database successfully');
+      } else {
+        console.warn('⚠️ Failed to save preferences to database:', response?.error);
       }
-    });
+    } catch (error) {
+      console.warn('⚠️ Failed to save preferences to database:', error);
+    }
+  },
+
+  async loadUtilitiesSettings() {
+    try {
+      // Try to load from database first if user is authenticated
+      const response = await this.safeSendMessage({ action: 'getUserPreferences' });
+      
+      if (response && response.success) {
+        const prefs = response.data;
+        
+        // Set toggle states from database
+        const toggle1 = document.getElementById('notifications-toggle');
+        const toggle2 = document.getElementById('tab-rename-toggle');
+        const toggle3 = document.getElementById('auto-switch-toggle');
+        
+        if (toggle1) toggle1.checked = prefs.notifications !== false; // Default true
+        if (toggle2) toggle2.checked = prefs.tabRename === true; // Default false
+        if (toggle3) toggle3.checked = prefs.autoSwitch === true; // Default false
+        
+        // Also update localStorage for backward compatibility
+        localStorage.setItem('lovable-notifications', (prefs.notifications !== false).toString());
+        localStorage.setItem('lovable-tab-rename', (prefs.tabRename === true).toString());
+        localStorage.setItem('lovable-auto-switch', (prefs.autoSwitch === true).toString());
+        
+        console.log('✅ User preferences loaded from database');
+      }
+    } catch (error) {
+      console.warn('Failed to load preferences from database, falling back to localStorage:', error);
+      
+      // Fallback to localStorage
+      const settings = [
+        { id: 'notifications-toggle', key: 'lovable-notifications', defaultValue: true },
+        { id: 'tab-rename-toggle', key: 'lovable-tab-rename', defaultValue: false },
+        { id: 'auto-switch-toggle', key: 'lovable-auto-switch', defaultValue: false }
+      ];
+
+      settings.forEach(setting => {
+        const toggle = document.getElementById(setting.id);
+        if (toggle) {
+          const storedValue = localStorage.getItem(setting.key);
+          toggle.checked = storedValue !== null ? storedValue === 'true' : setting.defaultValue;
+        }
+      });
+    }
+    
+    // Setup toggle switches AFTER loading values
+    this.setupToggleSwitches();
+    
+    // Clean up old auto-expand setting since Lovable now handles this natively
+    localStorage.removeItem('lovable-auto-expand');
   },
 
   async scrapeAllMessages() {

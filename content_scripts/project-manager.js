@@ -393,50 +393,61 @@ window.ProjectManager = {
    * 
    * Returns: Project object with current info + saved data from database
    */
-  async getCurrentProject() {
+  /**
+   * AUTO-SAVE PROJECT INFO (CALLED AFTER OWNERSHIP CONFIRMED)
+   * 
+   * This method is called only after project ownership has been confirmed.
+   * It handles authentication check and database saving.
+   */
+  async autoSaveProjectInfo() {
     try {
-      // Check if user is authenticated before proceeding
-      try {
-        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
-        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
-          console.log('🔒 User not authenticated - skipping project data operations');
-          return null;
-        }
-      } catch (error) {
-        console.log('⚠️ Could not verify authentication - skipping project data operations');
-        return null;
-      }
-      
-      // Use the current project ID from the detector, fallback to URL extraction if needed
       const projectId = this.projectId || this.extractProjectId();
-      console.log('🔍 Using project ID:', projectId);
       
       if (!projectId) {
-        console.log('❌ Could not determine project ID');
         return null;
       }
       
       const currentUrl = window.location.href;
       if (!currentUrl.includes('lovable.dev/projects/')) {
-        console.log('❌ Not on a Lovable project page');
         return null;
       }
+      
       const projectName = this.getProjectNameFromTitle();
-      console.log('🔍 Detected project:', { projectId, projectName });
       
-      // Check if this is the user's own project by detecting the Send button
-      const isUserProject = this.isUserOwnedProject();
-      console.log('🔍 Is user-owned project:', isUserProject);
+      // Show ready notification for owned projects
+      if (typeof this.showReadyNotification === 'function') {
+        this.showReadyNotification();
+      }
       
-      if (!isUserProject) {
-        console.log('🚫 Not a user-owned project, skipping auto-save');
-        
-        // Stop conversation capture for non-owned projects
-        if (window.simpleConversationCapture && typeof window.simpleConversationCapture.stopMonitoringDueToOwnership === 'function') {
-          window.simpleConversationCapture.stopMonitoringDueToOwnership('Project is not user-owned');
+      // Start conversation capture for owned projects
+      if (window.simpleConversationCapture && typeof window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed === 'function') {
+        window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed(projectId);
+      }
+      
+      // Check authentication for database operations
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+          console.log('🔒 User not authenticated - cannot save project data');
+          // Don't return null here - we still confirmed ownership
+          // Just skip database operations
+          return {
+            id: projectId,
+            name: projectName,
+            url: currentUrl,
+            description: '',
+            knowledge: ''
+          };
         }
-        
-        return null;
+      } catch (error) {
+        console.log('⚠️ Could not verify authentication - skipping database operations');
+        return {
+          id: projectId,
+          name: projectName,
+          url: currentUrl,
+          description: '',
+          knowledge: ''
+        };
       }
       
       const currentProject = {
@@ -493,18 +504,85 @@ window.ProjectManager = {
       } else {
         console.log('ℹ️ Project information already exists and is up to date');
       }
-      
-      // ========================================
-      // START CONVERSATION CAPTURE - After Ownership Confirmed
-      // ========================================
-      // Now that we've confirmed this is a user-owned project with valid project ID,
-      // start the conversation capture to automatically save chat messages
-      if (window.simpleConversationCapture && typeof window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed === 'function') {
-        console.log('🚀 Starting conversation capture for confirmed user-owned project:', projectId);
-        window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed(projectId);
+      return currentProject;
+    } catch (error) {
+      console.error('❌ Error getting current project:', error);
+      return null;
+    }
+  },
+
+  /**
+   * GET CURRENT PROJECT (FOR UTILITIES/DIALOG)
+   * 
+   * Returns current project info without ownership checking.
+   * Used by utilities dialog and other UI components.
+   */
+  async getCurrentProject() {
+    // If we haven't checked ownership yet or project is not owned, return null
+    if (!this.projectChecked || !this.isProjectOwned) {
+      return null;
+    }
+    
+    try {
+      const projectId = this.projectId || this.extractProjectId();
+      if (!projectId) {
+        return null;
       }
       
-      console.log('✅ Final current project:', currentProject);
+      const currentUrl = window.location.href;
+      if (!currentUrl.includes('lovable.dev/projects/')) {
+        return null;
+      }
+      
+      const projectName = this.getProjectNameFromTitle();
+      
+      // Check authentication for database operations
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        if (!authResponse?.success || !authResponse.data?.isAuthenticated) {
+          // Return basic info without database data
+          return {
+            id: projectId,
+            name: projectName,
+            url: currentUrl,
+            description: '',
+            knowledge: ''
+          };
+        }
+      } catch (error) {
+        // Return basic info without database data
+        return {
+          id: projectId,
+          name: projectName,
+          url: currentUrl,
+          description: '',
+          knowledge: ''
+        };
+      }
+      
+      const currentProject = {
+        id: projectId,
+        name: projectName,
+        url: currentUrl,
+        description: '',
+        knowledge: ''
+      };
+      
+      // Load saved project data from database
+      try {
+        const response = await this.safeSendMessageWithRetry({
+          action: 'getProjectManager',
+          projectId: projectId
+        });
+        
+        if (response?.success && response.data) {
+          currentProject.description = response.data.description || '';
+          currentProject.knowledge = response.data.knowledge || '';
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load project data from database:', error);
+      }
+      
       return currentProject;
     } catch (error) {
       console.error('❌ Error getting current project:', error);
@@ -581,6 +659,15 @@ window.ProjectManager = {
    */
   async autoSaveProjectInfo() {
     try {
+      // Check if we've already checked this project
+      if (this.projectChecked) {
+        console.log('🔄 Project already checked, skipping duplicate check');
+        return null;
+      }
+      
+      // Mark as checked to prevent multiple checks
+      this.projectChecked = true;
+      
       console.log('🚀 Auto-saving project information immediately on page load...');
       
       // Wait a moment for page title to be fully loaded
@@ -597,6 +684,8 @@ window.ProjectManager = {
       }
     } catch (error) {
       console.warn('⚠️ Error during immediate auto-save:', error);
+      // Reset the flag on error so it can be retried if needed
+      this.projectChecked = false;
       throw error;
     }
   },
@@ -619,66 +708,164 @@ window.ProjectManager = {
   },
 
   /**
-   * CHECK IF PROJECT IS USER-OWNED
+   * CHECK IF PROJECT IS USER-OWNED WITH IMPROVED WORKFLOW
    * 
-   * Detects if the current project belongs to the user by checking for the presence
-   * of the Send button (similar to how we detect Lovable's working status).
+   * Implements the new SVG icon-based detection with retry logic:
+   * 1. Check URL format first
+   * 2. Look for SVG icon at specific XPath
+   * 3. Identify lock icon (private) vs globe icon (public) by SVG path data
+   * 4. Implement retry logic if icon not loaded
+   * 5. Show appropriate notifications based on project type
    * 
-   * Only user-owned projects have the chat interface with the Send button.
-   * Public or other projects don't have this element.
-   * 
-   * Returns: Boolean indicating if this is a user-owned project
+   * Returns: Promise<boolean> indicating if this is a user-owned project
    */
-  isUserOwnedProject() {
+  async isUserOwnedProject() {
     try {
-      console.log('🔍 Checking if project is user-owned...');
-      
-      // Method 1: Check for lock icon (indicates PRIVATE/user-owned project)
-      try {
-        // Check for lock icon using multiple methods
-        
-        // First try the specific XPath
-        const lockIconXPath = '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]';
-        const lockResult = document.evaluate(
-          lockIconXPath,
-          document,
-          null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
-          null
-        );
-        
-        if (lockResult.singleNodeValue) {
-          // Verify it's the lock icon by checking the path data
-          const svgElement = lockResult.singleNodeValue;
-          const pathElement = svgElement.querySelector('path');
-          if (pathElement) {
-            const pathData = pathElement.getAttribute('d');
-            if (pathData && (pathData.includes('M220-80q-24.75') || pathData.includes('220-80'))) {
-              console.log('🔒 Found lock icon via XPath - this IS a private/user-owned project');
-              return true;
-            }
-          }
-        }
-        
-        // Also try finding lock icon by searching all SVGs
-        const allSvgs = document.querySelectorAll('svg');
-        for (const svg of allSvgs) {
-          if (svg.getAttribute('width') === '100%' && 
-              svg.getAttribute('height') === '100%' && 
-              svg.getAttribute('viewBox') === '0 -960 960 960') {
-            const path = svg.querySelector('path');
-            if (path && path.getAttribute('d')?.includes('M220-80q-24.75')) {
-              console.log('🔒 Found lock icon via SVG search - this IS a private/user-owned project');
-              return true;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Error checking for lock icon:', e);
-        // Continue checking other methods
+      // Check URL format first
+      const currentUrl = window.location.href;
+      if (!currentUrl.includes('lovable.dev/projects/')) {
+        return false;
       }
       
-      // Method 2: Try the exact XPath for Send button
+      // Don't show checking notification - removed per user request
+      
+      // Try to find the SVG icon with retry logic
+      const maxRetries = 3;
+      const retryDelay = 5000; // 5 seconds
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // First try the original XPath approach since it worked before
+          try {
+            const privateIconXPath = '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]';
+            const xpathResult = document.evaluate(
+              privateIconXPath,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null
+            );
+            
+            if (xpathResult.singleNodeValue) {
+              const svg = xpathResult.singleNodeValue;
+              const path = svg.querySelector('path');
+              if (path) {
+                const pathData = path.getAttribute('d');
+                
+                if (pathData && pathData.startsWith('M220-80q-24.75')) {
+                  console.log('🔒 Found LOCK icon - this IS a private/user-owned project');
+                  this.isProjectOwned = true;
+                  return true;
+                }
+              }
+            }
+          } catch (xpathError) {
+            // XPath failed, try querySelector
+          }
+          
+          // Fallback to querySelector - focus on navigation area first
+          const navSvgs = document.querySelectorAll('nav svg[viewBox="0 -960 960 960"]');
+          
+          let foundIcon = false;
+          
+          // Check navigation SVGs first
+          for (const svg of navSvgs) {
+            const path = svg.querySelector('path');
+            if (path) {
+              const pathData = path.getAttribute('d');
+              
+              if (pathData) {
+                // Check for LOCK icon (private/user-owned project)
+                if (pathData.startsWith('M220-80q-24.75 0-42.37-17.63Q160-115.25 160-140v-434')) {
+                  console.log('🔒 Found LOCK icon - this IS a private/user-owned project');
+                  this.isProjectOwned = true;
+                  foundIcon = true;
+                  return true;
+                }
+                
+                // Check for GLOBE icon (public project)
+                if (pathData.startsWith('M480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5')) {
+                  console.log('🌐 Found GLOBE icon - this is a PUBLIC project');
+                  this.isProjectOwned = false;
+                  foundIcon = true;
+                  return false;
+                }
+              }
+            }
+          }
+          
+          // If not found in nav, check all page SVGs
+          if (!foundIcon) {
+            const allSvgs = document.querySelectorAll('svg[viewBox="0 -960 960 960"]');
+            
+            for (const svg of allSvgs) {
+              const path = svg.querySelector('path');
+              if (path) {
+                const pathData = path.getAttribute('d');
+                
+                if (pathData) {
+                  // Check for LOCK icon (private/user-owned project)
+                  if (pathData.startsWith('M220-80q-24.75 0-42.37-17.63Q160-115.25 160-140v-434')) {
+                    console.log('🔒 Found LOCK icon - this IS a private/user-owned project');
+                    this.isProjectOwned = true;
+                    foundIcon = true;
+                    return true;
+                  }
+                  
+                  // Check for GLOBE icon (public project)
+                  if (pathData.startsWith('M480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5')) {
+                    console.log('🌐 Found GLOBE icon - this is a PUBLIC project');
+                    this.isProjectOwned = false;
+                    foundIcon = true;
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+          
+          // If we reach here, icon wasn't found - retry
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+          
+        } catch (error) {
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
+      }
+      
+      // If we exhausted all retries, fall back to old detection methods
+      console.log('⚠️ SVG icon detection failed after all retries, falling back to legacy detection...');
+      
+      // Fallback: Check for Send button or chat interface (legacy method)
+      const hasSendButton = this.checkForSendButton();
+      if (hasSendButton) {
+        console.log('✅ Found Send button via fallback method - this is a user-owned project');
+        this.isProjectOwned = true;
+        return true;
+      }
+      
+      console.log('❌ No ownership indicators found - this is not a user-owned project');
+      this.isProjectOwned = false;
+      return false;
+      
+    } catch (error) {
+      console.error('❌ Error in improved project ownership check:', error);
+      this.isProjectOwned = false;
+      return false;
+    }
+  },
+  
+  /**
+   * LEGACY SEND BUTTON DETECTION
+   * 
+   * Fallback method for detecting project ownership via Send button presence
+   */
+  checkForSendButton() {
+    try {
+      // Method 1: Try the exact XPath for Send button
       try {
         const xpathResult = document.evaluate(
           '/html/body/div[1]/div/div[2]/main/div/div/div[1]/div/div[2]/form/div[2]/div[2]/div[2]/button',
@@ -689,49 +876,45 @@ window.ProjectManager = {
         );
         
         if (xpathResult.singleNodeValue) {
-          console.log('✅ Found Send button via XPath - this is a user-owned project');
           return true;
         }
       } catch (xpathError) {
         // XPath evaluation failed
       }
       
-      // Method 3: Look for the specific button ID
+      // Method 2: Look for the specific button ID
       const sendButton = document.getElementById('chatinput-send-message-button');
       if (sendButton) {
-        console.log('✅ Found Send button via ID - this is a user-owned project');
         return true;
       }
       
-      // Method 4: Look for any button with the send message functionality
+      // Method 3: Look for any button with the send message functionality
       const sendButtons = document.querySelectorAll('button[type="submit"]');
       for (const button of sendButtons) {
         if ((button.id && button.id.includes('send-message')) ||
             (button.className && button.className.includes('send')) ||
             (button.innerHTML && button.innerHTML.includes('svg') && 
              button.classList.contains('bg-foreground'))) {
-          console.log('✅ Found Send button via query selector - this is a user-owned project');
           return true;
         }
       }
       
-      // Method 5: Look for form elements that indicate user interaction capability
+      // Method 4: Look for form elements that indicate user interaction capability
       const chatForm = document.querySelector('form');
       const chatInput = document.querySelector('input[type="text"], textarea');
       
       if (chatForm && chatInput) {
-        console.log('✅ Found chat form and input - this is a user-owned project');
         return true;
       }
       
-      console.log('❌ No Send button or chat interface found - this is not a user-owned project');
       return false;
     } catch (error) {
-      console.error('❌ Error checking if project is user-owned:', error);
-      // Default to false for safety - don't save if we can't determine ownership
+      console.error('❌ Error in legacy send button detection:', error);
       return false;
     }
   },
+  
+  
 
   async getSavedProjects() {
     try {

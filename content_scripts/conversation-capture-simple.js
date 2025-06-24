@@ -13,34 +13,9 @@ class SimpleConversationCapture {
   }
 
   async init() {
-    // Check if user is authenticated before initializing conversation capture
-    console.log('📚 Checking user authentication before initializing conversation capture...');
-    
-    try {
-      // Check authentication with service worker
-      const response = await this.safeSendMessage({ action: 'checkAuth' });
-      
-      if (!response?.success || !response.data?.isAuthenticated) {
-        console.log('🔒 User not authenticated - conversation capture will not start');
-        this.waitingForAuthentication = true;
-        this.waitingForOwnershipConfirmation = true;
-        return;
-      }
-      
-      console.log('✅ User authenticated - conversation capture can proceed');
-      this.waitingForAuthentication = false;
-    } catch (error) {
-      console.log('⚠️ Could not verify authentication - conversation capture will not start');
-      this.waitingForAuthentication = true;
-      this.waitingForOwnershipConfirmation = true;
-      return;
-    }
-    
-    // Simple Conversation Capture initialized but not started yet
-    console.log('📚 Conversation capture initialized but waiting for project ownership confirmation...');
-    
-    // Don't start monitoring immediately - wait for project ownership confirmation
+    // Set flags to wait for ownership confirmation
     this.waitingForOwnershipConfirmation = true;
+    this.waitingForAuthentication = true;
     
     // Process periodically (but only if monitoring has started)
     setInterval(() => {
@@ -51,17 +26,33 @@ class SimpleConversationCapture {
   }
 
   // Method to start monitoring after project ownership is confirmed
-  startMonitoringAfterOwnershipConfirmed(projectId) {
+  async startMonitoringAfterOwnershipConfirmed(projectId) {
     if (this.isMonitoring) return;
     
-    if (this.waitingForAuthentication) {
-      console.log('🔒 Cannot start monitoring - user not authenticated');
+    console.log('✅ Project ownership confirmed for project:', projectId);
+    this.projectId = projectId; // Store the confirmed project ID
+    this.waitingForOwnershipConfirmation = false;
+    
+    // NOW check authentication AFTER ownership is confirmed
+    try {
+      const response = await this.safeSendMessage({ action: 'checkAuth' });
+      
+      if (!response?.success || !response.data?.isAuthenticated) {
+        console.log('🔒 User not authenticated - conversation capture will not start');
+        this.waitingForAuthentication = true;
+        return;
+      }
+      
+      console.log('✅ User authenticated - starting conversation capture');
+      this.waitingForAuthentication = false;
+    } catch (error) {
+      console.log('⚠️ Could not verify authentication - conversation capture will not start');
+      this.waitingForAuthentication = true;
       return;
     }
     
-    console.log('✅ Project ownership confirmed! Starting conversation capture for project:', projectId);
-    this.projectId = projectId; // Store the confirmed project ID
-    this.waitingForOwnershipConfirmation = false;
+    // Both ownership and authentication confirmed - start monitoring
+    console.log('🚀 Starting conversation capture for project:', projectId);
     this.startMonitoring();
   }
 

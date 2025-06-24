@@ -4,6 +4,7 @@ export class SupabaseClient {
     this.baseURL = null;
     this.apiKey = null;
     this.initialized = false;
+    this.sessionToken = null;
   }
 
   async init() {
@@ -15,17 +16,25 @@ export class SupabaseClient {
     this.initialized = true;
   }
 
+  // Set session token for authenticated requests
+  setSessionToken(token) {
+    this.sessionToken = token;
+  }
+
   async request(endpoint, options = {}) {
     await this.init();
     
     const url = `${this.baseURL}/rest/v1/${endpoint}`;
     console.log(`🔍 Database request: ${options.method || 'GET'} ${url}`);
     
+    // Use session token if available for authenticated requests, otherwise use API key
+    const authToken = this.sessionToken || this.apiKey;
+    
     const response = await fetch(url, {
       ...options,
       headers: {
         'apikey': this.apiKey,
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation',
         ...options.headers
@@ -57,13 +66,34 @@ export class SupabaseClient {
     let responseText;
     try {
       responseText = await response.text();
+      
+      // Handle empty response
+      if (!responseText || responseText.trim() === '') {
+        console.log(`ℹ️ Database returned empty response for ${options.method || 'GET'} ${endpoint}`);
+        return null;
+      }
+      
+      // Handle non-JSON responses (like HTML error pages)
+      if (!responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
+        console.error(`❌ Response is not JSON. Response text:`, responseText.substring(0, 500));
+        throw new Error(`API returned non-JSON response: ${responseText.substring(0, 100)}...`);
+      }
+      
       const result = JSON.parse(responseText);
       console.log(`✅ Database response data:`, result);
       return result;
     } catch (jsonError) {
       console.error(`❌ Failed to parse JSON response:`, jsonError);
-      console.error(`❌ Response text:`, responseText);
-      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseText}`);
+      console.error(`❌ Response text (first 500 chars):`, responseText?.substring(0, 500));
+      console.error(`❌ Response length:`, responseText?.length);
+      console.error(`❌ Request details:`, { 
+        method: options.method || 'GET', 
+        endpoint,
+        status: response.status,
+        statusText: response.statusText
+      });
+      
+      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response length: ${responseText?.length || 0}`);
     }
   }
   // Original method for backward compatibility

@@ -392,50 +392,7 @@ export class MasterAuthService {
     }
   }
 
-  // Update user database configuration
-  async updateUserDatabaseConfig(databaseUrl, databaseKey) {
-    try {
-      if (!this.userProfile) {
-        throw new Error('User not logged in');
-      }
-
-      const response = await fetch(`${this.masterDbUrl}/rest/v1/user_profiles?id=eq.${this.userProfile.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': this.masterDbKey,
-          'Authorization': `Bearer ${this.sessionToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_database_url: databaseUrl,
-          user_database_key: databaseKey,
-          user_database_configured: true,
-          updated_at: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error('❌ Failed to update user database config:', error);
-        throw new Error(error);
-      }
-
-      // Update local profile
-      this.userProfile.user_database_url = databaseUrl;
-      this.userProfile.user_database_key = databaseKey;
-      this.userProfile.user_database_configured = true;
-
-      console.log('✅ User database configuration updated');
-      return { success: true };
-
-    } catch (error) {
-      console.error('❌ Error updating user database config:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
+  // Note: User database configuration removed - using single master database only
 
   // Log user action for audit
   async logUserAction(action, resourceType = null, resourceId = null, details = {}) {
@@ -499,5 +456,40 @@ export class MasterAuthService {
   getCurrentUserId() {
     if (!this.currentUser) return null;
     return this.currentUser.id;
+  }
+
+  // Get current session token for database requests
+  getSessionToken() {
+    return this.sessionToken;
+  }
+
+  // Get current user information with authentication status
+  async getCurrentUser() {
+    try {
+      // Check if we have a valid session
+      if (!this.currentUser || !this.sessionToken) {
+        return {
+          isAuthenticated: false,
+          user: null,
+          error: 'No active session'
+        };
+      }
+
+      return {
+        isAuthenticated: true,
+        user: {
+          ...this.userProfile,
+          id: this.currentUser.id,  // Ensure auth user ID always takes precedence
+          email: this.currentUser.email
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error getting current user:', error);
+      return {
+        isAuthenticated: false,
+        user: null,
+        error: error.message
+      };
+    }
   }
 }

@@ -14,7 +14,7 @@
 // Create UIDialogManager class that will be mixed into LovableDetector
 window.UIDialogManager = {
   // UI Dialog Management Methods
-  toggleAssistant() {
+  async toggleAssistant() {
     const now = Date.now();
     
     // Debounce rapid toggles (prevent toggles within 300ms)
@@ -32,16 +32,32 @@ window.UIDialogManager = {
     if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
       this.closeAssistant();
     } else {
-      this.showAssistant();
-      
-      // Check and save project info when dialog is opened
-      // This avoids unnecessary checks on page load
-      setTimeout(() => {
+      // Check if project is owned before showing the assistant
+      if (!this.projectChecked) {
+        console.log('⚠️ Project ownership not yet verified. Checking now...');
+        // Check project ownership first
         if (typeof this.autoSaveProjectInfo === 'function') {
-          console.log('📝 Checking project information...');
-          this.autoSaveProjectInfo();
+          this.autoSaveProjectInfo().then(async project => {
+            if (project) {
+              // Project is owned, show the assistant
+              await this.showAssistant();
+            } else {
+              console.log('🚫 Cannot open assistant - project is not owned by user');
+              this.showNotOwnedNotification();
+            }
+          }).catch(error => {
+            console.error('❌ Error checking project ownership:', error);
+          });
         }
-      }, 100);
+      } else {
+        // Already checked - show assistant for owned projects, show not-owned notification for public projects
+        if (this.isProjectOwned) {
+          await this.showAssistant();
+        } else {
+          console.log('🚫 Cannot open assistant - project is not owned by user');
+          this.showNotOwnedNotification();
+        }
+      }
     }
   },
 
@@ -115,7 +131,41 @@ window.UIDialogManager = {
     });
   },
 
-  showAssistant() {
+  showNotOwnedNotification() {
+    const notification = document.createElement('div');
+    notification.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #f56565;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      ">
+        🚫 Cannot Open Assistant
+        <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
+          This feature is only available for your own projects
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }, 4000);
+  },
+
+
+  async showAssistant() {
+    // Always create and show the dialog for owned projects
     if (this.assistantDialog) {
       this.assistantDialog.remove();
     }
@@ -126,9 +176,24 @@ window.UIDialogManager = {
     // Set up the close button handler immediately after creating the dialog
     this.setupCloseButton();
     
-    setTimeout(() => {
+    setTimeout(async () => {
       this.makeDraggable();
-      this.showWelcomePage(); // Start with welcome page instead of chat
+      
+      // Check authentication and show appropriate content
+      let isAuthenticated = false;
+      try {
+        const authResponse = await this.safeSendMessage({ action: 'checkAuth' });
+        isAuthenticated = authResponse?.success && authResponse.data?.isAuthenticated;
+      } catch (error) {
+        console.log('⚠️ Could not verify authentication');
+        isAuthenticated = false;
+      }
+      
+      if (isAuthenticated) {
+        this.showWelcomePage(); // Show normal welcome page if authenticated
+      } else {
+        this.showAuthSection(); // Show login/register page if not authenticated
+      }
       
       // Ensure close button is working with a retry mechanism
       this.ensureCloseButtonWorks();
@@ -603,9 +668,12 @@ window.UIDialogManager = {
       if (response.success) {
         this.showAuthSuccess('Signed in successfully!');
         setTimeout(() => {
-          // Restart conversation capture after successful login
-          if (window.conversationCapture && typeof window.conversationCapture.restartAfterAuth === 'function') {
-            window.conversationCapture.restartAfterAuth();
+          // Start conversation capture after successful login for owned projects
+          if (window.simpleConversationCapture && typeof window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed === 'function') {
+            const projectId = this.projectId || this.extractProjectId();
+            if (projectId) {
+              window.simpleConversationCapture.startMonitoringAfterOwnershipConfirmed(projectId);
+            }
           }
           // Show welcome page
           this.showWelcomePage();

@@ -17,6 +17,18 @@
 // Create ChatInterface class that will be mixed into LovableDetector
 window.ChatInterface = {
   setupPromptEnhancement() {
+    // Add cleanup function to window for manual testing
+    window.cleanupTestTemplates = async () => {
+      try {
+        const response = await this.safeSendMessage({ action: 'cleanupTestTemplates' });
+        console.log('🧹 Cleanup result:', response);
+        return response;
+      } catch (error) {
+        console.error('❌ Cleanup failed:', error);
+        return { success: false, error: error.message };
+      }
+    };
+    
     // Monitor for Ctrl+Enter / Cmd+Enter in Lovable input fields
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

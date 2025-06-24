@@ -12,6 +12,9 @@ class LovableDetector {
     this.verboseLogging = false; // Control verbose console logging
     this.isClosing = false; // Flag to prevent race conditions
     this.lastToggleTime = 0; // Debounce rapid toggles
+    this.contextLossHandled = false; // Track if context loss has been handled
+    this.projectChecked = false; // Track if project ownership has been checked
+    this.isProjectOwned = false; // Track if current project is owned by user
     
     // Mix in UI Dialog Manager methods
     if (window.UIDialogManager) {
@@ -63,10 +66,7 @@ class LovableDetector {
       this.setupPromptEnhancement();
     }
     
-    // Setup input auto-expansion
-    if (typeof this.setupInputAutoExpansion === 'function') {
-      this.setupInputAutoExpansion();
-    }
+    // Note: Auto-expansion removed - Lovable now handles this natively
   }
 
   detectLovablePage() {
@@ -86,11 +86,7 @@ class LovableDetector {
       
       // Lovable.dev project detected
       
-      setTimeout(() => {
-        if (typeof this.showReadyNotification === 'function') {
-          this.showReadyNotification();
-        }
-      }, 100);
+      // Note: Ready notification will be shown after project ownership is confirmed
       
       // Safely send message to background
       if (chrome.runtime?.id) {
@@ -108,50 +104,29 @@ class LovableDetector {
         });
       }
       
-      // Check project info after page is fully loaded AND chat interface is ready
-      // This ensures all elements are rendered before checking
+      // Check project ownership after page URL is confirmed
       const checkProjectWhenReady = () => {
-        // Wait for chat interface to be fully loaded
-        const waitForChatInterface = setInterval(() => {
-          // Check if either the send button or form exists
-          const hasChat = document.querySelector('form') || 
-                         document.getElementById('chatinput-send-message-button') ||
-                         document.querySelector('button[type="submit"]') ||
-                         document.querySelector('textarea') ||
-                         document.querySelector('input[type="text"]');
-          
-          // Also check if the page has the lock icon (which loads early)
-          const hasLockIcon = document.evaluate(
-            '/html/body/div[1]/div/div[2]/nav/div[1]/div/div/div[1]/div[1]/button/svg[2]',
-            document,
-            null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
-            null
-          ).singleNodeValue;
-          
-          // If we found either chat elements or lock icon, the page is ready
-          if (hasChat || hasLockIcon) {
-            clearInterval(waitForChatInterface);
-            console.log('📋 Page elements loaded, checking project ownership...');
+        // Only check once
+        if (this.projectChecked) {
+          return;
+        }
+        
+        // Only check ownership, don't auto-save yet
+        if (typeof this.isUserOwnedProject === 'function') {
+          this.isUserOwnedProject().then(isOwned => {
+            this.projectChecked = true;
+            this.isProjectOwned = isOwned;
             
-            if (typeof this.autoSaveProjectInfo === 'function') {
+            // Only auto-save after ownership is confirmed
+            if (isOwned && typeof this.autoSaveProjectInfo === 'function') {
               this.autoSaveProjectInfo();
             }
-          }
-        }, 500); // Check every 500ms
-        
-        // Maximum wait time of 10 seconds
-        setTimeout(() => {
-          clearInterval(waitForChatInterface);
-          console.log('⏱️ Timeout waiting for page elements, checking anyway...');
-          if (typeof this.autoSaveProjectInfo === 'function') {
-            this.autoSaveProjectInfo();
-          }
-        }, 10000);
+          });
+        }
       };
       
-      // Start checking after a small initial delay
-      setTimeout(checkProjectWhenReady, 2000);
+      // Start checking immediately after page detection
+      checkProjectWhenReady();
       
       // Initialize working status monitor after page detection
       setTimeout(() => {
@@ -245,6 +220,9 @@ class LovableDetector {
         this.currentProjectId = newProjectId;
         this.projectId = newProjectId;
         
+        // Reset project checked flag for new project
+        this.projectChecked = false;
+        
         // Refresh project-specific data in the dialog if it's open
         if (this.assistantDialog && document.body.contains(this.assistantDialog)) {
           this.refreshProjectData();
@@ -327,12 +305,14 @@ class LovableDetector {
     try {
       // Enhanced extension context validation
       if (!chrome?.runtime?.id) {
-        console.warn('⚠️ Extension context lost - runtime ID not available');
+        console.info('ℹ️ Extension context lost - runtime ID not available. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Extension context invalidated' };
       }
       
       if (!chrome?.runtime?.sendMessage) {
-        console.warn('⚠️ Extension context lost - sendMessage not available');
+        console.info('ℹ️ Extension context lost - sendMessage not available. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Extension context invalidated' };
       }
       
@@ -341,7 +321,8 @@ class LovableDetector {
         // This will throw if extension context is invalid
         chrome.runtime.getURL('');
       } catch (contextError) {
-        console.warn('⚠️ Extension context invalidated during runtime check');
+        console.info('ℹ️ Extension context invalidated during runtime check. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Extension context invalidated' };
       }
       
@@ -381,17 +362,20 @@ class LovableDetector {
     } catch (error) {
       // Handle specific Chrome extension errors
       if (error.message?.includes('Extension context invalidated')) {
-        console.warn('⚠️ Extension context invalidated during message send');
+        console.info('ℹ️ Extension context invalidated during message send. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Extension context invalidated' };
       }
       
       if (error.message?.includes('receiving end does not exist')) {
-        console.warn('⚠️ Background script not available - extension may be reloading');
+        console.info('ℹ️ Background script not available - extension may be reloading. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Background script not available' };
       }
       
       if (error.message?.includes('message channel closed')) {
-        console.warn('⚠️ Message channel closed - extension context lost');
+        console.info('ℹ️ Message channel closed - extension context lost. This is normal after extension updates.');
+        this.handleExtensionContextLoss();
         return { success: false, error: 'Extension context invalidated' };
       }
       
@@ -488,6 +472,71 @@ class LovableDetector {
         console.warn(`⚠️ Exception on attempt ${attempt}/${maxRetries} for ${message.action}:`, error.message);
       }
     }
+  }
+
+  handleExtensionContextLoss() {
+    // Only run this once to avoid multiple reloads
+    if (this.contextLossHandled) return;
+    this.contextLossHandled = true;
+
+    console.info('🔄 Extension context lost. This usually happens after extension updates or browser restarts.');
+    console.info('💡 Tip: Refresh the page to restore full extension functionality.');
+    
+    // Show a non-intrusive notification to the user
+    this.showContextLossNotification();
+  }
+
+  showContextLossNotification() {
+    // Only show if we're on a Lovable page
+    if (!this.isLovablePage) return;
+
+    // Check if notification already exists
+    if (document.getElementById('extension-context-loss-notification')) return;
+
+    const notification = document.createElement('div');
+    notification.id = 'extension-context-loss-notification';
+    notification.innerHTML = `
+      <div style="
+        position: fixed; top: 20px; right: 20px; z-index: 999999;
+        background: #1a202c; color: white; border: 1px solid #4a5568;
+        border-radius: 8px; padding: 16px; max-width: 350px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-family: system-ui, sans-serif;
+      ">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <div style="font-size: 18px;">🔄</div>
+          <div style="font-weight: 600; font-size: 14px;">Extension Updated</div>
+          <button id="close-context-notification" style="
+            margin-left: auto; background: none; border: none; color: #a0aec0;
+            cursor: pointer; font-size: 18px; padding: 0;
+          ">×</button>
+        </div>
+        <div style="font-size: 13px; line-height: 1.4; margin-bottom: 12px;">
+          The Lovable Assistant extension was updated. Refresh the page to restore full functionality.
+        </div>
+        <button id="refresh-page-btn" style="
+          background: #667eea; color: white; border: none; padding: 8px 16px;
+          border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+        ">Refresh Page</button>
+      </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Add event listeners
+    document.getElementById('close-context-notification')?.addEventListener('click', () => {
+      notification.remove();
+    });
+
+    document.getElementById('refresh-page-btn')?.addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 10000);
   }
 }
 

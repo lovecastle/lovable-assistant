@@ -88,13 +88,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
-    case 'masterAuth_updateUserDatabase':
-      handleMasterAuthUpdateUserDatabase(request.databaseUrl, request.databaseKey).then(result => {
-        sendResponse(result);
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-      break;
+    // Note: masterAuth_updateUserDatabase removed - using single master database only
       
     case 'checkAuth':
       handleCheckAuth().then(result => {
@@ -360,6 +354,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       break;
       
+    // User preferences handlers
+    case 'getUserPreferences':
+      handleGetUserPreferences().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'saveUserPreferences':
+      handleSaveUserPreferences(request.preferences).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    // Database-synced prompt templates handlers
+    case 'getPromptTemplatesFromDB':
+      handleGetPromptTemplatesFromDB().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'savePromptTemplatesToDB':
+      handleSavePromptTemplatesToDB(request.templates).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'deletePromptTemplateFromDB':
+      handleDeletePromptTemplateFromDB(request.templateId).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'hideSystemTemplate':
+      handleHideSystemTemplate(request.templateId).then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'cleanupTestTemplates':
+      handleCleanupTestTemplates().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
     default:
       sendResponse({ success: false, error: 'Unknown action' });
   }
@@ -393,14 +445,16 @@ async function handleSaveConversation(conversationData) {
     });
     
     // Check if user is authenticated
-    const userId = masterAuth.getCurrentUserId();
-    if (!userId) {
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
       console.error('❌ Service Worker: User not authenticated');
       return { 
         success: false, 
         error: 'User not authenticated. Please log in to save conversations.' 
       };
     }
+    
+    const userId = authResult.user.id;
     
     // Check if Supabase is properly configured
     const config = await chrome.storage.sync.get(['supabaseUrl', 'supabaseKey']);
@@ -574,14 +628,16 @@ async function handleGetConversations(filters = {}) {
     console.log('🔍 Service Worker: Getting conversations with filters:', filters);
     
     // Check if user is authenticated
-    const userId = masterAuth.getCurrentUserId();
-    if (!userId) {
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
       console.error('❌ Service Worker: User not authenticated');
       return { 
         success: false, 
         error: 'User not authenticated. Please log in to view conversations.' 
       };
     }
+    
+    const userId = authResult.user.id;
     
     const conversations = await supabase.getConversationsWithUser(
       filters.projectId, 
@@ -2089,23 +2145,7 @@ async function handleMasterAuthGetSystemTemplates() {
   }
 }
 
-async function handleMasterAuthUpdateUserDatabase(databaseUrl, databaseKey) {
-  try {
-    console.log('🔐 Service Worker: Updating user database configuration');
-    
-    const result = await masterAuth.updateUserDatabaseConfig(databaseUrl, databaseKey);
-    
-    if (result.success) {
-      // Log audit event
-      await masterAuth.logUserAction('update_database_config', 'user_database');
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('❌ Service Worker: Update user database config failed:', error);
-    return { success: false, error: error.message };
-  }
-}
+// Note: handleMasterAuthUpdateUserDatabase removed - using single master database only
 
 async function handleCheckAuth() {
   try {
@@ -2635,37 +2675,39 @@ SELECT 'Lovable Assistant database setup complete!' as message;`;
 
 async function handleGetPromptTemplates() {
   try {
-    // Load templates from localStorage (since they're now managed locally)
-    // Return templates in the format expected by the original UI
-    const defaultTemplates = {
-      'Design': {
-        'UI Change': 'Modify the UI to focus strictly on visual design elements without altering functionality. Ensure mobile responsiveness is maintained and test on different screen sizes. Use modern design principles.',
-        'Optimize for Mobile': 'Optimize this interface specifically for mobile devices. Ensure touch-friendly controls, proper sizing, and intuitive mobile navigation while maintaining desktop compatibility.'
-      },
-      'Editing Features': {
-        'Modifying an Existing Feature': 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
-        'Fragile Update': 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.'
-      },
-      'Error Debugging': {
-        'Minor Errors': 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
-        'Persistent Errors': 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
-        'Major Errors': 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
-        'Clean up Console Logs': 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
-        'Critical Errors': 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
-        'Extreme Errors': 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.'
-      },
-      'Refactoring': {
-        'Refactoring After Request Made by Lovable': 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.'
-      },
-      'Using another LLM': {
-        'Generate Comprehensive Explanation': 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.'
-      }
-    };
-
-    return { success: true, data: defaultTemplates };
+    // Get templates from database only - no fallback defaults
+    const dbResult = await handleGetPromptTemplatesFromDB();
+    
+    if (dbResult.success && dbResult.data) {
+      // Convert array format to nested object format for backward compatibility
+      const templates = {};
+      
+      dbResult.data.forEach(template => {
+        const category = template.category || 'Uncategorized';
+        const name = template.name;
+        const content = template.template_content || template.content || template.template;
+        
+        if (!templates[category]) {
+          templates[category] = {};
+        }
+        
+        templates[category][name] = content;
+      });
+      
+      return { success: true, data: templates };
+    } else {
+      // Return error if database fails - no default templates
+      return { 
+        success: false, 
+        error: dbResult.error || 'Failed to load prompt templates from database'
+      };
+    }
   } catch (error) {
     console.error('❌ Error getting prompt templates:', error);
-    return { success: false, error: error.message };
+    return { 
+      success: false, 
+      error: 'Failed to load prompt templates: ' + error.message 
+    };
   }
 }
 
@@ -2820,6 +2862,445 @@ async function callOpenAIAPI(prompt, apiKey) {
   } else {
     throw new Error('Invalid response format from OpenAI API');
   }
+}
+
+// ===========================
+// USER PREFERENCES HANDLERS
+// ===========================
+
+async function handleGetUserPreferences() {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Set session token for authenticated database requests
+    const sessionToken = masterAuth.getSessionToken();
+    if (sessionToken) {
+      supabase.setSessionToken(sessionToken);
+    }
+    
+    // Get user preferences from database
+    const result = await supabase.request(`user_preferences?user_id=eq.${userId}&limit=1`);
+    
+    if (result && result.length > 0) {
+      const prefs = result[0];
+      return {
+        success: true,
+        data: {
+          notifications: prefs.notifications !== undefined ? prefs.notifications : true,
+          tabRename: prefs.tab_rename !== undefined ? prefs.tab_rename : false,
+          autoSwitch: prefs.auto_switch !== undefined ? prefs.auto_switch : false
+        }
+      };
+    } else {
+      // Return default preferences
+      return {
+        success: true,
+        data: {
+          notifications: true,
+          tabRename: false,
+          autoSwitch: false
+        }
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error getting user preferences:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSaveUserPreferences(preferences) {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Set session token for authenticated database requests
+    const sessionToken = masterAuth.getSessionToken();
+    if (sessionToken) {
+      supabase.setSessionToken(sessionToken);
+    }
+    
+    const prefData = {
+      user_id: userId,
+      notifications: preferences.notifications,
+      tab_rename: preferences.tabRename,
+      auto_switch: preferences.autoSwitch,
+      updated_at: new Date().toISOString()
+    };
+
+    // Try to update existing record first, then insert if not found
+    try {
+      // First try to update existing record
+      const updateResult = await supabase.request(`user_preferences?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          notifications: preferences.notifications,
+          tab_rename: preferences.tabRename,
+          auto_switch: preferences.autoSwitch,
+          updated_at: new Date().toISOString()
+        })
+      });
+      
+      if (updateResult && updateResult.length > 0) {
+        console.log('✅ User preferences updated successfully');
+        return { success: true, data: updateResult[0] };
+      }
+    } catch (updateError) {
+      console.log('ℹ️ Update failed, trying insert:', updateError.message);
+    }
+    
+    // If update failed or no record exists, insert new record
+    const result = await supabase.request('user_preferences', {
+      method: 'POST',
+      body: JSON.stringify(prefData)
+    });
+
+    console.log('✅ User preferences saved successfully');
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('❌ Error saving user preferences:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ===========================
+// DATABASE-SYNCED PROMPT TEMPLATES HANDLERS
+// ===========================
+
+async function handleGetPromptTemplatesFromDB() {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Set session token for authenticated database requests
+    const sessionToken = masterAuth.getSessionToken();
+    if (sessionToken) {
+      supabase.setSessionToken(sessionToken);
+    }
+    
+    // Get user's custom templates and hidden system templates
+    const result = await supabase.request(`prompt_templates?user_id=eq.${userId}`);
+    
+    // Get default system templates
+    const defaultTemplates = getDefaultPromptTemplatesForDB();
+    
+    // Process user templates and hidden system templates
+    const userTemplates = result || [];
+    const hiddenSystemTemplates = userTemplates
+      .filter(t => t.is_system_template === true && t.is_hidden === true)
+      .map(t => t.template_id);
+    
+    // Filter out hidden system templates from defaults
+    const visibleSystemTemplates = defaultTemplates.filter(t => 
+      !hiddenSystemTemplates.includes(t.template_id)
+    );
+    
+    // Add user's custom templates
+    const customTemplates = userTemplates.filter(t => t.is_system_template !== true);
+    
+    // Combine visible system templates and custom templates
+    const allTemplates = [...visibleSystemTemplates, ...customTemplates];
+    
+    return { success: true, data: allTemplates };
+  } catch (error) {
+    console.error('❌ Error getting prompt templates from DB:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSavePromptTemplatesToDB(templates) {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Process templates for database save
+    const templatePromises = templates.map(async (template) => {
+      const templateData = {
+        user_id: userId,
+        template_id: template.template_id || generateTemplateId(template),
+        category: template.category,
+        name: template.name,
+        template_content: template.template || template.content,
+        shortcut: template.shortcut,
+        is_system_template: false,
+        is_hidden: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Use upsert for user templates
+      return supabase.request('prompt_templates', {
+        method: 'POST',
+        body: JSON.stringify(templateData),
+        headers: {
+          'Prefer': 'resolution=merge-duplicates'
+        }
+      });
+    });
+
+    await Promise.all(templatePromises);
+    
+    console.log('✅ Prompt templates saved to database successfully');
+    return { success: true, message: 'Templates saved successfully' };
+  } catch (error) {
+    console.error('❌ Error saving prompt templates to DB:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleDeletePromptTemplateFromDB(templateId) {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Delete user's custom template
+    await supabase.request(`prompt_templates?user_id=eq.${userId}&template_id=eq.${templateId}&is_system_template=eq.false`, {
+      method: 'DELETE'
+    });
+    
+    console.log('✅ Prompt template deleted from database successfully');
+    return { success: true, message: 'Template deleted successfully' };
+  } catch (error) {
+    console.error('❌ Error deleting prompt template from DB:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleHideSystemTemplate(templateId) {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Create a hidden system template record
+    const hiddenTemplateData = {
+      user_id: userId,
+      template_id: templateId,
+      category: '',
+      name: '',
+      content: '',
+      shortcut: '',
+      is_system_template: true,
+      is_hidden: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    await supabase.request('prompt_templates', {
+      method: 'POST',
+      body: JSON.stringify(hiddenTemplateData),
+      headers: {
+        'Prefer': 'resolution=merge-duplicates'
+      }
+    });
+    
+    console.log('✅ System template hidden successfully');
+    return { success: true, message: 'System template hidden successfully' };
+  } catch (error) {
+    console.error('❌ Error hiding system template:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleCleanupTestTemplates() {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    // Set session token for authenticated database requests
+    const sessionToken = masterAuth.getSessionToken();
+    if (sessionToken) {
+      supabase.setSessionToken(sessionToken);
+    }
+    
+    // Delete any templates with "TESTT" category or test-like names
+    const testPatterns = ['TESTT', 'TEST', 'test', 'fasfasfasf', 'asdfasdf'];
+    
+    let deletedCount = 0;
+    
+    for (const pattern of testPatterns) {
+      try {
+        // Delete by category
+        const categoryResult = await supabase.request(`prompt_templates?user_id=eq.${userId}&category=eq.${pattern}`, {
+          method: 'DELETE'
+        });
+        
+        // Delete by name containing pattern
+        const nameResult = await supabase.request(`prompt_templates?user_id=eq.${userId}&name=like.*${pattern}*`, {
+          method: 'DELETE'
+        });
+        
+        console.log(`🧹 Cleaned up templates matching pattern: ${pattern}`);
+        deletedCount++;
+      } catch (error) {
+        console.warn(`⚠️ Could not delete templates matching ${pattern}:`, error);
+      }
+    }
+    
+    console.log(`✅ Template cleanup completed. Processed ${deletedCount} patterns.`);
+    return { 
+      success: true, 
+      message: `Template cleanup completed. Processed ${deletedCount} test patterns.`,
+      deletedCount: deletedCount
+    };
+  } catch (error) {
+    console.error('❌ Error cleaning up test templates:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function getDefaultPromptTemplatesForDB() {
+  return [
+    {
+      template_id: 'system_design_ui_change',
+      category: 'Design',
+      name: 'UI Change',
+      content: 'Modify the UI to focus strictly on visual design elements without altering functionality. Ensure mobile responsiveness is maintained and test on different screen sizes. Use modern design principles.',
+      shortcut: 'ui_change',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_design_mobile_optimize',
+      category: 'Design',
+      name: 'Optimize for Mobile',
+      content: 'Optimize this interface specifically for mobile devices. Ensure touch-friendly controls, proper sizing, and intuitive mobile navigation while maintaining desktop compatibility.',
+      shortcut: 'mobile_optimize',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_editing_modify_feature',
+      category: 'Editing Features',
+      name: 'Modifying an Existing Feature',
+      content: 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
+      shortcut: 'modify_feature',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_editing_fragile_update',
+      category: 'Editing Features',
+      name: 'Fragile Update',
+      content: 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.',
+      shortcut: 'fragile_update',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_minor_errors',
+      category: 'Error Debugging',
+      name: 'Minor Errors',
+      content: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
+      shortcut: 'minor_errors',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_persistent_errors',
+      category: 'Error Debugging',
+      name: 'Persistent Errors',
+      content: 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
+      shortcut: 'persistent_errors',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_major_errors',
+      category: 'Error Debugging',
+      name: 'Major Errors',
+      content: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
+      shortcut: 'major_errors',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_clean_logs',
+      category: 'Error Debugging',
+      name: 'Clean up Console Logs',
+      content: 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
+      shortcut: 'clean_logs',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_critical_errors',
+      category: 'Error Debugging',
+      name: 'Critical Errors',
+      content: 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
+      shortcut: 'critical_errors',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_debug_extreme_errors',
+      category: 'Error Debugging',
+      name: 'Extreme Errors',
+      content: 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.',
+      shortcut: 'extreme_errors',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_refactor_lovable_request',
+      category: 'Refactoring',
+      name: 'Refactoring After Request Made by Lovable',
+      content: 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.',
+      shortcut: 'refactor_lovable',
+      is_system_template: true,
+      is_hidden: false
+    },
+    {
+      template_id: 'system_llm_comprehensive_explanation',
+      category: 'Using another LLM',
+      name: 'Generate Comprehensive Explanation',
+      content: 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.',
+      shortcut: 'comprehensive_explanation',
+      is_system_template: true,
+      is_hidden: false
+    }
+  ];
+}
+
+function generateTemplateId(template) {
+  // Generate a unique ID for user templates
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(7);
+  return `user_${template.category.toLowerCase().replace(/\s+/g, '_')}_${template.name.toLowerCase().replace(/\s+/g, '_')}_${timestamp}_${randomStr}`;
 }
 
 
