@@ -41,7 +41,9 @@ window.ChatInterface = {
           e.stopPropagation();
           e.stopImmediatePropagation();
           
-          this.showPromptEnhancementMenu(target);
+          this.showPromptEnhancementMenu(target).catch(error => {
+            console.error('Failed to show prompt enhancement menu:', error);
+          });
           return false;
         }
       }
@@ -68,7 +70,7 @@ window.ChatInterface = {
            element.closest('[data-testid*="chat"]');
   },
 
-  showPromptEnhancementMenu(inputElement) {
+  async showPromptEnhancementMenu(inputElement) {
     // Remove existing menu
     const existingMenu = document.getElementById('prompt-helper-menu');
     if (existingMenu) existingMenu.remove();
@@ -199,7 +201,7 @@ window.ChatInterface = {
     menu.style.visibility = 'visible'; // Show after positioning
     
     // Load prompt templates into menu
-    this.loadTemplatesIntoMenu();
+    await this.loadTemplatesIntoMenu();
     
     // Add menu styles
     if (!document.getElementById('prompt-menu-styles')) {

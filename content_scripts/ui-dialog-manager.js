@@ -325,24 +325,58 @@ window.UIDialogManager = {
   // Project name extraction functionality
   extractProjectName() {
     try {
-      // Try to get from page title first
+      // Method 1: Try to get from page title first
       const titleElement = document.querySelector('title');
       if (titleElement) {
-        const title = titleElement.textContent;
-        // Look for pattern like "ProjectName - Lovable"
-        const titleMatch = title.match(/^(.+?)\s*[-–]\s*Lovable/i);
-        if (titleMatch && titleMatch[1].trim()) {
-          return titleMatch[1].trim();
+        const title = titleElement.textContent.trim();
+        console.log('🔍 Trying to extract project name from title:', title);
+        
+        // Look for various patterns
+        const patterns = [
+          /^(.+?)\s*[-–|]\s*Lovable/i,  // "ProjectName - Lovable" or "ProjectName | Lovable"
+          /^(.+?)\s*[-–|]\s*lovable\.dev/i, // "ProjectName - lovable.dev"
+          /^(.+?)\s*\|\s*(.+)/i,       // "ProjectName | anything"
+          /^(.+?)\s*[-–]\s*(.+)/i      // "ProjectName - anything"
+        ];
+        
+        for (const pattern of patterns) {
+          const titleMatch = title.match(pattern);
+          if (titleMatch && titleMatch[1].trim() && titleMatch[1].trim().length > 0) {
+            const extractedName = titleMatch[1].trim();
+            console.log('✅ Extracted project name from title:', extractedName);
+            return extractedName;
+          }
         }
       }
 
-      // Try to get from URL path
+      // Method 2: Try to get from breadcrumb or navigation elements
+      const navElements = [
+        'nav [data-testid*="project"]',
+        'nav h1',
+        'nav .project-name',
+        '[data-testid="project-name"]',
+        '.project-title',
+        'header h1'
+      ];
+      
+      for (const selector of navElements) {
+        const element = document.querySelector(selector);
+        if (element && element.textContent.trim().length > 0) {
+          const navName = element.textContent.trim();
+          console.log('✅ Extracted project name from navigation:', navName);
+          return navName;
+        }
+      }
+
+      // Method 3: Try to get from URL path as last resort
       const urlProjectId = this.extractProjectIdFromUrl();
       if (urlProjectId) {
+        console.log('⚠️ Using project ID as fallback name:', urlProjectId);
         return urlProjectId;
       }
 
-      // Fallback to "Unknown Project"
+      // Final fallback
+      console.log('⚠️ No project name found, using fallback');
       return 'Unknown Project';
     } catch (error) {
       console.warn('⚠️ Could not extract project name:', error);
@@ -882,15 +916,37 @@ window.UIDialogManager = {
       return;
     }
     
-    // Safely get project name with fallback
+    // Get project name from database first, then fallback to other methods
     let projectName = 'Current Project';
-    if (typeof this.extractProjectName === 'function') {
-      projectName = this.extractProjectName();
-    } else {
-      // Fallback: extract project ID from URL
-      const url = window.location.href;
-      const match = url.match(/\/projects\/([^\/\?]+)/);
-      projectName = match ? match[1] : 'Current Project';
+    
+    // Try to get project name from database first
+    try {
+      if (typeof this.getCurrentProject === 'function') {
+        const currentProject = await this.getCurrentProject();
+        console.log('📋 Project data from database:', currentProject);
+        
+        if (currentProject && currentProject.name && currentProject.name !== currentProject.id) {
+          // Use database project name only if it's not just the project ID
+          projectName = currentProject.name;
+          console.log('✅ Using project name from database:', projectName);
+        } else {
+          throw new Error('No valid project name available in database (got: ' + (currentProject?.name || 'null') + ')');
+        }
+      } else {
+        throw new Error('getCurrentProject function not available');
+      }
+    } catch (error) {
+      console.log('ℹ️ Could not get project name from database, trying page title extraction:', error.message);
+      
+      // Fallback 1: Extract from page title
+      if (typeof this.extractProjectName === 'function') {
+        projectName = this.extractProjectName();
+      } else {
+        // Fallback 2: Extract project ID from URL as last resort
+        const url = window.location.href;
+        const match = url.match(/\/projects\/([^\/\?]+)/);
+        projectName = match ? match[1] : 'Current Project';
+      }
     }
     
     const content = document.getElementById('dialog-content');

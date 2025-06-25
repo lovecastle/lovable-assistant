@@ -1479,7 +1479,7 @@ CREATE INDEX IF NOT EXISTS idx_project_manager_project_id ON project_manager(pro
 CREATE INDEX IF NOT EXISTS idx_project_manager_user_id ON project_manager(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_prompt_templates_user_id ON prompt_templates(user_id);
-CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_section ON prompt_templates(section);
 CREATE INDEX IF NOT EXISTS idx_prompt_templates_is_active ON prompt_templates(is_active);
 CREATE INDEX IF NOT EXISTS idx_prompt_templates_shortcut ON prompt_templates(shortcut);
 
@@ -2683,7 +2683,7 @@ async function handleGetPromptTemplates() {
       const templates = {};
       
       dbResult.data.forEach(template => {
-        const category = template.category || 'Uncategorized';
+        const category = template.section || template.category || 'Uncategorized'; // Support both section and category
         const name = template.name;
         const content = template.template_content || template.content || template.template;
         
@@ -3002,7 +3002,8 @@ async function handleGetPromptTemplatesFromDB() {
     // Process user templates and hidden system templates
     const userTemplates = result || [];
     const hiddenSystemTemplates = userTemplates
-      .filter(t => t.is_system_template === true && t.is_hidden === true)
+      .filter(t => (t.template_content === '' && t.name === '') && 
+        (t.is_hidden === true || (t.template_content === '' && t.name === ''))) // Handle missing columns gracefully
       .map(t => t.template_id);
     
     // Filter out hidden system templates from defaults
@@ -3010,8 +3011,10 @@ async function handleGetPromptTemplatesFromDB() {
       !hiddenSystemTemplates.includes(t.template_id)
     );
     
-    // Add user's custom templates
-    const customTemplates = userTemplates.filter(t => t.is_system_template !== true);
+    // Add user's custom templates (assuming non-empty templates are user templates)
+    const customTemplates = userTemplates.filter(t => 
+      !(t.template_content === '' && t.name === '') // Exclude empty templates that might be system
+    );
     
     // Combine visible system templates and custom templates
     const allTemplates = [...visibleSystemTemplates, ...customTemplates];
@@ -3038,12 +3041,11 @@ async function handleSavePromptTemplatesToDB(templates) {
       const templateData = {
         user_id: userId,
         template_id: template.template_id || generateTemplateId(template),
-        category: template.category,
+        section: template.section || template.category, // Use section, fallback to category
         name: template.name,
         template_content: template.template || template.content,
         shortcut: template.shortcut,
         is_system_template: false,
-        is_hidden: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -3064,7 +3066,26 @@ async function handleSavePromptTemplatesToDB(templates) {
     return { success: true, message: 'Templates saved successfully' };
   } catch (error) {
     console.error('❌ Error saving prompt templates to DB:', error);
-    return { success: false, error: error.message };
+    
+    // Provide specific error messages for common database schema issues
+    let errorMessage = error.message;
+    if (error.message.includes('PGRST204')) {
+      if (error.message.includes('name')) {
+        errorMessage = 'Database schema error: "name" column missing. Please run the database migration.';
+      } else if (error.message.includes('section')) {
+        errorMessage = 'Database schema error: "section" column missing. Please run the database migration.';
+      } else if (error.message.includes('template_content')) {
+        errorMessage = 'Database schema error: "template_content" column missing. Please run the database migration.';
+      } else if (error.message.includes('is_system_template')) {
+        errorMessage = 'Database schema error: "is_system_template" column missing. Please run the database migration.';
+      } else if (error.message.includes('is_hidden')) {
+        errorMessage = 'Database schema error: "is_hidden" column missing. Please run the database migration.';
+      } else {
+        errorMessage = 'Database schema error: Some required columns are missing. Please run the database migration.';
+      }
+    }
+    
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -3079,7 +3100,7 @@ async function handleDeletePromptTemplateFromDB(templateId) {
     const userId = authResult.user.id;
     
     // Delete user's custom template
-    await supabase.request(`prompt_templates?user_id=eq.${userId}&template_id=eq.${templateId}&is_system_template=eq.false`, {
+    await supabase.request(`prompt_templates?user_id=eq.${userId}&template_id=eq.${templateId}`, {
       method: 'DELETE'
     });
     
@@ -3105,12 +3126,11 @@ async function handleHideSystemTemplate(templateId) {
     const hiddenTemplateData = {
       user_id: userId,
       template_id: templateId,
-      category: '',
+      section: '',
       name: '',
-      content: '',
+      template_content: '',
       shortcut: '',
       is_system_template: true,
-      is_hidden: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -3147,15 +3167,15 @@ async function handleCleanupTestTemplates() {
       supabase.setSessionToken(sessionToken);
     }
     
-    // Delete any templates with "TESTT" category or test-like names
+    // Delete any templates with "TESTT" section or test-like names
     const testPatterns = ['TESTT', 'TEST', 'test', 'fasfasfasf', 'asdfasdf'];
     
     let deletedCount = 0;
     
     for (const pattern of testPatterns) {
       try {
-        // Delete by category
-        const categoryResult = await supabase.request(`prompt_templates?user_id=eq.${userId}&category=eq.${pattern}`, {
+        // Delete by section
+        const sectionResult = await supabase.request(`prompt_templates?user_id=eq.${userId}&section=eq.${pattern}`, {
           method: 'DELETE'
         });
         
@@ -3187,111 +3207,87 @@ function getDefaultPromptTemplatesForDB() {
   return [
     {
       template_id: 'system_design_ui_change',
-      category: 'Design',
+      section: 'Design',
       name: 'UI Change',
       content: 'Modify the UI to focus strictly on visual design elements without altering functionality. Ensure mobile responsiveness is maintained and test on different screen sizes. Use modern design principles.',
-      shortcut: 'ui_change',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'ui_change'
     },
     {
       template_id: 'system_design_mobile_optimize',
-      category: 'Design',
+      section: 'Design',
       name: 'Optimize for Mobile',
       content: 'Optimize this interface specifically for mobile devices. Ensure touch-friendly controls, proper sizing, and intuitive mobile navigation while maintaining desktop compatibility.',
-      shortcut: 'mobile_optimize',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'mobile_optimize'
     },
     {
       template_id: 'system_editing_modify_feature',
-      category: 'Editing Features',
+      section: 'Editing Features',
       name: 'Modifying an Existing Feature',
       content: 'Make changes to the feature without impacting core functionality, other features, or flows. Analyze its behavior and dependencies to understand risks, and communicate any concerns before proceeding. Test thoroughly to confirm no regressions or unintended effects, and flag any out-of-scope changes for review. Work with precision—pause if uncertain.',
-      shortcut: 'modify_feature',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'modify_feature'
     },
     {
       template_id: 'system_editing_fragile_update',
-      category: 'Editing Features',
+      section: 'Editing Features',
       name: 'Fragile Update',
       content: 'This update is highly sensitive and demands extreme precision. Thoroughly analyze all dependencies and impacts before making changes, and test methodically to ensure nothing breaks. Avoid shortcuts or assumptions—pause and seek clarification if uncertain. Accuracy is essential.',
-      shortcut: 'fragile_update',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'fragile_update'
     },
     {
       template_id: 'system_debug_minor_errors',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Minor Errors',
       content: 'The same error persists. Do not make any code changes yet—investigate thoroughly to find the exact root cause. Analyze logs, flow, and dependencies deeply, and propose solutions only once you fully understand the issue.',
-      shortcut: 'minor_errors',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'minor_errors'
     },
     {
       template_id: 'system_debug_persistent_errors',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Persistent Errors',
       content: 'The error is still unresolved. Stop and identify the exact root cause with 100% certainty—no guesses or assumptions. Analyze every aspect of the flow and dependencies in detail, and ensure full understanding before making any changes.',
-      shortcut: 'persistent_errors',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'persistent_errors'
     },
     {
       template_id: 'system_debug_major_errors',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Major Errors',
       content: 'This is the final attempt to fix this issue. Stop all changes and methodically re-examine the entire flow—auth, Supabase, Stripe, state management, and redirects—from the ground up. Map out what\'s breaking and why, test everything in isolation, and do not proceed without absolute certainty.',
-      shortcut: 'major_errors',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'major_errors'
     },
     {
       template_id: 'system_debug_clean_logs',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Clean up Console Logs',
       content: 'Carefully remove unnecessary `console.log` statements without affecting functionality or design. Review each log to ensure it\'s non-critical, and document any that need alternative handling. Proceed methodically, testing thoroughly to confirm the app remains intact. Pause if uncertain about any log\'s purpose.',
-      shortcut: 'clean_logs',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'clean_logs'
     },
     {
       template_id: 'system_debug_critical_errors',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Critical Errors',
       content: 'The issue remains unresolved and requires a serious, thorough analysis. Step back and examine the code deeply—trace the entire flow, inspect logs, and analyze all dependencies without editing anything. Identify the exact root cause with complete certainty before proposing or making any changes. No assumptions or quick fixes—only precise, evidence-based insights. Do not edit any code yet.',
-      shortcut: 'critical_errors',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'critical_errors'
     },
     {
       template_id: 'system_debug_extreme_errors',
-      category: 'Error Debugging',
+      section: 'Error Debugging',
       name: 'Extreme Errors',
       content: 'This issue remains unresolved, and we need to **stop and rethink the entire approach**. Do not edit any code. Instead, conduct a deep, methodical analysis of the system. Map out the full flow, trace every interaction, log, and dependency step by step. Document exactly what is supposed to happen, what is actually happening, and where the disconnect occurs. Provide a detailed report explaining the root cause with clear evidence. If there are gaps, uncertainties, or edge cases, highlight them for discussion. Until you can identify the **precise, proven source of the issue**, do not propose or touch any fixes. This requires total focus, no guesses, and no shortcuts.',
-      shortcut: 'extreme_errors',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'extreme_errors'
     },
     {
       template_id: 'system_refactor_lovable_request',
-      category: 'Refactoring',
+      section: 'Refactoring',
       name: 'Refactoring After Request Made by Lovable',
       content: 'Refactor this file without changing the UI or functionality—everything must behave and look exactly the same. Focus on improving code structure and maintainability only. Document the current functionality, ensure testing is in place, and proceed incrementally with no risks or regressions. Stop if unsure.',
-      shortcut: 'refactor_lovable',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'refactor_lovable'
     },
     {
       template_id: 'system_llm_comprehensive_explanation',
-      category: 'Using another LLM',
+      section: 'Using another LLM',
       name: 'Generate Comprehensive Explanation',
       content: 'Generate a comprehensive and detailed explanation of the issue, including all relevant context, code snippets, error messages, logs, and dependencies involved. Clearly describe the expected behavior, the actual behavior, and any steps to reproduce the issue. Highlight potential causes or areas of concern based on your analysis. Ensure the information is structured and thorough enough to be copied and pasted into another system for further troubleshooting and debugging. Include any insights or observations that could help pinpoint the root cause. Focus on clarity and completeness to ensure the issue is easy to understand and address. Do not edit any code yet.',
-      shortcut: 'comprehensive_explanation',
-      is_system_template: true,
-      is_hidden: false
+      shortcut: 'comprehensive_explanation'
     }
   ];
 }
@@ -3300,7 +3296,7 @@ function generateTemplateId(template) {
   // Generate a unique ID for user templates
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(7);
-  return `user_${template.category.toLowerCase().replace(/\s+/g, '_')}_${template.name.toLowerCase().replace(/\s+/g, '_')}_${timestamp}_${randomStr}`;
+  return `user_${template.section.toLowerCase().replace(/\s+/g, '_')}_${template.name.toLowerCase().replace(/\s+/g, '_')}_${timestamp}_${randomStr}`;
 }
 
 

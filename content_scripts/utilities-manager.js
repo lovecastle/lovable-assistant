@@ -118,28 +118,23 @@ window.UtilitiesManager = {
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
             ✨ Prompt Helper
           </h3>
-          <div style="background: #f8fafc; border: 1px solid #c9cfd7; border-radius: 6px; padding: 12px;">
-            <h4 style="margin: 0 0 8px 0; color: #1a202c; font-size: 14px; font-weight: 600;">
-              Prompt Helper Templates (Ctrl+Enter / Cmd+Enter)
-            </h4>
-            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 13px;">
-              Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
-            </p>
-            
-            <div id="prompt-templates-container">
-              <!-- Templates will be loaded here -->
-            </div>
-            
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-              <button id="create-section-btn" style="
-                background: #667eea; color: white; border: none; padding: 6px 12px;
-                border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Create Section</button>
-              <button id="reset-prompt-templates-btn" style="
-                background: #f56565; color: white; border: none; padding: 6px 12px;
-                border-radius: 4px; cursor: pointer; font-size: 12px;
-              ">Reset to Defaults</button>
-            </div>
+          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
+            Press Ctrl+Enter (Windows) or Cmd+Enter (Mac) in the Lovable input field to access these templates. Edit templates below:
+          </p>
+          
+          <div id="prompt-templates-container">
+            <!-- Templates will be loaded here -->
+          </div>
+          
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button id="create-section-btn" style="
+              background: #667eea; color: white; border: none; padding: 6px 12px;
+              border-radius: 4px; cursor: pointer; font-size: 12px;
+            ">Create Section</button>
+            <button id="reset-prompt-templates-btn" style="
+              background: #f56565; color: white; border: none; padding: 6px 12px;
+              border-radius: 4px; cursor: pointer; font-size: 12px;
+            ">Reset to Defaults</button>
           </div>
         </div>
       </div>
@@ -265,9 +260,9 @@ window.UtilitiesManager = {
   convertDBTemplatesToUIFormat(dbTemplates) {
     // Convert database format to the format expected by the UI
     return dbTemplates.map(template => ({
-      category: template.category,
-      name: template.name,
-      template: template.template_content || template.content,
+      category: template.section || template.category, // Support both for backwards compatibility
+      name: template.name || template.template_name,
+      template: template.template_content || template.content || '', // Ensure never undefined
       shortcut: template.shortcut,
       template_id: template.template_id,
       is_system_template: template.is_system_template
@@ -276,14 +271,23 @@ window.UtilitiesManager = {
 
   convertUITemplatesToDBFormat(uiTemplates) {
     // Convert UI format to database format
-    return uiTemplates.map(template => ({
-      template_id: template.template_id,
-      category: template.category,
-      name: template.name,
-      template_content: template.template,
-      shortcut: template.shortcut,
-      is_system_template: template.is_system_template || false
-    }));
+    return uiTemplates.map(template => {
+      const dbTemplate = {
+        template_id: template.template_id,
+        section: template.category, // Map category to section for database
+        name: template.name,
+        template_content: template.template,
+        shortcut: template.shortcut,
+        is_system_template: template.is_system_template || false
+      };
+      
+      // Only include optional fields if they exist and are meaningful
+      if (template.is_hidden === true) {
+        dbTemplate.is_hidden = true;
+      }
+      
+      return dbTemplate;
+    });
   },
 
   renderPromptTemplates(templates) {
@@ -304,6 +308,9 @@ window.UtilitiesManager = {
       const icon = this.getCategoryIcon(category);
       const categoryId = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
       
+      // Check if all templates in this category are system templates
+      const allSystemTemplates = categories[category].every(template => template.is_system_template);
+      
       html += `
         <div style="margin-bottom: 20px;" data-category-container="${category}">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -314,10 +321,12 @@ window.UtilitiesManager = {
                data-original-value="${category}" data-edit-type="category">
               ${icon} ${category}
             </h5>
+            ${allSystemTemplates ? '' : `
             <button class="delete-section-btn" data-category="${category}" style="
               background: #f56565; color: white; border: none; padding: 2px 6px;
               border-radius: 3px; cursor: pointer; font-size: 10px; margin-left: 8px;
             ">Delete Section</button>
+            `}
           </div>
       `;
       
@@ -340,10 +349,12 @@ window.UtilitiesManager = {
                   background: #667eea; color: white; border: none; padding: 4px 8px;
                   border-radius: 4px; cursor: pointer; font-size: 10px;
                 ">Copy</button>
+                ${template.is_system_template ? '' : `
                 <button class="delete-template-btn" data-template-id="${templateId}" style="
                   background: #f56565; color: white; border: none; padding: 4px 8px;
                   border-radius: 4px; cursor: pointer; font-size: 10px;
                 ">Delete</button>
+                `}
               </div>
             </div>
             <textarea id="${templateId}" class="template-content"
@@ -489,41 +500,278 @@ window.UtilitiesManager = {
   },
 
   createNewSection() {
-    const sectionName = prompt('Enter section name:');
-    if (!sectionName || !sectionName.trim()) return;
+    // Create a custom dialog for section input
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; border: 1px solid #c9cfd7; border-radius: 8px;
+      padding: 24px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); z-index: 999999;
+      min-width: 400px; max-width: 500px;
+    `;
     
-    const templates = this.getCurrentTemplates();
-    // Check if section already exists
-    const exists = templates.some(t => t.category === sectionName.trim());
-    if (exists) {
-      alert('Section already exists!');
-      return;
-    }
+    dialog.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 18px;">Create New Section</h3>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Section Name:</label>
+        <input type="text" id="new-section-name" style="
+          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
+          font-size: 14px; color: #4a5568;
+        " placeholder="e.g., API Integration" autofocus>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">First Template Name:</label>
+        <input type="text" id="first-template-name" style="
+          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
+          font-size: 14px; color: #4a5568;
+        " placeholder="e.g., REST API Call">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">First Template Content:</label>
+        <textarea id="first-template-content" style="
+          width: 100%; min-height: 120px; padding: 8px 12px; border: 1px solid #c9cfd7;
+          border-radius: 4px; font-size: 14px; color: #4a5568; resize: vertical;
+        " placeholder="Enter the template content here..."></textarea>
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="cancel-section-btn" style="
+          background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+          padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        ">Cancel</button>
+        <button id="save-section-btn" style="
+          background: #667eea; color: white; border: none;
+          padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        ">Create Section</button>
+      </div>
+    `;
     
-    // Add a placeholder template to create the section
-    templates.push({
-      category: sectionName.trim(),
-      name: 'New Template',
-      template: 'Enter your template content here...',
-      shortcut: sectionName.toLowerCase().replace(/\s+/g, '_')
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 999998;
+    `;
+    
+    document.body.appendChild(backdrop);
+    document.body.appendChild(dialog);
+    
+    // Focus on section name input
+    document.getElementById('new-section-name').focus();
+    
+    // Handle save
+    const saveSection = async () => {
+      const sectionName = document.getElementById('new-section-name').value.trim();
+      const templateName = document.getElementById('first-template-name').value.trim();
+      const templateContent = document.getElementById('first-template-content').value.trim();
+      
+      if (!sectionName) {
+        alert('Please enter a section name.');
+        document.getElementById('new-section-name').focus();
+        return;
+      }
+      
+      if (!templateName) {
+        alert('Please enter a template name.');
+        document.getElementById('first-template-name').focus();
+        return;
+      }
+      
+      if (!templateContent) {
+        alert('Please enter template content.');
+        document.getElementById('first-template-content').focus();
+        return;
+      }
+      
+      // Load current templates from database first to ensure we have the latest data
+      await this.loadPromptTemplates();
+      const templates = this.getCurrentTemplatesFromDOM();
+      
+      // Check if section already exists
+      const exists = templates.some(t => t.category === sectionName);
+      if (exists) {
+        alert('Section already exists!');
+        document.getElementById('new-section-name').focus();
+        return;
+      }
+      
+      // Generate a unique template ID
+      const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Add the new template with the section
+      templates.push({
+        template_id: templateId,
+        category: sectionName,
+        name: templateName,
+        template: templateContent,
+        shortcut: templateName.toLowerCase().replace(/\s+/g, '_'),
+        is_system_template: false
+      });
+      
+      // Close dialog
+      backdrop.remove();
+      dialog.remove();
+      
+      // Save templates
+      await this.saveTemplatesAndReload(templates);
+    };
+    
+    // Handle cancel
+    const cancelSection = () => {
+      backdrop.remove();
+      dialog.remove();
+    };
+    
+    // Event listeners
+    document.getElementById('save-section-btn').addEventListener('click', saveSection);
+    document.getElementById('cancel-section-btn').addEventListener('click', cancelSection);
+    
+    // Enter key navigation
+    document.getElementById('new-section-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('first-template-name').focus();
+      }
     });
     
-    this.saveTemplatesAndReload(templates);
+    document.getElementById('first-template-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('first-template-content').focus();
+      }
+    });
+    
+    // Ctrl/Cmd+Enter saves
+    dialog.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveSection();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelSection();
+      }
+    });
   },
 
   addNewTemplate(category) {
-    const templateName = prompt('Enter template name:');
-    if (!templateName || !templateName.trim()) return;
+    // Create a custom dialog for template input
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; border: 1px solid #c9cfd7; border-radius: 8px;
+      padding: 24px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); z-index: 999999;
+      min-width: 400px; max-width: 500px;
+    `;
     
-    const templates = this.getCurrentTemplates();
-    templates.push({
-      category: category,
-      name: templateName.trim(),
-      template: 'Enter your template content here...',
-      shortcut: templateName.toLowerCase().replace(/\s+/g, '_')
+    dialog.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 18px;">Add New Template</h3>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Template Name:</label>
+        <input type="text" id="new-template-name" style="
+          width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
+          font-size: 14px; color: #4a5568;
+        " placeholder="e.g., Fix Bug" autofocus>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Template Content:</label>
+        <textarea id="new-template-content" style="
+          width: 100%; min-height: 120px; padding: 8px 12px; border: 1px solid #c9cfd7;
+          border-radius: 4px; font-size: 14px; color: #4a5568; resize: vertical;
+        " placeholder="Enter the template content here..."></textarea>
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="cancel-template-btn" style="
+          background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+          padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        ">Cancel</button>
+        <button id="save-template-btn" style="
+          background: #667eea; color: white; border: none;
+          padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        ">Save Template</button>
+      </div>
+    `;
+    
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 999998;
+    `;
+    
+    document.body.appendChild(backdrop);
+    document.body.appendChild(dialog);
+    
+    // Focus on name input
+    document.getElementById('new-template-name').focus();
+    
+    // Handle save
+    const saveTemplate = () => {
+      const templateName = document.getElementById('new-template-name').value.trim();
+      const templateContent = document.getElementById('new-template-content').value.trim();
+      
+      if (!templateName) {
+        alert('Please enter a template name.');
+        document.getElementById('new-template-name').focus();
+        return;
+      }
+      
+      if (!templateContent) {
+        alert('Please enter template content.');
+        document.getElementById('new-template-content').focus();
+        return;
+      }
+      
+      // Generate a unique template ID
+      const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Get current templates from DOM to ensure we have the latest
+      const templates = this.getCurrentTemplatesFromDOM();
+      
+      templates.push({
+        template_id: templateId,
+        category: category,
+        name: templateName,
+        template: templateContent,
+        shortcut: templateName.toLowerCase().replace(/\s+/g, '_'),
+        is_system_template: false
+      });
+      
+      // Close dialog
+      backdrop.remove();
+      dialog.remove();
+      
+      // Save templates
+      this.saveTemplatesAndReload(templates);
+    };
+    
+    // Handle cancel
+    const cancelTemplate = () => {
+      backdrop.remove();
+      dialog.remove();
+    };
+    
+    // Event listeners
+    document.getElementById('save-template-btn').addEventListener('click', saveTemplate);
+    document.getElementById('cancel-template-btn').addEventListener('click', cancelTemplate);
+    
+    // Enter key on name field moves to content
+    document.getElementById('new-template-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('new-template-content').focus();
+      }
     });
     
-    this.saveTemplatesAndReload(templates);
+    // Ctrl/Cmd+Enter saves
+    dialog.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveTemplate();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelTemplate();
+      }
+    });
   },
 
   deleteSection(category) {
@@ -713,10 +961,12 @@ window.UtilitiesManager = {
     
     textareas.forEach(textarea => {
       templates.push({
+        template_id: textarea.dataset.templateId,
         category: textarea.dataset.category,
         name: textarea.dataset.name,
         template: textarea.value,
-        shortcut: textarea.dataset.shortcut
+        shortcut: textarea.dataset.shortcut,
+        is_system_template: textarea.dataset.isSystemTemplate === 'true'
       });
     });
     
@@ -725,43 +975,46 @@ window.UtilitiesManager = {
 
   async saveTemplatesAndReload(templates) {
     try {
-      // Save to localStorage as backup
-      localStorage.setItem('lovable-prompt-templates', JSON.stringify(templates));
+      // Save ONLY to database - no localStorage
+      const dbTemplates = this.convertUITemplatesToDBFormat(templates);
+      console.log('📤 Attempting to save templates to database:', dbTemplates);
       
-      // Try to save to database if user is authenticated
-      try {
-        const dbTemplates = this.convertUITemplatesToDBFormat(templates);
-        const response = await this.safeSendMessage({ 
-          action: 'savePromptTemplatesToDB', 
-          templates: dbTemplates 
-        });
-        
-        if (response && response.success) {
-          console.log('✅ Templates saved to database successfully');
-        } else {
-          console.warn('⚠️ Failed to save to database, saved locally only:', response?.error);
-        }
-      } catch (error) {
-        console.warn('⚠️ Failed to save to database, saved locally only:', error);
+      const response = await this.safeSendMessage({ 
+        action: 'savePromptTemplatesToDB', 
+        templates: dbTemplates 
+      });
+      
+      if (response && response.success) {
+        console.log('✅ Templates saved to database successfully');
+        await this.loadPromptTemplates();
+      } else {
+        console.error('❌ Failed to save to database:', response?.error);
+        alert('Failed to save template to database:\n\n' + (response?.error || 'Database save failed') + '\n\nPlease check the console for more details.');
+        throw new Error(response?.error || 'Database save failed');
       }
-      
-      await this.loadPromptTemplates();
       console.log('✅ Templates saved and reloaded');
     } catch (error) {
       console.error('Failed to save templates:', error);
+      // Error already shown to user via alert above
     }
   },
 
-  loadTemplatesIntoMenu() {
+  async loadTemplatesIntoMenu() {
     const menuContainer = document.getElementById('prompt-templates-menu');
     if (!menuContainer) return;
     
-    // Load templates from localStorage or defaults
+    // Load templates from database instead of localStorage
     let templates;
     try {
-      const stored = localStorage.getItem('lovable-prompt-templates');
-      templates = stored ? JSON.parse(stored) : this.getDefaultPromptTemplates();
+      const response = await this.safeSendMessage({ action: 'getPromptTemplatesFromDB' });
+      if (response && response.success && response.templates) {
+        templates = this.convertDBTemplatesToUIFormat(response.templates);
+      } else {
+        console.warn('Failed to load templates from database, using defaults');
+        templates = this.getDefaultPromptTemplates();
+      }
     } catch (error) {
+      console.warn('Error loading templates from database:', error);
       templates = this.getDefaultPromptTemplates();
     }
     

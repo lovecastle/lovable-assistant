@@ -692,10 +692,27 @@ window.ProjectManager = {
 
   getProjectNameFromTitle() {
     try {
-      if (document.title && document.title.includes('Lovable')) {
-        const titleMatch = document.title.match(/(.+?)\s*[-|]\s*Lovable/);
-        if (titleMatch) {
-          return titleMatch[1].trim();
+      // Use the enhanced extractProjectName method if available
+      if (typeof this.extractProjectName === 'function') {
+        return this.extractProjectName();
+      }
+      
+      // Fallback implementation
+      const title = document.title?.trim();
+      if (title) {
+        // Look for various patterns
+        const patterns = [
+          /^(.+?)\s*[-–|]\s*Lovable/i,  // "ProjectName - Lovable" or "ProjectName | Lovable"
+          /^(.+?)\s*[-–|]\s*lovable\.dev/i, // "ProjectName - lovable.dev"
+          /^(.+?)\s*\|\s*(.+)/i,       // "ProjectName | anything"
+          /^(.+?)\s*[-–]\s*(.+)/i      // "ProjectName - anything"
+        ];
+        
+        for (const pattern of patterns) {
+          const titleMatch = title.match(pattern);
+          if (titleMatch && titleMatch[1].trim() && titleMatch[1].trim().length > 0) {
+            return titleMatch[1].trim();
+          }
         }
       }
       
