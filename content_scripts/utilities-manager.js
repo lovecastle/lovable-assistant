@@ -259,14 +259,22 @@ window.UtilitiesManager = {
 
   convertDBTemplatesToUIFormat(dbTemplates) {
     // Convert database format to the format expected by the UI
-    return dbTemplates.map(template => ({
-      category: template.section || template.category, // Support both for backwards compatibility
-      name: template.name || template.template_name,
-      template: template.template_content || template.content || '', // Ensure never undefined
-      shortcut: template.shortcut,
-      template_id: template.template_id,
-      is_system_template: template.is_system_template
-    }));
+    return dbTemplates.map(template => {
+      const isSystemTemplate = template.is_system_template === true || template.is_system_template === 'true' || 
+                               template.is_system === true || template.is_system === 'true' ||
+                               template.user_id === 'default' || template.user_id === 'system';
+      
+      
+      
+      return {
+        category: template.section || template.category, // Support both for backwards compatibility
+        name: template.name || template.template_name,
+        template: template.template_content || template.content || '', // Ensure never undefined
+        shortcut: template.shortcut,
+        template_id: template.template_id,
+        is_system_template: isSystemTemplate
+      };
+    });
   },
 
   convertUITemplatesToDBFormat(uiTemplates) {
@@ -309,16 +317,18 @@ window.UtilitiesManager = {
       const categoryId = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
       
       // Check if all templates in this category are system templates
-      const allSystemTemplates = categories[category].every(template => template.is_system_template);
+      const allSystemTemplates = categories[category].every(template => 
+        template.is_system_template === true || template.is_system_template === 'true'
+      );
       
       html += `
         <div style="margin-bottom: 20px;" data-category-container="${category}">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <h5 id="${categoryId}" class="editable-category"
+            <h5 id="${categoryId}" class="${allSystemTemplates ? '' : 'editable-category'}"
                style="margin: 0; color: #1a202c; font-size: 13px; font-weight: 600; 
-                      border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; cursor: pointer;
+                      border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; ${allSystemTemplates ? '' : 'cursor: pointer;'}
                       flex: 1; margin-right: 8px;"
-               data-original-value="${category}" data-edit-type="category">
+               data-original-value="${category}" data-edit-type="category" data-is-system="${allSystemTemplates}">
               ${icon} ${category}
             </h5>
             ${allSystemTemplates ? '' : `
@@ -334,27 +344,26 @@ window.UtilitiesManager = {
         const templateId = `template-${template.category.replace(/\s+/g, '-').toLowerCase()}-${index}`;
         const templateNameId = `name-${templateId}`;
         
+        // Ensure robust boolean checking
+        const isSystemTemplate = template.is_system_template === true || template.is_system_template === 'true';
+        
         html += `
           <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white;"
                data-template-container="${templateId}">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span id="${templateNameId}" class="editable-template-name"
-                    style="font-weight: 500; color: #1a202c; font-size: 12px; cursor: pointer; 
+              <span id="${templateNameId}" class="${isSystemTemplate ? '' : 'editable-template-name'}"
+                    style="font-weight: 500; color: #1a202c; font-size: 12px; ${isSystemTemplate ? '' : 'cursor: pointer;'} 
                            border: 1px solid transparent; padding: 2px 4px; border-radius: 3px;"
-                    data-original-value="${template.name}" data-template-id="${templateId}" data-edit-type="template-name">
+                    data-original-value="${template.name}" data-template-id="${templateId}" data-edit-type="template-name" data-is-system="${isSystemTemplate}">
                 ${template.name}
               </span>
               <div style="display: flex; gap: 4px;">
-                <button class="copy-template-btn" data-template-id="${templateId}" style="
-                  background: #667eea; color: white; border: none; padding: 4px 8px;
-                  border-radius: 4px; cursor: pointer; font-size: 10px;
-                ">Copy</button>
-                ${template.is_system_template ? '' : `
+                ${!isSystemTemplate ? `
                 <button class="delete-template-btn" data-template-id="${templateId}" style="
                   background: #f56565; color: white; border: none; padding: 4px 8px;
                   border-radius: 4px; cursor: pointer; font-size: 10px;
                 ">Delete</button>
-                `}
+                ` : ''}
               </div>
             </div>
             <textarea id="${templateId}" class="template-content"
@@ -362,10 +371,11 @@ window.UtilitiesManager = {
                       data-name="${template.name}" 
                       data-shortcut="${template.shortcut}"
                       data-template-id="${template.template_id || ''}"
-                      data-is-system-template="${template.is_system_template || false}"
+                      data-is-system-template="${isSystemTemplate}"
+                      ${isSystemTemplate ? 'readonly' : ''}
                       style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
                              border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
-                             background: white; color: #1a202c;">${template.template}</textarea>
+                             background: ${isSystemTemplate ? '#f8f9fa' : 'white'}; color: #1a202c;">${template.template}</textarea>
           </div>
         `;
       });
@@ -396,27 +406,27 @@ window.UtilitiesManager = {
     const container = document.getElementById('prompt-templates-container');
     if (!container) return;
     
-    // Editable category names
+    // Editable category names (only for non-system categories)
     container.querySelectorAll('.editable-category').forEach(element => {
       element.addEventListener('click', () => {
-        this.makeEditable(element.id, 'category');
+        const isSystem = element.dataset.isSystem === 'true';
+        if (!isSystem) {
+          this.makeEditable(element.id, 'category');
+        }
       });
     });
     
-    // Editable template names
+    // Editable template names (only for non-system templates)
     container.querySelectorAll('.editable-template-name').forEach(element => {
       element.addEventListener('click', () => {
-        this.makeEditable(element.id, 'template-name');
+        const isSystem = element.dataset.isSystem === 'true';
+        if (!isSystem) {
+          this.makeEditable(element.id, 'template-name');
+        }
       });
     });
     
-    // Copy template buttons
-    container.querySelectorAll('.copy-template-btn').forEach(button => {
-      button.addEventListener('click', () => {
-        const templateId = button.dataset.templateId;
-        this.copyTemplate(templateId);
-      });
-    });
+    // Copy template buttons removed - no longer needed
     
     // Delete template buttons
     container.querySelectorAll('.delete-template-btn').forEach(button => {
@@ -450,11 +460,14 @@ window.UtilitiesManager = {
       });
     });
     
-    // Auto-save for template content
+    // Auto-save for template content (only for non-system templates)
     container.querySelectorAll('.template-content').forEach(textarea => {
-      textarea.addEventListener('input', () => {
-        this.autoSaveTemplate(textarea.id);
-      });
+      const isSystemTemplate = textarea.dataset.isSystemTemplate === 'true';
+      if (!isSystemTemplate) {
+        textarea.addEventListener('input', () => {
+          this.autoSaveTemplate(textarea.id);
+        });
+      }
     });
   },
 
@@ -469,27 +482,6 @@ window.UtilitiesManager = {
     return icons[category] || '📝';
   },
 
-  copyTemplate(templateId) {
-    const textarea = document.getElementById(templateId);
-    if (textarea) {
-      textarea.select();
-      textarea.setSelectionRange(0, 99999); // For mobile devices
-      navigator.clipboard.writeText(textarea.value).then(() => {
-        console.log('Template copied to clipboard');
-        // Show brief success message
-        const button = textarea.parentElement.querySelector('.copy-template-btn');
-        const originalText = button.textContent;
-        button.textContent = 'Copied!';
-        button.style.background = '#48bb78';
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.style.background = '#667eea';
-        }, 1500);
-      }).catch(err => {
-        console.error('Failed to copy template:', err);
-      });
-    }
-  },
 
   resetPromptTemplates() {
     if (confirm('Are you sure you want to reset all prompt templates to their default values? This will overwrite any custom changes.')) {

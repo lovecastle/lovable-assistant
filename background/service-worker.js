@@ -3006,15 +3006,27 @@ async function handleGetPromptTemplatesFromDB() {
         (t.is_hidden === true || (t.template_content === '' && t.name === ''))) // Handle missing columns gracefully
       .map(t => t.template_id);
     
-    // Filter out hidden system templates from defaults
-    const visibleSystemTemplates = defaultTemplates.filter(t => 
-      !hiddenSystemTemplates.includes(t.template_id)
-    );
+    // Filter out hidden system templates from defaults and mark as system templates
+    const visibleSystemTemplates = defaultTemplates
+      .filter(t => !hiddenSystemTemplates.includes(t.template_id))
+      .map(t => ({
+        ...t,
+        template_content: t.content, // Map content to template_content for frontend compatibility
+        template_name: t.name, // Map name to template_name for backward compatibility
+        category: t.section, // Map section to category for backward compatibility
+        is_system_template: true,
+        is_system: true,
+        user_id: 'system'
+      }));
     
-    // Add user's custom templates (assuming non-empty templates are user templates)
-    const customTemplates = userTemplates.filter(t => 
-      !(t.template_content === '' && t.name === '') // Exclude empty templates that might be system
-    );
+    // Add user's custom templates and mark as user templates
+    const customTemplates = userTemplates
+      .filter(t => !(t.template_content === '' && t.name === '')) // Exclude empty templates that might be system
+      .map(t => ({
+        ...t,
+        is_system_template: false,
+        is_system: false
+      }));
     
     // Combine visible system templates and custom templates
     const allTemplates = [...visibleSystemTemplates, ...customTemplates];
