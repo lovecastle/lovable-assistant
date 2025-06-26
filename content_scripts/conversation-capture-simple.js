@@ -25,6 +25,12 @@ class SimpleConversationCapture {
     }, 3000);
   }
 
+  // Method to reset authentication status (called when user signs in)
+  resetAuthenticationStatus() {
+    this.waitingForAuthentication = false;
+    console.log('✅ Auto-capture: Authentication status reset - capture will resume');
+  }
+
   // Method to start monitoring after project ownership is confirmed
   async startMonitoringAfterOwnershipConfirmed(projectId) {
     if (this.isMonitoring) return;
@@ -758,6 +764,11 @@ class SimpleConversationCapture {
   }
 
   async saveToDatabaseAsync(group) {
+    // Check authentication before attempting to save to reduce error spam
+    if (this.waitingForAuthentication) {
+      return; // Silently skip if not authenticated
+    }
+    
     try {
       console.log(`🔍 Auto-capture: Saving to database:`, {
         groupId: group.id,
@@ -798,7 +809,13 @@ class SimpleConversationCapture {
           console.log(`✅ Auto-capture: Successfully saved group ${group.id} to database`);
         }
       } else {
-        console.warn(`⚠️ Auto-capture: Failed to save group ${group.id}:`, response?.error);
+        // Check if this is an authentication error and update our flag
+        if (response?.error && response.error.toLowerCase().includes('not configured')) {
+          this.waitingForAuthentication = true;
+          console.log('🔒 Auto-capture: Authentication required - stopping further save attempts');
+        } else {
+          console.warn(`⚠️ Auto-capture: Failed to save group ${group.id}:`, response?.error);
+        }
       }
     } catch (error) {
       console.error(`❌ Auto-capture: Error saving group ${group.id}:`, error);

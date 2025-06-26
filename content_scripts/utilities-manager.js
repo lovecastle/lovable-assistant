@@ -372,6 +372,7 @@ window.UtilitiesManager = {
                       data-shortcut="${template.shortcut}"
                       data-template-id="${template.template_id || ''}"
                       data-is-system-template="${isSystemTemplate}"
+                      ${isSystemTemplate ? `data-original-content="${(template.template || '').replace(/"/g, '&quot;')}"` : ''}
                       ${isSystemTemplate ? 'readonly' : ''}
                       style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #c9cfd7; 
                              border-radius: 4px; font-size: 11px; line-height: 1.4; resize: vertical;
@@ -507,21 +508,21 @@ window.UtilitiesManager = {
         <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Section Name:</label>
         <input type="text" id="new-section-name" style="
           width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
-          font-size: 14px; color: #4a5568;
+          font-size: 14px; color: #c9cfd7;
         " placeholder="e.g., API Integration" autofocus>
       </div>
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">First Template Name:</label>
         <input type="text" id="first-template-name" style="
           width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
-          font-size: 14px; color: #4a5568;
+          font-size: 14px; color: #c9cfd7;
         " placeholder="e.g., REST API Call">
       </div>
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">First Template Content:</label>
         <textarea id="first-template-content" style="
           width: 100%; min-height: 120px; padding: 8px 12px; border: 1px solid #c9cfd7;
-          border-radius: 4px; font-size: 14px; color: #4a5568; resize: vertical;
+          border-radius: 4px; font-size: 14px; color: #c9cfd7; resize: vertical;
         " placeholder="Enter the template content here..."></textarea>
       </div>
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -576,6 +577,7 @@ window.UtilitiesManager = {
       // Load current templates from database first to ensure we have the latest data
       await this.loadPromptTemplates();
       const templates = this.getCurrentTemplatesFromDOM();
+      console.log('📋 Current templates before adding new one:', templates);
       
       // Check if section already exists
       const exists = templates.some(t => t.category === sectionName);
@@ -588,21 +590,29 @@ window.UtilitiesManager = {
       // Generate a unique template ID
       const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Add the new template with the section
-      templates.push({
+      // Add the new template to a separate array to avoid including all existing templates
+      const newTemplate = {
         template_id: templateId,
         category: sectionName,
         name: templateName,
         template: templateContent,
         shortcut: templateName.toLowerCase().replace(/\s+/g, '_'),
         is_system_template: false
+      };
+      
+      // Add to the templates array for the save
+      templates.push(newTemplate);
+      
+      console.log('📝 Saving templates with new section:', {
+        totalTemplates: templates.length,
+        newTemplate: newTemplate
       });
       
       // Close dialog
       backdrop.remove();
       dialog.remove();
       
-      // Save templates
+      // Save all templates (including the new one)
       await this.saveTemplatesAndReload(templates);
     };
     
@@ -660,14 +670,14 @@ window.UtilitiesManager = {
         <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Template Name:</label>
         <input type="text" id="new-template-name" style="
           width: 100%; padding: 8px 12px; border: 1px solid #c9cfd7; border-radius: 4px;
-          font-size: 14px; color: #4a5568;
+          font-size: 14px; color: #c9cfd7;
         " placeholder="e.g., Fix Bug" autofocus>
       </div>
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 4px; color: #4a5568; font-size: 14px;">Template Content:</label>
         <textarea id="new-template-content" style="
           width: 100%; min-height: 120px; padding: 8px 12px; border: 1px solid #c9cfd7;
-          border-radius: 4px; font-size: 14px; color: #4a5568; resize: vertical;
+          border-radius: 4px; font-size: 14px; color: #c9cfd7; resize: vertical;
         " placeholder="Enter the template content here..."></textarea>
       </div>
       <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -696,7 +706,7 @@ window.UtilitiesManager = {
     document.getElementById('new-template-name').focus();
     
     // Handle save
-    const saveTemplate = () => {
+    const saveTemplate = async () => {
       const templateName = document.getElementById('new-template-name').value.trim();
       const templateContent = document.getElementById('new-template-content').value.trim();
       
@@ -732,7 +742,7 @@ window.UtilitiesManager = {
       dialog.remove();
       
       // Save templates
-      this.saveTemplatesAndReload(templates);
+      await this.saveTemplatesAndReload(templates);
     };
     
     // Handle cancel
@@ -766,12 +776,12 @@ window.UtilitiesManager = {
     });
   },
 
-  deleteSection(category) {
+  async deleteSection(category) {
     if (!confirm(`Are you sure you want to delete the entire "${category}" section and all its templates?`)) return;
     
     const templates = this.getCurrentTemplates();
     const filteredTemplates = templates.filter(t => t.category !== category);
-    this.saveTemplatesAndReload(filteredTemplates);
+    await this.saveTemplatesAndReload(filteredTemplates);
   },
 
   async deleteTemplate(templateId) {
@@ -890,17 +900,17 @@ window.UtilitiesManager = {
     input.select();
   },
 
-  updateCategoryName(oldName, newName) {
+  async updateCategoryName(oldName, newName) {
     const templates = this.getCurrentTemplates();
     templates.forEach(template => {
       if (template.category === oldName) {
         template.category = newName;
       }
     });
-    this.saveTemplatesAndReload(templates);
+    await this.saveTemplatesAndReload(templates);
   },
 
-  updateTemplateName(templateId, newName) {
+  async updateTemplateName(templateId, newName) {
     const textarea = document.getElementById(templateId);
     if (!textarea) return;
     
@@ -913,7 +923,7 @@ window.UtilitiesManager = {
     if (template) {
       template.name = newName;
       textarea.dataset.name = newName;
-      this.saveTemplatesAndReload(templates);
+      await this.saveTemplatesAndReload(templates);
     }
   },
 
@@ -952,11 +962,18 @@ window.UtilitiesManager = {
     const textareas = container.querySelectorAll('textarea');
     
     textareas.forEach(textarea => {
+      // Get the template content - if it's empty and it's a system template, 
+      // use the original content from data attribute
+      let templateContent = textarea.value;
+      if (!templateContent && textarea.dataset.isSystemTemplate === 'true' && textarea.dataset.originalContent) {
+        templateContent = textarea.dataset.originalContent;
+      }
+      
       templates.push({
         template_id: textarea.dataset.templateId,
         category: textarea.dataset.category,
         name: textarea.dataset.name,
-        template: textarea.value,
+        template: templateContent,
         shortcut: textarea.dataset.shortcut,
         is_system_template: textarea.dataset.isSystemTemplate === 'true'
       });

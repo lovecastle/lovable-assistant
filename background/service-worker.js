@@ -3048,14 +3048,28 @@ async function handleSavePromptTemplatesToDB(templates) {
 
     const userId = authResult.user.id;
     
+    // Filter out system templates - only save user templates
+    const userTemplates = templates.filter(template => 
+      !template.is_system_template && 
+      !template.is_system && 
+      template.name && 
+      template.template_content
+    );
+    
+    console.log('💾 Saving user templates:', {
+      totalTemplates: templates.length,
+      userTemplates: userTemplates.length,
+      filtered: templates.length - userTemplates.length
+    });
+    
     // Process templates for database save
-    const templatePromises = templates.map(async (template) => {
+    const templatePromises = userTemplates.map(async (template) => {
       const templateData = {
         user_id: userId,
         template_id: template.template_id || generateTemplateId(template),
         section: template.section || template.category, // Use section, fallback to category
         name: template.name,
-        template_content: template.template || template.content,
+        template_content: template.template_content || template.template || template.content,
         shortcut: template.shortcut,
         is_system_template: false,
         created_at: new Date().toISOString(),
