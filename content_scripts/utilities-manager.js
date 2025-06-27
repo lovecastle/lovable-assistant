@@ -312,7 +312,7 @@ window.UtilitiesManager = {
     });
     
     let html = '';
-    Object.keys(categories).forEach((category, categoryIndex) => {
+    Object.keys(categories).forEach((category) => {
       const icon = this.getCategoryIcon(category);
       const categoryId = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
       
@@ -588,7 +588,7 @@ window.UtilitiesManager = {
       }
       
       // Generate a unique template ID
-      const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const templateId = `template_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
       // Add the new template to a separate array to avoid including all existing templates
       const newTemplate = {
@@ -723,7 +723,7 @@ window.UtilitiesManager = {
       }
       
       // Generate a unique template ID
-      const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const templateId = `template_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
       // Get current templates from DOM to ensure we have the latest
       const templates = this.getCurrentTemplatesFromDOM();
@@ -779,9 +779,27 @@ window.UtilitiesManager = {
   async deleteSection(category) {
     if (!confirm(`Are you sure you want to delete the entire "${category}" section and all its templates?`)) return;
     
-    const templates = this.getCurrentTemplates();
-    const filteredTemplates = templates.filter(t => t.category !== category);
-    await this.saveTemplatesAndReload(filteredTemplates);
+    try {
+      console.log(`🗑️ Deleting section: ${category}`);
+      
+      // Delete all templates in this section from the database
+      const response = await this.safeSendMessage({
+        action: 'deleteSectionTemplates',
+        category: category
+      });
+      
+      if (response && response.success) {
+        console.log(`✅ Section "${category}" deleted successfully`);
+        // Reload templates to reflect the changes
+        await this.loadPromptTemplates();
+      } else {
+        console.error('❌ Failed to delete section:', response?.error);
+        alert('Failed to delete section:\n\n' + (response?.error || 'Delete failed'));
+      }
+    } catch (error) {
+      console.error('❌ Error deleting section:', error);
+      alert('Error deleting section: ' + error.message);
+    }
   },
 
   async deleteTemplate(templateId) {

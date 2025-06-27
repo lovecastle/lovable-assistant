@@ -856,8 +856,9 @@ window.UIDialogManager = {
           </h3>
           <div style="color: #4a5568; font-size: 14px; line-height: 1.5;">
             <p><strong>Version:</strong> 2.0.0</p>
-            <p><strong>Database:</strong> Master Supabase</p>
+            <p><strong>Master Database:</strong> Enabled</p>
             <p><strong>Authentication:</strong> Enabled</p>
+            <p><strong>Contact:</strong> support@wowz.cloud</p>
           </div>
         </div>
       </div>

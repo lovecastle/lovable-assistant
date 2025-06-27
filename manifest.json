@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "https://lovable.dev/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js",

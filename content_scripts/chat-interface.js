@@ -382,8 +382,7 @@ window.ChatInterface = {
         data: {
           prompt: `You must translate the following text to English. Your response should contain ONLY the translated text with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the translation:" or similar phrases. Just output the direct translation:
 
-${currentPrompt}`,
-          provider: 'gemini'
+${currentPrompt}`
         }
       });
 
@@ -442,8 +441,7 @@ ${currentPrompt}`,
         data: {
           prompt: `You must fix grammar, spelling errors, and sentence structure to make the following text more fluent and professional. Your response should contain ONLY the corrected text with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the corrected text:" or similar phrases. Just output the direct rewritten text:
 
-${currentPrompt}`,
-          provider: 'gemini'
+${currentPrompt}`
         }
       });
 
@@ -506,8 +504,7 @@ ${currentPrompt}`,
 
 Now enhance the following prompt according to these Lovable best practices. Your response should contain ONLY the enhanced prompt with no introductions, explanations, greetings, quotation marks, or any other text before or after. Do not add "Here is the enhanced prompt:" or similar phrases. Just output the direct enhanced prompt:
 
-${currentPrompt}`,
-          provider: 'gemini'
+${currentPrompt}`
         }
       });
 

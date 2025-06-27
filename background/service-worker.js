@@ -12,27 +12,42 @@ chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
   chrome.storage.sync.set({
     autoCapture: true,
-    notificationEnabled: false
+    notificationEnabled: false,
+    geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
   });
 });
 
-// Restore session when service worker starts
-chrome.runtime.onStartup.addListener(() => {
-  console.log('🔄 Service Worker starting - restoring session...');
-  masterAuth.restoreSession().then(restored => {
+// Initialize API key and restore session when service worker starts
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('🔄 Service Worker starting - initializing API key and restoring session...');
+  
+  try {
+    // Initialize hardcoded Gemini API key
+    await chrome.storage.sync.set({
+      geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
+    });
+    console.log('✅ Hardcoded Gemini API key initialized on startup');
+    
+    const restored = await masterAuth.restoreSession();
     if (restored) {
       console.log('✅ Session restored on startup');
     } else {
       console.log('ℹ️ No session to restore on startup');
     }
-  }).catch(error => {
-    console.error('❌ Failed to restore session on startup:', error);
-  });
+  } catch (error) {
+    console.error('❌ Failed to initialize on startup:', error);
+  }
 });
 
-// Also try to restore session when the service worker first loads
+// Initialize Gemini API key and restore session when the service worker first loads
 (async () => {
   try {
+    // Initialize hardcoded Gemini API key
+    await chrome.storage.sync.set({
+      geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
+    });
+    console.log('✅ Hardcoded Gemini API key initialized in service worker');
+    
     console.log('🔄 Service Worker loaded - attempting session restore...');
     const restored = await masterAuth.restoreSession();
     if (restored) {
@@ -406,6 +421,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'cleanupTestTemplates':
       handleCleanupTestTemplates().then(result => {
+        sendResponse(result);
+      }).catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+      break;
+      
+    case 'deleteSectionTemplates':
+      handleDeleteSectionTemplates(request.category).then(result => {
         sendResponse(result);
       }).catch(error => {
         sendResponse({ success: false, error: error.message });
@@ -2728,42 +2751,20 @@ async function handleSavePromptTemplates(templates) {
 
 async function handleCallAI(data) {
   try {
-    const { prompt, provider = 'gemini' } = data;
+    const { prompt } = data;
     
     if (!prompt) {
       return { success: false, error: 'Prompt is required' };
     }
 
-    // Get API keys from chrome storage
-    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
+    // Get Gemini API key from chrome storage
+    const storage = await chrome.storage.sync.get(['geminiApiKey']);
     
-    let response;
-    switch (provider) {
-      case 'gemini':
-        if (!storage.geminiApiKey) {
-          return { success: false, error: 'Gemini API key not configured. Please add it in the extension popup.' };
-        }
-        response = await callGeminiAPI(prompt, storage.geminiApiKey);
-        break;
-        
-      case 'claude':
-        if (!storage.claudeApiKey) {
-          return { success: false, error: 'Claude API key not configured. Please add it in the extension popup.' };
-        }
-        response = await callClaudeAPI(prompt, storage.claudeApiKey);
-        break;
-        
-      case 'openai':
-        if (!storage.openaiApiKey) {
-          return { success: false, error: 'OpenAI API key not configured. Please add it in the extension popup.' };
-        }
-        response = await callOpenAIAPI(prompt, storage.openaiApiKey);
-        break;
-        
-      default:
-        return { success: false, error: `Unsupported AI provider: ${provider}` };
+    if (!storage.geminiApiKey) {
+      return { success: false, error: 'Gemini API key not configured. Please add it in the extension popup.' };
     }
-
+    
+    const response = await callGeminiAPI(prompt, storage.geminiApiKey);
     return { success: true, data: response };
   } catch (error) {
     console.error('❌ Error calling AI:', error);
@@ -2787,7 +2788,7 @@ async function callGeminiAPI(prompt, apiKey) {
   });
 
   if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    throw new Error(`Gemini 2.0 Flash API error: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
@@ -2795,74 +2796,11 @@ async function callGeminiAPI(prompt, apiKey) {
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
     return data.candidates[0].content.parts[0].text;
   } else {
-    throw new Error('Invalid response format from Gemini API');
+    throw new Error('Invalid response format from Gemini 2.0 Flash API');
   }
 }
 
-async function callClaudeAPI(prompt, apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-sonnet-20240229',
-      max_tokens: 4000,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    })
-  });
 
-  if (!response.ok) {
-    throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  
-  if (data.content && data.content[0] && data.content[0].text) {
-    return data.content[0].text;
-  } else {
-    throw new Error('Invalid response format from Claude API');
-  }
-}
-
-async function callOpenAIAPI(prompt, apiKey) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      max_tokens: 4000
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  
-  if (data.choices && data.choices[0] && data.choices[0].message) {
-    return data.choices[0].message.content;
-  } else {
-    throw new Error('Invalid response format from OpenAI API');
-  }
-}
 
 // ===========================
 // USER PREFERENCES HANDLERS
@@ -3134,6 +3072,31 @@ async function handleDeletePromptTemplateFromDB(templateId) {
     return { success: true, message: 'Template deleted successfully' };
   } catch (error) {
     console.error('❌ Error deleting prompt template from DB:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleDeleteSectionTemplates(category) {
+  try {
+    // Get current user
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const userId = authResult.user.id;
+    
+    console.log(`🗑️ Deleting all templates in section "${category}" for user ${userId}`);
+
+    // Delete all user templates in this section (check both section and category fields for compatibility)
+    const response = await supabase.request(`prompt_templates?user_id=eq.${userId}&or=(section.eq.${encodeURIComponent(category)},category.eq.${encodeURIComponent(category)})`, {
+      method: 'DELETE'
+    });
+
+    console.log('✅ Section templates deleted from database successfully:', response);
+    return { success: true, message: `Section "${category}" and all its templates deleted successfully` };
+  } catch (error) {
+    console.error('❌ Error deleting section templates from DB:', error);
     return { success: false, error: error.message };
   }
 }

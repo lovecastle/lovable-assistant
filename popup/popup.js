@@ -24,8 +24,7 @@ async function initializePopup() {
       showAuthSection();
     }
     
-    // Always check overall connection status
-    await checkConnectionStatus();
+    // Note: Connection status check removed
     
   } catch (error) {
     console.error('❌ Error initializing popup:', error);
@@ -53,9 +52,6 @@ function setupEventListeners() {
   
   // General listeners
   document.getElementById('check-connection').addEventListener('click', checkConnectionStatus);
-  
-  // API key configuration
-  document.getElementById('save-api-keys-btn').addEventListener('click', saveAPIKeys);
 }
 
 async function handleLogin() {
@@ -165,30 +161,12 @@ function showUserDashboard(user) {
   document.getElementById('user-role').textContent = user.role;
   document.getElementById('user-plan').textContent = user.subscriptionStatus;
   
-  // Load existing API keys
-  loadAPIKeys();
+  // Note: API keys are now hardcoded - no need to load
   
   clearMessages();
 }
 
 
-async function checkConnectionStatus() {
-  try {
-    updateStatus('Checking connection...', false);
-    
-    // Check if user is authenticated
-    const authResult = await sendToBackground('masterAuth_getCurrentUser');
-    
-    if (authResult.success && authResult.isAuthenticated) {
-      updateStatus('✅ Connected and authenticated', false);
-    } else {
-      updateStatus('🔐 Please sign in to continue', true);
-    }
-  } catch (error) {
-    console.error('❌ Connection check failed:', error);
-    updateStatus('❌ Connection check failed', true);
-  }
-}
 
 
 
@@ -243,73 +221,25 @@ function clearMessages() {
   document.getElementById('auth-success').style.display = 'none';
 }
 
-function updateStatus(message, isError) {
-  const statusText = document.getElementById('status-text');
-  const statusDot = document.getElementById('status-dot');
-  
-  if (statusText) statusText.textContent = message;
-  if (statusDot) {
-    statusDot.style.backgroundColor = isError ? '#f56565' : '#48bb78';
-  }
-}
 
 // ===========================
-// API KEY CONFIGURATION
+// HARDCODED GEMINI 2.0 PRO API KEY
 // ===========================
+// Google Gemini 2.0 Pro API key is hardcoded for all users
+const GEMINI_API_KEY = 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs';
 
-async function loadAPIKeys() {
+// Store the hardcoded API key in storage for service worker access
+async function initializeAPIKey() {
   try {
-    const storage = await chrome.storage.sync.get(['geminiApiKey', 'claudeApiKey', 'openaiApiKey']);
-    
-    // Show masked versions of existing keys
-    if (storage.geminiApiKey) {
-      document.getElementById('gemini-api-key').placeholder = '••••••••••••••••';
-    }
-    if (storage.claudeApiKey) {
-      document.getElementById('claude-api-key').placeholder = '••••••••••••••••';
-    }
-    if (storage.openaiApiKey) {
-      document.getElementById('openai-api-key').placeholder = '••••••••••••••••';
-    }
+    await chrome.storage.sync.set({ geminiApiKey: GEMINI_API_KEY });
+    console.log('✅ Hardcoded Gemini 2.0 Pro API key initialized');
   } catch (error) {
-    console.error('❌ Error loading API keys:', error);
+    console.error('❌ Error initializing Gemini 2.0 Pro API key:', error);
   }
 }
 
-async function saveAPIKeys() {
-  try {
-    const geminiKey = document.getElementById('gemini-api-key').value.trim();
-    const claudeKey = document.getElementById('claude-api-key').value.trim();
-    const openaiKey = document.getElementById('openai-api-key').value.trim();
-    
-    const updates = {};
-    
-    // Only update keys that have been entered
-    if (geminiKey) updates.geminiApiKey = geminiKey;
-    if (claudeKey) updates.claudeApiKey = claudeKey;
-    if (openaiKey) updates.openaiApiKey = openaiKey;
-    
-    if (Object.keys(updates).length === 0) {
-      showError('Please enter at least one API key to save', 'api-error');
-      return;
-    }
-    
-    await chrome.storage.sync.set(updates);
-    
-    // Clear the input fields
-    document.getElementById('gemini-api-key').value = '';
-    document.getElementById('claude-api-key').value = '';
-    document.getElementById('openai-api-key').value = '';
-    
-    // Update placeholders to show keys are saved
-    await loadAPIKeys();
-    
-    showSuccess('API keys saved successfully!', 'api-success');
-  } catch (error) {
-    console.error('❌ Error saving API keys:', error);
-    showError('Failed to save API keys. Please try again.', 'api-error');
-  }
-}
+// Initialize API key when popup loads
+initializeAPIKey();
 
 // Helper function to send messages to background script
 function sendToBackground(action, data = {}) {

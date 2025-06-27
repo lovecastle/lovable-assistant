@@ -336,9 +336,13 @@ class LovableDetector {
       }
       
       // Set a timeout for the message to prevent hanging
+      // Use longer timeout for AI requests
+      const isAIRequest = message.action === 'callAI';
+      const timeoutDuration = isAIRequest ? 60000 : 10000; // 60 seconds for AI, 10 seconds for others
+      
       const messagePromise = chrome.runtime.sendMessage(message);
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Message timeout after 10 seconds')), 10000);
+        setTimeout(() => reject(new Error(`Message timeout after ${timeoutDuration/1000} seconds`)), timeoutDuration);
       });
       
       const response = await Promise.race([messagePromise, timeoutPromise]);
