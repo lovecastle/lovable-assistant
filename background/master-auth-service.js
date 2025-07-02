@@ -253,6 +253,11 @@ export class MasterAuthService {
     }
   }
 
+  // Get current session token for API calls
+  getSessionToken() {
+    return this.sessionToken;
+  }
+
   // Restore session from storage
   async restoreSession() {
     try {

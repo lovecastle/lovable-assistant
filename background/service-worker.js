@@ -12,22 +12,15 @@ chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
   chrome.storage.sync.set({
     autoCapture: true,
-    notificationEnabled: false,
-    geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
+    notificationEnabled: false
   });
 });
 
-// Initialize API key and restore session when service worker starts
+// Restore session when service worker starts
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('🔄 Service Worker starting - initializing API key and restoring session...');
+  console.log('🔄 Service Worker starting - restoring session...');
   
   try {
-    // Initialize hardcoded Gemini API key
-    await chrome.storage.sync.set({
-      geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
-    });
-    console.log('✅ Hardcoded Gemini API key initialized on startup');
-    
     const restored = await masterAuth.restoreSession();
     if (restored) {
       console.log('✅ Session restored on startup');
@@ -35,19 +28,13 @@ chrome.runtime.onStartup.addListener(async () => {
       console.log('ℹ️ No session to restore on startup');
     }
   } catch (error) {
-    console.error('❌ Failed to initialize on startup:', error);
+    console.error('❌ Failed to restore session on startup:', error);
   }
 });
 
-// Initialize Gemini API key and restore session when the service worker first loads
+// Restore session when the service worker first loads
 (async () => {
   try {
-    // Initialize hardcoded Gemini API key
-    await chrome.storage.sync.set({
-      geminiApiKey: 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs'
-    });
-    console.log('✅ Hardcoded Gemini API key initialized in service worker');
-    
     console.log('🔄 Service Worker loaded - attempting session restore...');
     const restored = await masterAuth.restoreSession();
     if (restored) {
@@ -2757,46 +2744,74 @@ async function handleCallAI(data) {
       return { success: false, error: 'Prompt is required' };
     }
 
-    // Get Gemini API key from chrome storage
-    const storage = await chrome.storage.sync.get(['geminiApiKey']);
+    // Check if user is authenticated
+    const authResult = await masterAuth.getCurrentUser();
+    if (!authResult.isAuthenticated) {
+      return { success: false, error: 'User not authenticated. Please sign in to use AI features.' };
+    }
+
+    // Get user's session token
+    const sessionToken = masterAuth.getSessionToken();
+    console.log('🔍 Session token available:', !!sessionToken);
+    console.log('🔍 Session token length:', sessionToken ? sessionToken.length : 0);
     
-    if (!storage.geminiApiKey) {
-      return { success: false, error: 'Gemini API key not configured. Please add it in the extension popup.' };
+    if (!sessionToken) {
+      return { success: false, error: 'No valid session. Please sign in again.' };
     }
     
-    const response = await callGeminiAPI(prompt, storage.geminiApiKey);
-    return { success: true, data: response };
+    const response = await callSecureAIProxy(prompt, sessionToken);
+    return response;
   } catch (error) {
     console.error('❌ Error calling AI:', error);
     return { success: false, error: error.message };
   }
 }
 
-async function callGeminiAPI(prompt, apiKey) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: prompt
-        }]
-      }]
-    })
-  });
+async function callSecureAIProxy(prompt, sessionToken) {
+  try {
+    console.log('🔍 Making AI proxy request with token:', sessionToken ? 'Token present' : 'No token');
+    console.log('🔍 Calling endpoint:', `${masterAuth.masterDbUrl}/functions/v1/ai-proxy`);
+    
+    // Call the secure Supabase Edge Function
+    const response = await fetch(`${masterAuth.masterDbUrl}/functions/v1/ai-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`,
+        'apikey': masterAuth.masterDbKey
+      },
+      body: JSON.stringify({
+        prompt: prompt
+      })
+    });
 
-  if (!response.ok) {
-    throw new Error(`Gemini 2.0 Flash API error: ${response.status} ${response.statusText}`);
-  }
+    console.log('🔍 AI proxy response status:', response.status);
 
-  const data = await response.json();
-  
-  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    return data.candidates[0].content.parts[0].text;
-  } else {
-    throw new Error('Invalid response format from Gemini 2.0 Flash API');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ AI proxy error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Unknown error' };
+      }
+      
+      throw new Error(errorData.error || `AI proxy error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ AI proxy success:', data.success ? 'Success' : 'Failed');
+    
+    if (data.success && data.data) {
+      return { success: true, data: data.data };
+    } else {
+      throw new Error(data.error || 'Invalid response from AI proxy');
+    }
+  } catch (error) {
+    console.error('❌ Secure AI proxy error:', error);
+    throw error;
   }
 }
 

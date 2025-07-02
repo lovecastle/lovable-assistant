@@ -812,7 +812,7 @@ window.UIDialogManager = {
     }
   },
 
-  showSettingsPage() {
+  async showSettingsPage() {
     const content = document.getElementById('dialog-content');
     const title = document.getElementById('dialog-title');
     
@@ -821,6 +821,17 @@ window.UIDialogManager = {
     }
     
     if (!content) return;
+    
+    // Get current user information
+    let userInfo = null;
+    try {
+      const authResponse = await this.safeSendMessage({ action: 'masterAuth_getCurrentUser' });
+      if (authResponse.success && authResponse.isAuthenticated) {
+        userInfo = authResponse.user;
+      }
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+    }
     
     content.innerHTML = `
       <div style="padding: 24px;">
@@ -838,14 +849,62 @@ window.UIDialogManager = {
           <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
             🔐 Account Settings
           </h3>
-          <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
-            Manage your account settings and preferences.
-          </p>
+          
+          ${userInfo ? `
+            <div style="margin-bottom: 20px;">
+              <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <label style="color: #4a5568; font-size: 14px; font-weight: 500; display: block; margin-bottom: 4px;">Email:</label>
+                    <span style="color: #1a202c; font-size: 14px;">${userInfo.email}</span>
+                  </div>
+                  <a id="change-email-btn" style="
+                    color: #667eea; font-size: 13px; text-decoration: none; cursor: pointer;
+                    border-bottom: 1px solid transparent; transition: border-color 0.2s;
+                  " onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='transparent'">Change Email</a>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label style="color: #4a5568; font-size: 14px; font-weight: 500;">Password:</label>
+                  <a id="change-password-btn" style="
+                    color: #667eea; font-size: 13px; text-decoration: none; cursor: pointer;
+                    border-bottom: 1px solid transparent; transition: border-color 0.2s;
+                  " onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='transparent'">Change Password</a>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <label style="color: #4a5568; font-size: 14px; font-weight: 500;">Subscription:</label>
+                  <span style="
+                    color: ${userInfo.subscriptionStatus === 'active' ? '#48bb78' : '#f56565'}; 
+                    font-size: 14px; 
+                    font-weight: 600;
+                    text-transform: capitalize;
+                  ">${userInfo.subscriptionStatus || 'Free'}</span>
+                </div>
+                ${userInfo.subscriptionExpiresAt ? `
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="color: #4a5568; font-size: 14px; font-weight: 500;">Expires:</label>
+                    <span style="color: #1a202c; font-size: 14px;">
+                      ${new Date(userInfo.subscriptionExpiresAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : `
+            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px;">
+              Loading account information...
+            </p>
+          `}
           
           <div style="display: flex; gap: 8px;">
             <button id="logout-btn" style="
-              background: #f56565; color: white; border: none; padding: 10px 16px;
-              border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+              background: #f56565; color: white; border: none; padding: 8px 14px;
+              border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
             ">Sign Out</button>
           </div>
         </div>
@@ -877,6 +936,205 @@ window.UIDialogManager = {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => this.handleLogout());
+    }
+    
+    // Change email button
+    const changeEmailBtn = document.getElementById('change-email-btn');
+    if (changeEmailBtn) {
+      changeEmailBtn.addEventListener('click', () => this.showChangeEmailDialog());
+    }
+    
+    // Change password button
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    if (changePasswordBtn) {
+      changePasswordBtn.addEventListener('click', () => this.showChangePasswordDialog());
+    }
+  },
+  
+  showChangeEmailDialog() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '📧 Change Email';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 24px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-settings-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Settings</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            Change Email Address
+          </h3>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: #4a5568; font-size: 14px; margin-bottom: 8px;">New Email</label>
+            <input type="email" id="new-email" placeholder="Enter new email address" style="
+              width: 100%; padding: 10px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; color: #1a202c;
+            ">
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: #4a5568; font-size: 14px; margin-bottom: 8px;">Current Password</label>
+            <input type="password" id="confirm-password" placeholder="Enter your password" style="
+              width: 100%; padding: 10px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; color: #1a202c;
+            ">
+          </div>
+          
+          <div id="email-change-error" style="
+            display: none; background: #fed7d7; color: #c53030; padding: 12px;
+            border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+          "></div>
+          
+          <div id="email-change-success" style="
+            display: none; background: #c6f6d5; color: #22543d; padding: 12px;
+            border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+          "></div>
+          
+          <button id="update-email-btn" style="
+            background: #667eea; color: white; border: none; padding: 10px 20px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+          ">Update Email</button>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('back-to-settings-btn')?.addEventListener('click', () => this.showSettingsPage());
+    document.getElementById('update-email-btn')?.addEventListener('click', () => this.handleChangeEmail());
+  },
+  
+  showChangePasswordDialog() {
+    const content = document.getElementById('dialog-content');
+    const title = document.getElementById('dialog-title');
+    
+    if (title) {
+      title.textContent = '🔑 Change Password';
+    }
+    
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div style="padding: 24px;">
+        <div style="margin-bottom: 20px;">
+          <button id="back-to-settings-btn" style="
+            background: #f7fafc; color: #4a5568; border: 1px solid #c9cfd7;
+            padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px;
+          ">← Back to Settings</button>
+        </div>
+        
+        <div style="background: white; border: 1px solid #c9cfd7; border-radius: 8px; padding: 20px;">
+          <h3 style="margin: 0 0 16px 0; color: #1a202c; font-size: 16px; font-weight: 600;">
+            Change Password
+          </h3>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: #4a5568; font-size: 14px; margin-bottom: 8px;">Current Password</label>
+            <input type="password" id="current-password" placeholder="Enter current password" style="
+              width: 100%; padding: 10px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; color: #1a202c;
+            ">
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: #4a5568; font-size: 14px; margin-bottom: 8px;">New Password</label>
+            <input type="password" id="new-password" placeholder="Enter new password (min 6 characters)" style="
+              width: 100%; padding: 10px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; color: #1a202c;
+            ">
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: #4a5568; font-size: 14px; margin-bottom: 8px;">Confirm New Password</label>
+            <input type="password" id="confirm-new-password" placeholder="Confirm new password" style="
+              width: 100%; padding: 10px; border: 1px solid #c9cfd7; border-radius: 6px;
+              font-size: 14px; color: #1a202c;
+            ">
+          </div>
+          
+          <div id="password-change-error" style="
+            display: none; background: #fed7d7; color: #c53030; padding: 12px;
+            border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+          "></div>
+          
+          <div id="password-change-success" style="
+            display: none; background: #c6f6d5; color: #22543d; padding: 12px;
+            border-radius: 6px; font-size: 14px; margin-bottom: 16px;
+          "></div>
+          
+          <button id="update-password-btn" style="
+            background: #667eea; color: white; border: none; padding: 10px 20px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;
+          ">Update Password</button>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('back-to-settings-btn')?.addEventListener('click', () => this.showSettingsPage());
+    document.getElementById('update-password-btn')?.addEventListener('click', () => this.handleChangePassword());
+  },
+  
+  async handleChangeEmail() {
+    const newEmail = document.getElementById('new-email')?.value.trim();
+    const password = document.getElementById('confirm-password')?.value;
+    
+    if (!newEmail || !password) {
+      this.showChangeError('email-change-error', 'Please fill in all fields');
+      return;
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      this.showChangeError('email-change-error', 'Please enter a valid email address');
+      return;
+    }
+    
+    // TODO: Implement email change API call
+    this.showChangeError('email-change-error', 'Email change feature coming soon');
+  },
+  
+  async handleChangePassword() {
+    const currentPassword = document.getElementById('current-password')?.value;
+    const newPassword = document.getElementById('new-password')?.value;
+    const confirmPassword = document.getElementById('confirm-new-password')?.value;
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      this.showChangeError('password-change-error', 'Please fill in all fields');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      this.showChangeError('password-change-error', 'New password must be at least 6 characters');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      this.showChangeError('password-change-error', 'New passwords do not match');
+      return;
+    }
+    
+    // TODO: Implement password change API call
+    this.showChangeError('password-change-error', 'Password change feature coming soon');
+  },
+  
+  showChangeError(elementId, message) {
+    const errorElement = document.getElementById(elementId);
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+      setTimeout(() => {
+        errorElement.style.display = 'none';
+      }, 5000);
     }
   },
 

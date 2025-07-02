@@ -223,23 +223,10 @@ function clearMessages() {
 
 
 // ===========================
-// HARDCODED GEMINI 2.0 PRO API KEY
+// SECURE AI PROXY
 // ===========================
-// Google Gemini 2.0 Pro API key is hardcoded for all users
-const GEMINI_API_KEY = 'AIzaSyAOVowi8mG3prvCtZGHSzimec4oRNZp3Gs';
-
-// Store the hardcoded API key in storage for service worker access
-async function initializeAPIKey() {
-  try {
-    await chrome.storage.sync.set({ geminiApiKey: GEMINI_API_KEY });
-    console.log('✅ Hardcoded Gemini 2.0 Pro API key initialized');
-  } catch (error) {
-    console.error('❌ Error initializing Gemini 2.0 Pro API key:', error);
-  }
-}
-
-// Initialize API key when popup loads
-initializeAPIKey();
+// AI requests are now handled through secure Supabase Edge Functions
+// No API keys are stored in the extension for security
 
 // Helper function to send messages to background script
 function sendToBackground(action, data = {}) {

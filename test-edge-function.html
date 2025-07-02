@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>Test AI Proxy Edge Function</h1>
+    <button onclick="testFunction()">Test Function</button>
+    <div id="result"></div>
+
+    <script>
+        async function testFunction() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test without auth first to see if function responds
+                const response = await fetch('https://dwbrjztmskvzpyufwxnt.supabase.co/functions/v1/ai-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3YnJqenRtc2t2enB5dWZ3eG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTkyNTAsImV4cCI6MjA2MzU5NTI1MH0.t5qo1CEePXCxfdFRaVABMqR0TOX9DHIbHXb7Z8zFq1Q'
+                    },
+                    body: JSON.stringify({
+                        prompt: 'Hello'
+                    })
+                });
+                
+                const text = await response.text();
+                resultDiv.innerHTML = `
+                    <h3>Response:</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Body:</strong> ${text}</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
